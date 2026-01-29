@@ -1,0 +1,8 @@
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\NodeEditor\bin\Debug\NodeEditor.dll
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\NodeEditor\bin\Debug\NodeEditor.pdb
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\NodeEditor\obj\Debug\NodeEditor.csproj.AssemblyReference.cache
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\NodeEditor\obj\Debug\NodeEditor.Resources.resources
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\NodeEditor\obj\Debug\NodeEditor.csproj.GenerateResource.cache
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\NodeEditor\obj\Debug\NodeEditor.csproj.CoreCompileInputs.cache
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\NodeEditor\obj\Debug\NodeEditor.dll
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\NodeEditor\obj\Debug\NodeEditor.pdb

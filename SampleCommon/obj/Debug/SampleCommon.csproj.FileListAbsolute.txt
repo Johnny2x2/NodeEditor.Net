@@ -1,0 +1,12 @@
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\bin\Debug\SampleCommon.dll
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\bin\Debug\SampleCommon.pdb
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\bin\Debug\NodeEditor.dll
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\bin\Debug\NodeEditor.pdb
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\obj\Debug\SampleCommon.csproj.AssemblyReference.cache
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\obj\Debug\SampleCommon.ControlNodeEditor.resources
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\obj\Debug\SampleCommon.Properties.Resources.resources
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\obj\Debug\SampleCommon.csproj.GenerateResource.cache
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\obj\Debug\SampleCommon.csproj.CoreCompileInputs.cache
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\obj\Debug\SampleCommon.csproj.CopyComplete
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\obj\Debug\SampleCommon.dll
+C:\Users\johnl\Source\Repos\johnlomba\NodeEditorRemake\SampleCommon\obj\Debug\SampleCommon.pdb

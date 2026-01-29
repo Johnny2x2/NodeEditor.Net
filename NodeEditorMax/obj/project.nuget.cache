@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "dgSpecHash": "K/BDjXzW9bE=",
+  "success": false,
+  "projectFilePath": "C:\\Users\\johnl\\source\\repos\\NodeEditorMax\\NodeEditorMax\\NodeEditorMax.csproj",
+  "expectedPackageFiles": [],
+  "logs": [
+    {
+      "code": "NU1301",
+      "level": "Error",
+      "message": "Unable to load the service index for source https://api.nuget.org/v3/index.json.\r\n  No such host is known. (api.nuget.org:443)\r\n  No such host is known.",
+      "projectPath": "C:\\Users\\johnl\\source\\repos\\NodeEditorMax\\NodeEditorMax\\NodeEditorMax.csproj",
+      "filePath": "C:\\Users\\johnl\\source\\repos\\NodeEditorMax\\NodeEditorMax\\NodeEditorMax.csproj",
+      "targetGraphs": []
+    },
+    {
+      "code": "NU1301",
+      "level": "Error",
+      "message": "Unable to load the service index for source https://api.nuget.org/v3/index.json.\r\n  No such host is known. (api.nuget.org:443)\r\n  No such host is known.",
+      "projectPath": "C:\\Users\\johnl\\source\\repos\\NodeEditorMax\\NodeEditorMax\\NodeEditorMax.csproj",
+      "filePath": "C:\\Users\\johnl\\source\\repos\\NodeEditorMax\\NodeEditorMax\\NodeEditorMax.csproj",
+      "targetGraphs": []
+    },
+    {
+      "code": "NU1900",
+      "level": "Warning",
+      "message": "Error occurred while getting package vulnerability data: Unable to load the service index for source https://api.nuget.org/v3/index.json.",
+      "projectPath": "C:\\Users\\johnl\\source\\repos\\NodeEditorMax\\NodeEditorMax\\NodeEditorMax.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\Users\\johnl\\source\\repos\\NodeEditorMax\\NodeEditorMax\\NodeEditorMax.csproj",
+      "targetGraphs": []
+    }
+  ]
+}
