@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using NodeEditor.Blazor.Services.Execution;
+using NodeEditor.Blazor.Services.Serialization;
 
 namespace NodeEditor.Blazor.Services;
 
@@ -42,6 +43,10 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<BackgroundExecutionQueue>();
         services.AddScoped<BackgroundExecutionWorker>();
         services.AddScoped<NodeExecutionService>();
+
+        // Register serialization services
+        services.AddSingleton<GraphSchemaMigrator>();
+        services.AddScoped<GraphSerializer>();
         
         return services;
     }
@@ -74,6 +79,9 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<BackgroundExecutionQueue>();
         services.AddScoped<BackgroundExecutionWorker>();
         services.AddScoped<NodeExecutionService>();
+
+        services.AddSingleton<GraphSchemaMigrator>();
+        services.AddScoped<GraphSerializer>();
         
         return services;
     }

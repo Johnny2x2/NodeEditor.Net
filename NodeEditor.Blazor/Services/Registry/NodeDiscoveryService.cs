@@ -129,7 +129,8 @@ public sealed class NodeDiscoveryService
                 attribute.IsCallable,
                 attribute.IsExecutionInitiator,
                 inputsSnapshot,
-                outputsSnapshot));
+                outputsSnapshot,
+                id));
     }
 
     private static SocketData CreateSocket(string name, Type type, bool isInput)

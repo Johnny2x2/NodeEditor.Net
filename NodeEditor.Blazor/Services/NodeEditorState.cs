@@ -352,6 +352,22 @@ public sealed class NodeEditorState
     public void RequestRedo() => RedoRequested?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
+    /// Clears all nodes, connections, selections, and resets viewport/zoom.
+    /// </summary>
+    public void Clear()
+    {
+        var nodesToRemove = Nodes.ToList();
+        foreach (var node in nodesToRemove)
+        {
+            RemoveNode(node.Data.Id);
+        }
+
+        ClearSelectionInternal();
+        Viewport = new Rect2D(0, 0, 0, 0);
+        Zoom = 1.0;
+    }
+
+    /// <summary>
     /// Internal method to clear selection without raising events.
     /// </summary>
     private void ClearSelectionInternal()
