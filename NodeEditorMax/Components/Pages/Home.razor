@@ -4,17 +4,40 @@
 @using NodeEditor.Blazor.Services
 @using NodeEditor.Blazor.ViewModels
 @using NodeEditor.Blazor.Services.Execution
+@using NodeEditorMax.Services
 @inject NodeEditorState EditorState
 @inject NodeExecutionService ExecutionService
+@inject GraphLibraryService GraphLibrary
 
 <div class="node-editor-toolbar">
-    <button @onclick="StartExecutionAsync" disabled="@_isExecuting">Start</button>
-    <button @onclick="StopExecution" disabled="@(!_isExecuting)">Stop</button>
-    <span class="execution-status">@_executionStatus</span>
-    @if (!string.IsNullOrWhiteSpace(_lastMessage))
-    {
-        <span class="execution-message">@_lastMessage</span>
-    }
+    <div class="execution-controls">
+        <button @onclick="StartExecutionAsync" disabled="@_isExecuting">Start</button>
+        <button @onclick="StopExecution" disabled="@(!_isExecuting)">Stop</button>
+        <span class="execution-status">@_executionStatus</span>
+        @if (!string.IsNullOrWhiteSpace(_lastMessage))
+        {
+            <span class="execution-message">@_lastMessage</span>
+        }
+    </div>
+
+    <div class="graph-settings">
+        <label class="graph-settings-label">Graph</label>
+        <select @bind="_selectedGraphName">
+            @foreach (var item in GraphLibrary.Items)
+            {
+                <option value="@item.Name">@item.Name</option>
+            }
+        </select>
+        <button @onclick="LoadSelectedGraphAsync" disabled="@(!_canLoadGraph)">Load</button>
+
+        <input placeholder="Save as..." @bind="_newGraphName" />
+        <button @onclick="SaveCurrentGraphAsync" disabled="@(!_canSaveGraph)">Save</button>
+
+        @if (!string.IsNullOrWhiteSpace(_graphStatus))
+        {
+            <span class="graph-status">@_graphStatus</span>
+        }
+    </div>
 </div>
 
 <NodePropertiesPanel State="EditorState" />
@@ -29,13 +52,29 @@
     private string _executionStatus = "Idle";
     private string? _lastMessage;
     private readonly SampleNodeContext _nodeContext = new();
+    private string? _selectedGraphName;
+    private string? _newGraphName = "My Graph";
+    private string? _graphStatus;
+    private bool _isLoadingGraph;
 
-    protected override void OnInitialized()
+    private bool _canLoadGraph =>
+        !_isExecuting && !_isLoadingGraph && !string.IsNullOrWhiteSpace(_selectedGraphName);
+
+    private bool _canSaveGraph =>
+        !_isExecuting && !string.IsNullOrWhiteSpace(_newGraphName);
+
+    protected override async Task OnInitializedAsync()
     {
-        // Add some sample nodes for testing
-        if (EditorState.Nodes.Count == 0)
+        await GraphLibrary.InitializeAsync();
+
+        if (GraphLibrary.Items.Count > 0)
         {
-            CreateSampleGraph();
+            _selectedGraphName ??= GraphLibrary.Items[0].Name;
+        }
+
+        if (EditorState.Nodes.Count == 0 && _selectedGraphName is not null)
+        {
+            await LoadSelectedGraphAsync();
         }
     }
 
@@ -95,128 +134,60 @@
         _executionCts?.Cancel();
     }
 
-    private void CreateSampleGraph()
+    private async Task LoadSelectedGraphAsync()
     {
-        // Node 1: Start node
-        var startNode = new NodeViewModel(new NodeData(
-            Id: "node-start",
-            Name: "Start",
-            Callable: true,
-            ExecInit: true,
-            Inputs: Array.Empty<SocketData>(),
-            Outputs: new[]
-            {
-                new SocketData("ExecOut", "execution", false, true)
-            }))
+        if (string.IsNullOrWhiteSpace(_selectedGraphName))
         {
-            Position = new Point2D(50, 100)
-        };
+            _graphStatus = "Select a graph to load.";
+            return;
+        }
 
-        // Node 2: Add operation
-        var valueANode = new NodeViewModel(new NodeData(
-            Id: "node-value-a",
-            Name: "Value",
-            Callable: false,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("Value", "int", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("Value", "int", false, false)
-            }))
+        _isLoadingGraph = true;
+        _graphStatus = null;
+
+        try
         {
-            Position = new Point2D(200, 20)
-        };
-
-        var valueBNode = new NodeViewModel(new NodeData(
-            Id: "node-value-b",
-            Name: "Value",
-            Callable: false,
-            ExecInit: false,
-            Inputs: new[]
+            var result = await GraphLibrary.LoadGraphAsync(_selectedGraphName, EditorState);
+            if (result.Warnings.Count > 0)
             {
-                new SocketData("Value", "int", true, false)
-            },
-            Outputs: new[]
+                _graphStatus = string.Join(" ", result.Warnings);
+            }
+            else
             {
-                new SocketData("Value", "int", false, false)
-            }))
+                _graphStatus = $"Loaded '{_selectedGraphName}'.";
+            }
+        }
+        catch (Exception ex)
         {
-            Position = new Point2D(200, 120)
-        };
-
-        var addNode = new NodeViewModel(new NodeData(
-            Id: "node-add",
-            Name: "Add",
-            Callable: false,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("A", "int", true, false),
-                new SocketData("B", "int", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("Result", "int", false, false)
-            }))
+            _graphStatus = ex.Message;
+        }
+        finally
         {
-            Position = new Point2D(450, 70)
-        };
+            _isLoadingGraph = false;
+        }
+    }
 
-        // Node 3: Print node
-        var printNode = new NodeViewModel(new NodeData(
-            Id: "node-print",
-            Name: "Print",
-            Callable: true,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("ExecIn", "execution", true, true),
-                new SocketData("Message", "string", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("ExecOut", "execution", false, true)
-            }))
+    private async Task SaveCurrentGraphAsync()
+    {
+        var name = _newGraphName?.Trim();
+        if (string.IsNullOrWhiteSpace(name))
         {
-            Position = new Point2D(300, 200)
-        };
+            _graphStatus = "Enter a name to save.";
+            return;
+        }
 
-        // Node 4: Constant
-        // Node 5: ToString
-        var toStringNode = new NodeViewModel(new NodeData(
-            Id: "node-tostring",
-            Name: "ToString",
-            Callable: false,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("Input", "object", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("Output", "string", false, false)
-            }))
+        _graphStatus = null;
+
+        try
         {
-            Position = new Point2D(550, 100)
-        };
-
-        // Add all nodes
-        EditorState.AddNode(startNode);
-        EditorState.AddNode(valueANode);
-        EditorState.AddNode(valueBNode);
-        EditorState.AddNode(addNode);
-        EditorState.AddNode(printNode);
-        EditorState.AddNode(toStringNode);
-
-        // Add connections
-        EditorState.AddConnection(new ConnectionData("node-start", "node-print", "ExecOut", "ExecIn", true));
-        EditorState.AddConnection(new ConnectionData("node-value-a", "node-add", "Value", "A", false));
-        EditorState.AddConnection(new ConnectionData("node-value-b", "node-add", "Value", "B", false));
-        EditorState.AddConnection(new ConnectionData("node-add", "node-tostring", "Result", "Input", false));
-        EditorState.AddConnection(new ConnectionData("node-tostring", "node-print", "Output", "Message", false));
+            await GraphLibrary.SaveGraphAsync(name, EditorState);
+            _selectedGraphName = name;
+            _graphStatus = $"Saved '{name}'.";
+        }
+        catch (Exception ex)
+        {
+            _graphStatus = ex.Message;
+        }
     }
 
     private sealed class SampleNodeContext : INodeMethodContext

@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using NodeEditor.Blazor.Services;
 using NodeEditor.Blazor.Services.Plugins;
+using NodeEditorMax.Services;
 
 namespace NodeEditorMax
 {
@@ -21,6 +22,7 @@ namespace NodeEditorMax
             
             // Register Node Editor services
             builder.Services.AddNodeEditor();
+            builder.Services.AddScoped<GraphLibraryService>();
             builder.Services.Configure<PluginOptions>(options =>
             {
                 options.PluginDirectory = "plugins";
