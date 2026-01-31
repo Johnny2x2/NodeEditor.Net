@@ -1,5 +1,5 @@
-@using NodeEditor.Blazor.Services
 @using NodeEditor.Blazor.ViewModels
+@using NodeEditor.Blazor.Models
 
 <div class="ne-node @(Node.IsSelected ? "ne-node--selected" : "")"
      style="@NodeStyle"
@@ -7,8 +7,7 @@
      @onpointerdown:stopPropagation
      @key="Node.Data.Id">
     
-            <div class="ne-node-header"
-                @onpointerdown="OnHeaderPointerDown">
+    <div class="ne-node-header">
         @if (Node.Data.Callable)
         {
             <span class="ne-node-exec-icon" title="Callable node">▶</span>
@@ -23,6 +22,8 @@
             {
                 <SocketComponent Socket="input"
                                  NodeId="@Node.Data.Id"
+                                 Node="Node"
+                                 IsConnected="IsInputConnected(input)"
                                  OnPointerDown="@OnSocketPointerDown"
                                  OnPointerUp="@OnSocketPointerUp"
                                  @key="@($"in-{input.Data.Name}")" />
@@ -35,6 +36,7 @@
             {
                 <SocketComponent Socket="output"
                                  NodeId="@Node.Data.Id"
+                                 Node="Node"
                                  OnPointerDown="@OnSocketPointerDown"
                                  OnPointerUp="@OnSocketPointerUp"
                                  @key="@($"out-{output.Data.Name}")" />
@@ -48,6 +50,9 @@
     public NodeViewModel Node { get; set; } = null!;
 
     [Parameter]
+    public IReadOnlyList<ConnectionData> Connections { get; set; } = Array.Empty<ConnectionData>();
+
+    [Parameter]
     public EventCallback<SocketPointerEventArgs> OnSocketPointerDown { get; set; }
 
     [Parameter]
@@ -56,38 +61,53 @@
     [Parameter]
     public EventCallback<NodePointerEventArgs> OnNodeDragStart { get; set; }
 
-    [CascadingParameter]
-    private NodeEditorState? EditorState { get; set; }
-
     private string NodeStyle =>
         $"left: {Node.Position.X}px; top: {Node.Position.Y}px; " +
         $"width: {Node.Size.Width}px; min-height: {Node.Size.Height}px;";
 
-    private void OnNodePointerDown(PointerEventArgs e)
+    private async Task OnNodePointerDown(PointerEventArgs e)
     {
-        if (e.Button == 0 && EditorState is not null)
+        if (e.Button == 0)
         {
             // Ctrl/Shift+click for multi-select, otherwise single select
             if (e.CtrlKey || e.ShiftKey)
             {
-                EditorState.ToggleSelectNode(Node.Data.Id);
+                OnToggleSelectNode();
+                return;
             }
             else
             {
-                EditorState.SelectNode(Node.Data.Id, clearExisting: true);
+                OnSelectNode();
+            }
+
+            if (OnNodeDragStart.HasDelegate)
+            {
+                await OnNodeDragStart.InvokeAsync(new NodePointerEventArgs
+                {
+                    NodeId = Node.Data.Id,
+                    Position = new Point2D(e.ClientX, e.ClientY)
+                });
             }
         }
     }
 
-    private async Task OnHeaderPointerDown(PointerEventArgs e)
+    [CascadingParameter]
+    private NodeEditorState? EditorState { get; set; }
+
+    private void OnSelectNode()
     {
-        if (e.Button == 0 && OnNodeDragStart.HasDelegate)
-        {
-            await OnNodeDragStart.InvokeAsync(new NodePointerEventArgs
-            {
-                NodeId = Node.Data.Id,
-                Position = new Point2D(e.ClientX, e.ClientY)
-            });
-        }
+        EditorState?.SelectNode(Node.Data.Id, clearExisting: true);
+    }
+
+    private void OnToggleSelectNode()
+    {
+        EditorState?.ToggleSelectNode(Node.Data.Id);
+    }
+
+    private bool IsInputConnected(SocketViewModel socket)
+    {
+        return Connections.Any(c =>
+            c.InputNodeId == Node.Data.Id &&
+            c.InputSocketName == socket.Data.Name);
     }
 }

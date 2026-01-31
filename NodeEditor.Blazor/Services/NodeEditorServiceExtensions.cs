@@ -31,10 +31,16 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<Registry.NodeDiscoveryService>();
         services.AddSingleton<Registry.NodeRegistryService>();
 
+        // Register custom editors
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.TextEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.NumericEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.BoolEditorDefinition>();
+        services.AddSingleton<Editors.NodeEditorCustomEditorRegistry>();
+
         // Register execution services
         services.AddSingleton<ExecutionPlanner>();
         services.AddSingleton<BackgroundExecutionQueue>();
-        services.AddSingleton<BackgroundExecutionWorker>();
+        services.AddScoped<BackgroundExecutionWorker>();
         services.AddScoped<NodeExecutionService>();
         
         return services;
@@ -59,9 +65,14 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<Registry.NodeDiscoveryService>();
         services.AddSingleton<Registry.NodeRegistryService>();
 
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.TextEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.NumericEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.BoolEditorDefinition>();
+        services.AddSingleton<Editors.NodeEditorCustomEditorRegistry>();
+
         services.AddSingleton<ExecutionPlanner>();
         services.AddSingleton<BackgroundExecutionQueue>();
-        services.AddSingleton<BackgroundExecutionWorker>();
+        services.AddScoped<BackgroundExecutionWorker>();
         services.AddScoped<NodeExecutionService>();
         
         return services;

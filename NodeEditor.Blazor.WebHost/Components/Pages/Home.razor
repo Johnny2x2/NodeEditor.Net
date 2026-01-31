@@ -1,0 +1,103 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@using NodeEditor.Blazor.Components
+@using NodeEditor.Blazor.Models
+@using NodeEditor.Blazor.Services
+@using NodeEditor.Blazor.ViewModels
+@using NodeEditor.Blazor.Services.Execution
+@inject NodeEditorState EditorState
+
+<PageTitle>Node Editor</PageTitle>
+
+<div class="node-editor-container">
+	<NodeEditorCanvas State="EditorState" />
+</div>
+
+@code {
+	protected override void OnInitialized()
+	{
+		if (EditorState.Nodes.Count == 0)
+		{
+			CreateSampleGraph();
+		}
+	}
+
+	private void CreateSampleGraph()
+	{
+		var startNode = new NodeViewModel(new NodeData(
+			Id: "node-start",
+			Name: "Start",
+			Callable: true,
+			ExecInit: true,
+			Inputs: Array.Empty<SocketData>(),
+			Outputs: new[]
+			{
+				new SocketData("Exit", typeof(ExecutionPath).FullName ?? "ExecutionPath", false, true)
+			}))
+		{
+			Position = new Point2D(60, 80)
+		};
+
+		var mathNode = new NodeViewModel(new NodeData(
+			Id: "node-math",
+			Name: "Add",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("A", "int", true, false),
+				new SocketData("B", "int", true, false)
+			},
+			Outputs: new[]
+			{
+				new SocketData("Result", "int", false, false)
+			}))
+		{
+			Position = new Point2D(320, 60)
+		};
+
+		var boolNode = new NodeViewModel(new NodeData(
+			Id: "node-bool",
+			Name: "Branch",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", typeof(ExecutionPath).FullName ?? "ExecutionPath", true, true),
+				new SocketData("Condition", "bool", true, false)
+			},
+			Outputs: new[]
+			{
+				new SocketData("True", typeof(ExecutionPath).FullName ?? "ExecutionPath", false, true),
+				new SocketData("False", typeof(ExecutionPath).FullName ?? "ExecutionPath", false, true)
+			}))
+		{
+			Position = new Point2D(320, 220)
+		};
+
+		var textNode = new NodeViewModel(new NodeData(
+			Id: "node-text",
+			Name: "Message",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Text", "string", true, false)
+			},
+			Outputs: new[]
+			{
+				new SocketData("Output", "string", false, false)
+			}))
+		{
+			Position = new Point2D(600, 120)
+		};
+
+		EditorState.AddNode(startNode);
+		EditorState.AddNode(mathNode);
+		EditorState.AddNode(boolNode);
+		EditorState.AddNode(textNode);
+
+		EditorState.AddConnection(new ConnectionData("node-start", "node-bool", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("node-math", "node-text", "Result", "Text", false));
+	}
+}

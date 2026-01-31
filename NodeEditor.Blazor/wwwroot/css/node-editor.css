@@ -333,6 +333,44 @@
 }
 
 /* ============================================
+   Socket Editors
+   ============================================ */
+.ne-socket-editor {
+    margin-left: 18px;
+    margin-top: 4px;
+    margin-bottom: 6px;
+}
+
+.ne-editor-input {
+    width: 120px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: #1f1f2b;
+    color: #e0e0f0;
+    font-size: 11px;
+    outline: none;
+}
+
+.ne-editor-input:focus {
+    border-color: rgba(102, 153, 255, 0.6);
+    box-shadow: 0 0 0 2px rgba(102, 153, 255, 0.2);
+}
+
+.ne-editor-bool {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.ne-editor-checkbox {
+    width: 14px;
+    height: 14px;
+}
+
+/* ============================================
    Responsive adjustments
    ============================================ */
 @media (max-width: 768px) {

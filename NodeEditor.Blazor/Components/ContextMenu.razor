@@ -72,10 +72,17 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_focusPending)
+        if (_focusPending && IsOpen)
         {
             _focusPending = false;
-            await _menuRef.FocusAsync();
+            try
+            {
+                await _menuRef.FocusAsync();
+            }
+            catch (JSException)
+            {
+                // Ignore focus errors if the element is no longer available.
+            }
         }
     }
 

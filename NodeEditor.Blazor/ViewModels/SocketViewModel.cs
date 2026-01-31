@@ -6,13 +6,23 @@ public sealed class SocketViewModel : ViewModelBase
 {
     private Point2D _position;
     private Size2D _size = new(12, 12);
+    private SocketData _data;
 
     public SocketViewModel(SocketData data)
     {
-        Data = data;
+        _data = data;
     }
 
-    public SocketData Data { get; }
+    public SocketData Data
+    {
+        get => _data;
+        private set => SetProperty(ref _data, value);
+    }
+
+    public void SetValue(object? value)
+    {
+        Data = Data with { Value = SocketValue.FromObject(value) };
+    }
 
     public Point2D Position
     {

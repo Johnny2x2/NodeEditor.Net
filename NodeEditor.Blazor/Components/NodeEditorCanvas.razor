@@ -41,16 +41,19 @@
         </svg>
 
         @* Node layer (HTML) - rendered above connections *@
-        <div class="ne-nodes">
-            @foreach (var node in State.Nodes)
-            {
-                <NodeComponent Node="node"
-                               @key="node.Data.Id"
-                               OnSocketPointerDown="OnSocketPointerDown"
-                               OnSocketPointerUp="OnSocketPointerUp"
-                               OnNodeDragStart="OnNodeDragStart" />
-            }
-        </div>
+        <CascadingValue Value="State">
+            <div class="ne-nodes">
+                @foreach (var node in State.Nodes)
+                {
+                    <NodeComponent Node="node"
+                                   Connections="State.Connections"
+                                   @key="node.Data.Id"
+                                   OnSocketPointerDown="OnSocketPointerDown"
+                                   OnSocketPointerUp="OnSocketPointerUp"
+                                   OnNodeDragStart="OnNodeDragStart" />
+                }
+            </div>
+        </CascadingValue>
     </div>
 </div>
 
