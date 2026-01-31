@@ -106,14 +106,47 @@
             Inputs: Array.Empty<SocketData>(),
             Outputs: new[]
             {
-                new SocketData("ExecOut", "execution", false, true),
-                new SocketData("Value", "int", false, false)
+                new SocketData("ExecOut", "execution", false, true)
             }))
         {
             Position = new Point2D(50, 100)
         };
 
         // Node 2: Add operation
+        var valueANode = new NodeViewModel(new NodeData(
+            Id: "node-value-a",
+            Name: "Value",
+            Callable: false,
+            ExecInit: false,
+            Inputs: new[]
+            {
+                new SocketData("Value", "int", true, false)
+            },
+            Outputs: new[]
+            {
+                new SocketData("Value", "int", false, false)
+            }))
+        {
+            Position = new Point2D(200, 20)
+        };
+
+        var valueBNode = new NodeViewModel(new NodeData(
+            Id: "node-value-b",
+            Name: "Value",
+            Callable: false,
+            ExecInit: false,
+            Inputs: new[]
+            {
+                new SocketData("Value", "int", true, false)
+            },
+            Outputs: new[]
+            {
+                new SocketData("Value", "int", false, false)
+            }))
+        {
+            Position = new Point2D(200, 120)
+        };
+
         var addNode = new NodeViewModel(new NodeData(
             Id: "node-add",
             Name: "Add",
@@ -129,7 +162,7 @@
                 new SocketData("Result", "int", false, false)
             }))
         {
-            Position = new Point2D(300, 50)
+            Position = new Point2D(450, 70)
         };
 
         // Node 3: Print node
@@ -152,20 +185,6 @@
         };
 
         // Node 4: Constant
-        var constNode = new NodeViewModel(new NodeData(
-            Id: "node-const",
-            Name: "Constant: 42",
-            Callable: false,
-            ExecInit: false,
-            Inputs: Array.Empty<SocketData>(),
-            Outputs: new[]
-            {
-                new SocketData("Value", "int", false, false)
-            }))
-        {
-            Position = new Point2D(50, 250)
-        };
-
         // Node 5: ToString
         var toStringNode = new NodeViewModel(new NodeData(
             Id: "node-tostring",
@@ -186,15 +205,16 @@
 
         // Add all nodes
         EditorState.AddNode(startNode);
+        EditorState.AddNode(valueANode);
+        EditorState.AddNode(valueBNode);
         EditorState.AddNode(addNode);
         EditorState.AddNode(printNode);
-        EditorState.AddNode(constNode);
         EditorState.AddNode(toStringNode);
 
         // Add connections
         EditorState.AddConnection(new ConnectionData("node-start", "node-print", "ExecOut", "ExecIn", true));
-        EditorState.AddConnection(new ConnectionData("node-start", "node-add", "Value", "A", false));
-        EditorState.AddConnection(new ConnectionData("node-const", "node-add", "Value", "B", false));
+        EditorState.AddConnection(new ConnectionData("node-value-a", "node-add", "Value", "A", false));
+        EditorState.AddConnection(new ConnectionData("node-value-b", "node-add", "Value", "B", false));
         EditorState.AddConnection(new ConnectionData("node-add", "node-tostring", "Result", "Input", false));
         EditorState.AddConnection(new ConnectionData("node-tostring", "node-print", "Output", "Message", false));
     }
@@ -213,9 +233,8 @@
         }
 
         [Node("Start", isCallable: true, isExecutionInitiator: true)]
-        public void Start(out ExecutionPath ExecOut, out int Value)
+        public void Start(out ExecutionPath ExecOut)
         {
-            Value = 7;
             ExecOut = new ExecutionPath();
             ExecOut.Signal();
         }
@@ -234,10 +253,10 @@
             ExecOut.Signal();
         }
 
-        [Node("Constant: 42", isCallable: false)]
-        public void Constant(out int Value)
+        [Node("Value", isCallable: false)]
+        public void Value(int Value, out int Output)
         {
-            Value = 42;
+            Output = Value;
         }
 
         [Node("ToString", isCallable: false)]
