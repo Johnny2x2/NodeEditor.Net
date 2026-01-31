@@ -3,13 +3,33 @@
 @using NodeEditor.Blazor.Models
 @using NodeEditor.Blazor.Services
 @using NodeEditor.Blazor.ViewModels
+@using NodeEditor.Blazor.Services.Execution
 @inject NodeEditorState EditorState
+@inject NodeExecutionService ExecutionService
+
+<div class="node-editor-toolbar">
+    <button @onclick="StartExecutionAsync" disabled="@_isExecuting">Start</button>
+    <button @onclick="StopExecution" disabled="@(!_isExecuting)">Stop</button>
+    <span class="execution-status">@_executionStatus</span>
+    @if (!string.IsNullOrWhiteSpace(_lastMessage))
+    {
+        <span class="execution-message">@_lastMessage</span>
+    }
+</div>
+
+<NodePropertiesPanel State="EditorState" />
 
 <div class="node-editor-container">
     <NodeEditorCanvas State="EditorState" />
 </div>
 
 @code {
+    private CancellationTokenSource? _executionCts;
+    private bool _isExecuting;
+    private string _executionStatus = "Idle";
+    private string? _lastMessage;
+    private readonly SampleNodeContext _nodeContext = new();
+
     protected override void OnInitialized()
     {
         // Add some sample nodes for testing
@@ -17,6 +37,62 @@
         {
             CreateSampleGraph();
         }
+    }
+
+    private async Task StartExecutionAsync()
+    {
+        if (_isExecuting)
+        {
+            return;
+        }
+
+        _isExecuting = true;
+        _executionStatus = "Running";
+        _lastMessage = null;
+        _nodeContext.Reset();
+
+        _executionCts?.Dispose();
+        _executionCts = new CancellationTokenSource();
+
+        var context = new NodeExecutionContext();
+
+        try
+        {
+            await ExecutionService.ExecuteAsync(
+                EditorState.Nodes.Select(n => n.Data).ToList(),
+                EditorState.Connections.ToList(),
+                context,
+                _nodeContext,
+                null,
+                _executionCts.Token).ConfigureAwait(false);
+
+            _executionStatus = "Completed";
+        }
+        catch (OperationCanceledException)
+        {
+            _executionStatus = "Canceled";
+        }
+        catch (Exception ex)
+        {
+            _executionStatus = $"Failed: {ex.Message}";
+        }
+        finally
+        {
+            _isExecuting = false;
+            _lastMessage = _nodeContext.LastMessage;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void StopExecution()
+    {
+        if (!_isExecuting)
+        {
+            return;
+        }
+
+        _executionStatus = "Canceling";
+        _executionCts?.Cancel();
     }
 
     private void CreateSampleGraph()
@@ -121,5 +197,53 @@
         EditorState.AddConnection(new ConnectionData("node-const", "node-add", "Value", "B", false));
         EditorState.AddConnection(new ConnectionData("node-add", "node-tostring", "Result", "Input", false));
         EditorState.AddConnection(new ConnectionData("node-tostring", "node-print", "Output", "Message", false));
+    }
+
+    private sealed class SampleNodeContext : INodeMethodContext
+    {
+        public NodeData? CurrentProcessingNode { get; set; }
+
+        public event Action<string, NodeData, ExecutionFeedbackType, object?, bool>? FeedbackInfo;
+
+        public string? LastMessage { get; private set; }
+
+        public void Reset()
+        {
+            LastMessage = null;
+        }
+
+        [Node("Start", isCallable: true, isExecutionInitiator: true)]
+        public void Start(out ExecutionPath ExecOut, out int Value)
+        {
+            Value = 7;
+            ExecOut = new ExecutionPath();
+            ExecOut.Signal();
+        }
+
+        [Node("Add", isCallable: false)]
+        public void Add(int A, int B, out int Result)
+        {
+            Result = A + B;
+        }
+
+        [Node("Print", isCallable: true)]
+        public void Print(ExecutionPath ExecIn, string Message, out ExecutionPath ExecOut)
+        {
+            LastMessage = Message;
+            ExecOut = new ExecutionPath();
+            ExecOut.Signal();
+        }
+
+        [Node("Constant: 42", isCallable: false)]
+        public void Constant(out int Value)
+        {
+            Value = 42;
+        }
+
+        [Node("ToString", isCallable: false)]
+        public void ToStringNode(object Input, out string Output)
+        {
+            Output = Input?.ToString() ?? string.Empty;
+        }
     }
 }

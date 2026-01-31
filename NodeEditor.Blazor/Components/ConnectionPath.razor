@@ -72,7 +72,7 @@
                 // Socket position is relative to node
                 // Output sockets are on the right side
                 start = new Point2D(
-                    startNode.Position.X + startNode.Size.Width,
+                    startNode.Position.X + startNode.Size.Width - SocketDotCenterOffsetX,
                     startNode.Position.Y + CalculateSocketYOffset(startNode, outputSocket, isInput: false));
             }
         }
@@ -86,7 +86,7 @@
             {
                 // Input sockets are on the left side
                 end = new Point2D(
-                    endNode.Position.X,
+                    endNode.Position.X + SocketDotCenterOffsetX,
                     endNode.Position.Y + CalculateSocketYOffset(endNode, inputSocket, isInput: true));
             }
         }
@@ -96,10 +96,12 @@
 
     private double CalculateSocketYOffset(NodeViewModel node, SocketViewModel socket, bool isInput)
     {
-        // Header height + some padding
+        // Match layout metrics from node-editor.css
         const double headerHeight = 28;
+        const double bodyPaddingTop = 8;
+        const double socketPaddingTop = 2;
         const double socketSpacing = 24;
-        const double firstSocketOffset = headerHeight + 12;
+        const double firstSocketOffset = headerHeight + bodyPaddingTop + socketPaddingTop + SocketDotOuterRadius;
 
         var sockets = isInput ? node.Inputs : node.Outputs;
         var index = 0;
@@ -127,6 +129,9 @@
 
         return $"M {F(start.X)} {F(start.Y)} C {F(cp1.X)} {F(cp1.Y)}, {F(cp2.X)} {F(cp2.Y)}, {F(end.X)} {F(end.Y)}";
     }
+
+    private const double SocketDotOuterRadius = 8;
+    private const double SocketDotCenterOffsetX = 8 + SocketDotOuterRadius;
 
     // Format double for SVG (invariant culture, no trailing zeros)
     private static string F(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);

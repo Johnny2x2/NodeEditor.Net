@@ -101,12 +101,41 @@ h1:focus {
 }
 
 /* Node Editor Container */
-.node-editor-container {
+.node-editor-toolbar {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(20, 20, 30, 0.9);
+    color: #e0e0f0;
+    z-index: 10;
+    backdrop-filter: blur(6px);
+}
+
+.node-editor-toolbar button {
+    padding: 4px 10px;
+    border: 1px solid #3d3d5c;
+    background: #2d2d3d;
+    color: #e0e0f0;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.node-editor-toolbar button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.node-editor-container {
+    position: fixed;
+    top: 48px;
+    left: 0;
+    right: 0;
     bottom: 0;
     width: 100vw;
-    height: 100vh;
+    height: calc(100vh - 48px);
 }

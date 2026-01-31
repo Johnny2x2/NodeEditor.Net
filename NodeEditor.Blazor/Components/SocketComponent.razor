@@ -89,6 +89,9 @@
                 classes.Add("ne-socket--execution");
             else
                 classes.Add("ne-socket--data");
+
+            if (IsConnected)
+                classes.Add("ne-socket--connected");
                 
             return string.Join(" ", classes);
         }

@@ -238,6 +238,102 @@
 }
 
 /* ============================================
+   Properties Panel
+   ============================================ */
+.ne-properties-panel {
+    position: fixed;
+    top: 48px;
+    right: 12px;
+    width: 260px;
+    max-height: calc(100vh - 72px);
+    overflow: auto;
+    background: rgba(30, 30, 46, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    padding: 10px 12px;
+    color: #e0e0f0;
+    z-index: 12;
+}
+
+.ne-properties-header {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.ne-properties-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.ne-properties-section + .ne-properties-section {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ne-properties-subtitle {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.65);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.ne-properties-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.ne-properties-label {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ne-properties-value {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.ne-properties-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(136, 204, 136, 0.15);
+    color: #88cc88;
+}
+
+.ne-properties-empty {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 6px 0;
+}
+
+/* Fill socket when connected */
+.ne-socket--connected .ne-socket-dot {
+    background-color: currentColor;
+    border-color: rgba(255, 255, 255, 0.7);
+}
+
+.ne-socket--connected.ne-socket--execution .ne-socket-dot {
+    background-color: #ffffff !important;
+    border-color: #ffffff;
+}
+
+/* ============================================
    Context Menu
    ============================================ */
 .ne-context-menu {

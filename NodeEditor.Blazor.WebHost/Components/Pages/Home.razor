@@ -6,20 +6,95 @@
 @using NodeEditor.Blazor.ViewModels
 @using NodeEditor.Blazor.Services.Execution
 @inject NodeEditorState EditorState
+@inject NodeExecutionService ExecutionService
 
 <PageTitle>Node Editor</PageTitle>
+
+<div class="node-editor-toolbar">
+	<button @onclick="StartExecutionAsync" disabled="@_isExecuting">Start</button>
+	<button @onclick="StopExecution" disabled="@(!_isExecuting)">Stop</button>
+	<span class="execution-status">@_executionStatus</span>
+	@if (!string.IsNullOrWhiteSpace(_lastMessage))
+	{
+		<span class="execution-message">@_lastMessage</span>
+	}
+</div>
+
+<NodePropertiesPanel State="EditorState" />
 
 <div class="node-editor-container">
 	<NodeEditorCanvas State="EditorState" />
 </div>
 
 @code {
+	private CancellationTokenSource? _executionCts;
+	private bool _isExecuting;
+	private string _executionStatus = "Idle";
+	private string? _lastMessage;
+	private readonly SampleNodeContext _nodeContext = new();
+
 	protected override void OnInitialized()
 	{
 		if (EditorState.Nodes.Count == 0)
 		{
 			CreateSampleGraph();
 		}
+	}
+
+	private async Task StartExecutionAsync()
+	{
+		if (_isExecuting)
+		{
+			return;
+		}
+
+		_isExecuting = true;
+		_executionStatus = "Running";
+		_lastMessage = null;
+		_nodeContext.Reset();
+
+		_executionCts?.Dispose();
+		_executionCts = new CancellationTokenSource();
+
+		var context = new NodeExecutionContext();
+
+		try
+		{
+			await ExecutionService.ExecuteAsync(
+				EditorState.Nodes.Select(n => n.Data).ToList(),
+				EditorState.Connections.ToList(),
+				context,
+				_nodeContext,
+				null,
+				_executionCts.Token).ConfigureAwait(false);
+
+			_executionStatus = "Completed";
+		}
+		catch (OperationCanceledException)
+		{
+			_executionStatus = "Canceled";
+		}
+		catch (Exception ex)
+		{
+			_executionStatus = $"Failed: {ex.Message}";
+		}
+		finally
+		{
+			_isExecuting = false;
+			_lastMessage = _nodeContext.LastMessage;
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private void StopExecution()
+	{
+		if (!_isExecuting)
+		{
+			return;
+		}
+
+		_executionStatus = "Canceling";
+		_executionCts?.Cancel();
 	}
 
 	private void CreateSampleGraph()
@@ -38,6 +113,40 @@
 			Position = new Point2D(60, 80)
 		};
 
+		var valueANode = new NodeViewModel(new NodeData(
+			Id: "node-value-a",
+			Name: "Value",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Value", "int", true, false)
+			},
+			Outputs: new[]
+			{
+				new SocketData("Value", "int", false, false)
+			}))
+		{
+			Position = new Point2D(200, 20)
+		};
+
+		var valueBNode = new NodeViewModel(new NodeData(
+			Id: "node-value-b",
+			Name: "Value",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Value", "int", true, false)
+			},
+			Outputs: new[]
+			{
+				new SocketData("Value", "int", false, false)
+			}))
+		{
+			Position = new Point2D(200, 120)
+		};
+
 		var mathNode = new NodeViewModel(new NodeData(
 			Id: "node-math",
 			Name: "Add",
@@ -53,51 +162,102 @@
 				new SocketData("Result", "int", false, false)
 			}))
 		{
-			Position = new Point2D(320, 60)
+			Position = new Point2D(420, 70)
 		};
 
-		var boolNode = new NodeViewModel(new NodeData(
-			Id: "node-bool",
-			Name: "Branch",
-			Callable: true,
-			ExecInit: false,
-			Inputs: new[]
-			{
-				new SocketData("Enter", typeof(ExecutionPath).FullName ?? "ExecutionPath", true, true),
-				new SocketData("Condition", "bool", true, false)
-			},
-			Outputs: new[]
-			{
-				new SocketData("True", typeof(ExecutionPath).FullName ?? "ExecutionPath", false, true),
-				new SocketData("False", typeof(ExecutionPath).FullName ?? "ExecutionPath", false, true)
-			}))
-		{
-			Position = new Point2D(320, 220)
-		};
-
-		var textNode = new NodeViewModel(new NodeData(
-			Id: "node-text",
-			Name: "Message",
+		var toStringNode = new NodeViewModel(new NodeData(
+			Id: "node-tostring",
+			Name: "ToString",
 			Callable: false,
 			ExecInit: false,
 			Inputs: new[]
 			{
-				new SocketData("Text", "string", true, false)
+				new SocketData("Input", "object", true, false)
 			},
 			Outputs: new[]
 			{
 				new SocketData("Output", "string", false, false)
 			}))
 		{
-			Position = new Point2D(600, 120)
+			Position = new Point2D(600, 60)
+		};
+
+		var printNode = new NodeViewModel(new NodeData(
+			Id: "node-print",
+			Name: "Print",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", typeof(ExecutionPath).FullName ?? "ExecutionPath", true, true),
+				new SocketData("Message", "string", true, false)
+			},
+			Outputs: new[]
+			{
+				new SocketData("Exit", typeof(ExecutionPath).FullName ?? "ExecutionPath", false, true)
+			}))
+		{
+			Position = new Point2D(760, 120)
 		};
 
 		EditorState.AddNode(startNode);
+		EditorState.AddNode(valueANode);
+		EditorState.AddNode(valueBNode);
 		EditorState.AddNode(mathNode);
-		EditorState.AddNode(boolNode);
-		EditorState.AddNode(textNode);
+		EditorState.AddNode(toStringNode);
+		EditorState.AddNode(printNode);
 
-		EditorState.AddConnection(new ConnectionData("node-start", "node-bool", "Exit", "Enter", true));
-		EditorState.AddConnection(new ConnectionData("node-math", "node-text", "Result", "Text", false));
+		EditorState.AddConnection(new ConnectionData("node-start", "node-print", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("node-value-a", "node-math", "Value", "A", false));
+		EditorState.AddConnection(new ConnectionData("node-value-b", "node-math", "Value", "B", false));
+		EditorState.AddConnection(new ConnectionData("node-math", "node-tostring", "Result", "Input", false));
+		EditorState.AddConnection(new ConnectionData("node-tostring", "node-print", "Output", "Message", false));
+	}
+
+	private sealed class SampleNodeContext : INodeMethodContext
+	{
+		public NodeData? CurrentProcessingNode { get; set; }
+
+		public event Action<string, NodeData, ExecutionFeedbackType, object?, bool>? FeedbackInfo;
+
+		public string? LastMessage { get; private set; }
+
+		public void Reset()
+		{
+			LastMessage = null;
+		}
+
+		[Node("Start", isCallable: true, isExecutionInitiator: true)]
+		public void Start(out ExecutionPath Exit)
+		{
+			Exit = new ExecutionPath();
+			Exit.Signal();
+		}
+
+		[Node("Add", isCallable: false)]
+		public void Add(int A, int B, out int Result)
+		{
+			Result = A + B;
+		}
+
+		[Node("Value", isCallable: false)]
+		public void Value(int Value, out int Output)
+		{
+			Output = Value;
+		}
+
+		[Node("ToString", isCallable: false)]
+		public void ToStringNode(object Input, out string Output)
+		{
+			Output = Input?.ToString() ?? string.Empty;
+		}
+
+		[Node("Print", isCallable: true)]
+		public void Print(ExecutionPath Enter, string Message, out ExecutionPath Exit)
+		{
+			LastMessage = Message;
+			Exit = new ExecutionPath();
+			Exit.Signal();
+		}
 	}
 }
