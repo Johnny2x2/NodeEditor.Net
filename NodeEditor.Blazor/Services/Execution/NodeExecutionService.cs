@@ -141,14 +141,21 @@ public sealed class NodeExecutionService
         CancellationToken token)
     {
         var childContext = parentContext.CreateChild(group.Id);
+
+        foreach (var mapping in group.InputMappings)
+        {
+            var value = parentContext.GetSocketValue(group.Id, mapping.GroupSocketName);
+            childContext.SetSocketValue(mapping.NodeId, mapping.SocketName, value);
+        }
+
         var plan = _planner.BuildPlan(group.Nodes, group.Connections);
         await ExecutePlannedAsync(plan, group.Connections, childContext, nodeContext, options ?? NodeExecutionOptions.Default, token)
             .ConfigureAwait(false);
 
-        foreach (var output in group.Outputs)
+        foreach (var mapping in group.OutputMappings)
         {
-            var value = childContext.GetSocketValue(group.Id, output.Name);
-            parentContext.SetSocketValue(group.Id, output.Name, value);
+            var value = childContext.GetSocketValue(mapping.NodeId, mapping.SocketName);
+            parentContext.SetSocketValue(group.Id, mapping.GroupSocketName, value);
         }
     }
 

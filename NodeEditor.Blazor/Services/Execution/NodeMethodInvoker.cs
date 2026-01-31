@@ -49,6 +49,12 @@ public sealed class NodeMethodInvoker
             var isOut = parameter.IsOut;
             var socketName = parameter.Name ?? string.Empty;
 
+            if (parameterType == typeof(CancellationToken))
+            {
+                args[i] = token;
+                continue;
+            }
+
             if (isByRef)
             {
                 parameterType = parameterType.GetElementType() ?? parameterType;
