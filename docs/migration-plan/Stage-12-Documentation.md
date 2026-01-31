@@ -1,5 +1,19 @@
 # Stage 12 — Documentation & Migration Guide
 
+## Status: 🔴 Not Started
+
+### What's Done
+- ✅ Stage documentation exists in `docs/migration-plan/`
+- ✅ Inline XML docs on services and models
+
+### What's Remaining
+- ❌ Library README with quick start
+- ❌ API reference documentation
+- ❌ Migration guide (WinForms → Blazor mapping)
+- ❌ Working sample project
+- ❌ Custom node tutorial
+- ❌ Troubleshooting guide
+
 ## Goal
 Provide clear guidance for users migrating from WinForms to MAUI Blazor.
 
@@ -58,7 +72,75 @@ NodeGraph        -> NodeEditorCanvas
 - **Versioned docs** aligned with package versions
 - **Sample project** with working graph
 
+## Implementation Notes (for next developer)
+
+### Documentation Structure
+```
+docs/
+├── README.md                    # Quick start, installation
+├── API.md                       # Public API reference
+├── MIGRATION.md                 # WinForms to Blazor guide
+├── CUSTOM-NODES.md              # Creating custom nodes
+├── TROUBLESHOOTING.md           # Common issues and solutions
+└── samples/
+    └── BasicNodeEditor/         # Complete working sample
+```
+
+### Migration Mapping Table
+Include in `MIGRATION.md`:
+
+| WinForms (Legacy) | Blazor (New) | Notes |
+|-------------------|--------------|-------|
+| `NodeGraph` | `NodeEditorCanvas` | Main canvas component |
+| `NodeVisual` | `NodeViewModel` + `NodeComponent` | Separated model and view |
+| `SocketVisual` | `SocketViewModel` + `SocketComponent` | |
+| `NodeConnection` | `ConnectionData` | Immutable record |
+| `NodeManager` | `NodeExecutionService` | Execution engine |
+| `INodesContext` | `INodeContext` | Node method container |
+| `NodeAttribute` | `NodeAttribute` (ported) | Same concept |
+| `FeedbackInfo` | `FeedbackInfo` (ported) | Execution control |
+| `NodeControl` | `NodeEditorState` | State management |
+
+### Quick Start Guide
+```markdown
+## Installation
+
+1. Add project reference to NodeEditor.Blazor
+2. Register services in Program.cs:
+   ```csharp
+   builder.Services.AddNodeEditor();
+   ```
+3. Add CSS to index.html:
+   ```html
+   <link rel="stylesheet" href="_content/NodeEditor.Blazor/css/node-editor.css" />
+   ```
+4. Use the canvas component:
+   ```razor
+   @inject NodeEditorState EditorState
+   <NodeEditorCanvas State="EditorState" />
+   ```
+```
+
+### Custom Node Tutorial Outline
+1. Create a class implementing `INodeContext`
+2. Add methods with `[Node]` attribute
+3. Define inputs/outputs via method parameters and return type
+4. Register the context with DI
+5. Nodes appear in context menu automatically
+
+### API Reference Format
+For each public class/interface:
+- Purpose (one sentence)
+- Constructor/parameters
+- Properties
+- Methods
+- Events
+- Example usage
+
 ## Checklist
 - [ ] Migration guide covers common WinForms patterns
 - [ ] Each public API has usage examples
 - [ ] Troubleshooting section covers top 5 issues
+- [ ] Sample project builds and runs
+- [ ] Plugin guidance includes iOS restriction
+- [ ] Version-specific documentation

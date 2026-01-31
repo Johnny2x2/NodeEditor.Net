@@ -1,5 +1,18 @@
 # Stage 05 — Execution Engine
 
+## Status: 🔴 Not Started
+
+### What's Done
+- ✅ `NodeData` and `ConnectionData` models ready for execution
+- ✅ `SocketValue` with type-safe serialization
+
+### What's Remaining
+- ❌ `NodeExecutionService` - main execution orchestrator
+- ❌ `INodeExecutionContext` - variable storage and outputs
+- ❌ Port `Resolve()` algorithm from legacy `NodeGraph.cs`
+- ❌ Port `FeedbackInfo` mechanism for execution flow control
+- ❌ Node method binding via reflection
+
 ## Goal
 Port NodeManager execution logic into a service layer compatible with MAUI/Blazor.
 
@@ -80,7 +93,55 @@ public sealed class NodeExecutionService
 - **Error routing**: determine how execution errors are surfaced in UI
 - **Loop protection**: guard against infinite loops with iteration limits
 
+## Implementation Notes (for next developer)
+
+### Legacy Code to Port
+The execution logic lives in the original `NodeEditor` project:
+- `NodeManager.cs` - Main execution orchestrator
+- `NodeGraph.cs` - Contains `Resolve()` method for dependency resolution
+- `ExecutionPath.cs` - Tracks execution flow
+- `FeedbackType.cs` - Enum for execution control (Break, Continue, Wait, True, False, None)
+
+### Key Algorithm: Resolve()
+The `Resolve()` method in `NodeGraph.cs` recursively resolves node inputs:
+1. Find connections feeding into the target socket
+2. Execute the source node if not yet executed
+3. Cache the output value
+4. Return the value for the input socket
+
+### FeedbackInfo Pattern
+Legacy uses `FeedbackInfo` to control execution flow:
+```csharp
+public struct FeedbackInfo
+{
+    public FeedbackType Type;  // Break, Continue, Wait, True, False, None
+    public object Value;
+}
+```
+This allows conditional nodes to signal which execution path to follow.
+
+### Recommended Service Structure
+```
+NodeEditor.Blazor/Services/Execution/
+├── NodeExecutionService.cs      # Main orchestrator
+├── INodeExecutionContext.cs     # Variable storage interface
+├── NodeExecutionContext.cs      # Default implementation
+├── NodeMethodInvoker.cs         # Reflection-based method binding
+├── ExecutionResult.cs           # Success/failure with values
+└── FeedbackInfo.cs             # Port from legacy
+```
+
+### INodesContext Equivalent
+Legacy uses `INodesContext` (implemented by `StandardNodeContext`) for node method implementations.
+Need to create `INodeContext` interface in Blazor that:
+- Provides methods for all standard nodes (math, conditions, etc.)
+- Is injectable and testable
+- Supports async operations
+
 ## Checklist
 - [ ] Execution is deterministic and matches WinForms output
 - [ ] Cancellation is respected at every node boundary
 - [ ] No UI references in execution code
+- [ ] `Resolve()` algorithm ported correctly
+- [ ] `FeedbackInfo` flow control working
+- [ ] Error aggregation and reporting

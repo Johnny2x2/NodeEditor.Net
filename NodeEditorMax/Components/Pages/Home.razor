@@ -1,5 +1,125 @@
 ﻿@page "/"
+@using NodeEditor.Blazor.Components
+@using NodeEditor.Blazor.Models
+@using NodeEditor.Blazor.Services
+@using NodeEditor.Blazor.ViewModels
+@inject NodeEditorState EditorState
 
-<h1>Hello, world!</h1>
+<div class="node-editor-container">
+    <NodeEditorCanvas State="EditorState" />
+</div>
 
-Welcome to your new app.
+@code {
+    protected override void OnInitialized()
+    {
+        // Add some sample nodes for testing
+        if (EditorState.Nodes.Count == 0)
+        {
+            CreateSampleGraph();
+        }
+    }
+
+    private void CreateSampleGraph()
+    {
+        // Node 1: Start node
+        var startNode = new NodeViewModel(new NodeData(
+            Id: "node-start",
+            Name: "Start",
+            Callable: true,
+            ExecInit: true,
+            Inputs: Array.Empty<SocketData>(),
+            Outputs: new[]
+            {
+                new SocketData("ExecOut", "execution", false, true),
+                new SocketData("Value", "int", false, false)
+            }))
+        {
+            Position = new Point2D(50, 100)
+        };
+
+        // Node 2: Add operation
+        var addNode = new NodeViewModel(new NodeData(
+            Id: "node-add",
+            Name: "Add",
+            Callable: false,
+            ExecInit: false,
+            Inputs: new[]
+            {
+                new SocketData("A", "int", true, false),
+                new SocketData("B", "int", true, false)
+            },
+            Outputs: new[]
+            {
+                new SocketData("Result", "int", false, false)
+            }))
+        {
+            Position = new Point2D(300, 50)
+        };
+
+        // Node 3: Print node
+        var printNode = new NodeViewModel(new NodeData(
+            Id: "node-print",
+            Name: "Print",
+            Callable: true,
+            ExecInit: false,
+            Inputs: new[]
+            {
+                new SocketData("ExecIn", "execution", true, true),
+                new SocketData("Message", "string", true, false)
+            },
+            Outputs: new[]
+            {
+                new SocketData("ExecOut", "execution", false, true)
+            }))
+        {
+            Position = new Point2D(300, 200)
+        };
+
+        // Node 4: Constant
+        var constNode = new NodeViewModel(new NodeData(
+            Id: "node-const",
+            Name: "Constant: 42",
+            Callable: false,
+            ExecInit: false,
+            Inputs: Array.Empty<SocketData>(),
+            Outputs: new[]
+            {
+                new SocketData("Value", "int", false, false)
+            }))
+        {
+            Position = new Point2D(50, 250)
+        };
+
+        // Node 5: ToString
+        var toStringNode = new NodeViewModel(new NodeData(
+            Id: "node-tostring",
+            Name: "ToString",
+            Callable: false,
+            ExecInit: false,
+            Inputs: new[]
+            {
+                new SocketData("Input", "object", true, false)
+            },
+            Outputs: new[]
+            {
+                new SocketData("Output", "string", false, false)
+            }))
+        {
+            Position = new Point2D(550, 100)
+        };
+
+        // Add all nodes
+        EditorState.AddNode(startNode);
+        EditorState.AddNode(addNode);
+        EditorState.AddNode(printNode);
+        EditorState.AddNode(constNode);
+        EditorState.AddNode(toStringNode);
+
+        // Add connections
+        EditorState.AddConnection(new ConnectionData("node-start", "node-print", "ExecOut", "ExecIn", true));
+        EditorState.AddConnection(new ConnectionData("node-start", "node-add", "Value", "A", false));
+        EditorState.AddConnection(new ConnectionData("node-const", "node-add", "Value", "B", false));
+        EditorState.AddConnection(new ConnectionData("node-add", "node-tostring", "Result", "Input", false));
+        EditorState.AddConnection(new ConnectionData("node-tostring", "node-print", "Output", "Message", false));
+    }
+}

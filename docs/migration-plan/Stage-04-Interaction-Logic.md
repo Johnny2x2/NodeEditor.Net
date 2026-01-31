@@ -1,5 +1,22 @@
 # Stage 04 — Interaction Logic
 
+## Status: 🟡 Partially Complete
+
+### What's Done
+- ✅ Pan via middle mouse button (`NodeEditorCanvas.razor`)
+- ✅ Zoom via mouse wheel with min/max limits
+- ✅ Node selection (click to select, Ctrl+click for multi-select)
+- ✅ `CoordinateConverter` service for screen ↔ graph conversions
+- ✅ Connection drag start/end events wired to sockets
+- ✅ Basic connection preview (pending connection)
+
+### What's Remaining
+- ❌ Node dragging (pointer events in place but drag delta not applied)
+- ❌ Connection type validation (IsExecution match, type compatibility)
+- ❌ Keyboard shortcuts (Delete, Escape, Ctrl+A)
+- ❌ Selection box (rubber band selection)
+- ❌ Undo/redo command infrastructure
+
 ## Goal
 Port mouse, keyboard, zoom, and drag behaviors from WinForms to Blazor event handlers.
 
@@ -81,11 +98,49 @@ public static class HitTest
 ```
 
 ## Missing Architecture Gaps (to close in this stage)
-- **Graph coordinate conversions**: `ScreenToGraph(Point2D)` and `GraphToScreen(Point2D)` helpers.
+- ~~**Graph coordinate conversions**: `ScreenToGraph(Point2D)` and `GraphToScreen(Point2D)` helpers.~~ ✅ Done in `CoordinateConverter.cs`
 - **Type compatibility**: connection validation strategy based on socket type + execution/data rules.
 - **Undo/redo hooks**: placeholder events for future history (even if not implemented yet).
+- **Node drag controller**: separate drag state from canvas, apply delta to node positions
+
+## Implementation Notes (for next developer)
+
+### Current Code Location
+- Canvas pointer handlers: `NodeEditor.Blazor/Components/NodeEditorCanvas.razor` (lines 107-150)
+- Coordinate conversion: `NodeEditor.Blazor/Services/CoordinateConverter.cs`
+- Socket events: `NodeEditor.Blazor/Components/NodeEditorCanvas.razor.cs` (`SocketPointerEventArgs`)
+
+### To Implement Node Dragging
+The canvas already tracks `_isDraggingNode` and `_draggingNode` but the `NodeComponent` needs to:
+1. Emit a `OnNodeDragStart` event when left-click on node header
+2. Canvas captures pointer and applies delta via `CoordinateConverter.ScreenDeltaToGraph()`
+3. Update `node.Position` on each `OnPointerMove`
+
+### To Implement Connection Validation
+Create a `ConnectionValidator` service:
+```csharp
+public class ConnectionValidator
+{
+    public bool CanConnect(SocketData source, SocketData target)
+    {
+        // Rule 1: Can't connect to self
+        // Rule 2: Execution must match execution
+        // Rule 3: Data types must be compatible (or object)
+        // Rule 4: Input connects to output only
+    }
+}
+```
+
+### To Implement Keyboard Shortcuts
+Add `@onkeydown` to canvas with `tabindex="0"`:
+- Delete/Backspace: Remove selected nodes and their connections
+- Escape: Cancel current operation (drag, connection)
+- Ctrl+A: Select all nodes
 
 ## Checklist
-- [ ] Dragging respects zoom
-- [ ] Selection is deterministic and consistent
+- [x] Dragging respects zoom (via CoordinateConverter)
+- [x] Selection is deterministic and consistent
 - [ ] Connection preview renders at 60 FPS
+- [ ] Node drag works smoothly
+- [ ] Keyboard shortcuts implemented
+- [ ] Connection type validation

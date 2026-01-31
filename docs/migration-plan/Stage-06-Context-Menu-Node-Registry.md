@@ -1,5 +1,19 @@
 # Stage 06 — Context Menu & Node Registry
 
+## Status: 🔴 Not Started
+
+### What's Done
+- ✅ `NodeData` model supports all node properties
+- ✅ `NodeAttribute` exists in legacy project (needs port)
+- ✅ Canvas component can receive new nodes via `EditorState.AddNode()`
+
+### What's Remaining
+- ❌ `NodeRegistryService` - scan and catalog nodes
+- ❌ `NodeDefinition` model - schema for node templates
+- ❌ `ContextMenuComponent` - right-click menu UI
+- ❌ Assembly scanning for `[Node]` attributes
+- ❌ Search and category filtering
+
 ## Goal
 Rebuild the node discovery and context menu using Blazor components.
 
@@ -77,11 +91,68 @@ void AddNode(NodeDefinition definition, Point2D cursorGraphPoint)
 ```
 
 ## Missing Architecture Gaps (to close in this stage)
-- **Node ID policy**: stable IDs across sessions
+- **Node ID policy**: stable IDs across sessions (consider GUID or hash-based)
 - **Registry caching**: avoid scanning assemblies more than once
 - **Search ranking**: prioritize exact matches and category matches
+
+## Implementation Notes (for next developer)
+
+### Legacy Code Reference
+- `NodeEditor/NodeAttribute.cs` - Attribute for marking node methods
+- `NodeEditor/StandardNodeContext.cs` (and partials) - Built-in node implementations
+- Legacy uses reflection to find methods with `[Node]` attribute on `INodesContext` implementations
+
+### Node Discovery Strategy
+1. Define `INodeContext` interface (Blazor equivalent of `INodesContext`)
+2. Scan assemblies for types implementing `INodeContext`
+3. Find methods with `[Node]` attribute
+4. Build `NodeDefinition` from attribute metadata + method signature
+
+### Recommended Files to Create
+```
+NodeEditor.Blazor/Services/Registry/
+├── NodeRegistryService.cs       # Main registry, scans and caches
+├── NodeDefinition.cs            # Template for node types
+├── NodeDiscoveryService.cs      # Assembly scanning
+├── INodeContext.cs              # Interface for node implementations
+└── NodeCatalog.cs               # Searchable, categorized collection
+
+NodeEditor.Blazor/Components/
+├── ContextMenu.razor            # Right-click menu container
+├── ContextMenuItem.razor        # Individual menu item
+└── ContextMenuSearch.razor      # Search input component
+```
+
+### Context Menu Positioning
+Use graph coordinates from right-click event:
+```csharp
+private void OnContextMenu(MouseEventArgs e)
+{
+    var graphPos = _coordinator.ScreenToGraph(new Point2D(e.ClientX, e.ClientY));
+    _contextMenuPosition = graphPos;
+    _showContextMenu = true;
+}
+```
+
+### Node Factory Pattern
+```csharp
+// NodeDefinition includes a factory that creates NodeData
+public Func<string, NodeData> CreateFactory(MethodInfo method, NodeAttribute attr)
+{
+    return (id) => new NodeData(
+        Id: id,
+        Name: attr.Name ?? method.Name,
+        Callable: attr.IsExecutable,
+        ExecInit: attr.IsInitializer,
+        Inputs: BuildInputs(method, attr),
+        Outputs: BuildOutputs(method, attr));
+}
+```
 
 ## Checklist
 - [ ] Registry loads nodes from primary assembly
 - [ ] Context menu is keyboard navigable
 - [ ] Plugin nodes appear only on supported platforms
+- [ ] Search filters nodes in real-time
+- [ ] Categories group related nodes
+- [ ] Node added at cursor position in graph coordinates

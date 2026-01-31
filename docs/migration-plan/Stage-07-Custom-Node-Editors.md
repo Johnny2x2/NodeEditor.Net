@@ -1,5 +1,19 @@
 # Stage 07 — Custom Node Editors
 
+## Status: 🔴 Not Started
+
+### What's Done
+- ✅ `SocketData` has `Value` property (`SocketValue?`)
+- ✅ `SocketValue` supports type-safe value storage
+- ✅ `SocketComponent` renders socket with type info
+
+### What's Remaining
+- ❌ `INodeCustomEditor` interface contract
+- ❌ `NodeEditorRegistry` service for editor lookup
+- ❌ Default editors (text, number, bool, color)
+- ❌ Socket-to-editor binding in `SocketComponent`
+- ❌ Focus management between editors and canvas
+
 ## Goal
 Replace WinForms custom editors with Blazor-based editors.
 
@@ -72,7 +86,60 @@ public interface INodeCustomEditor
 - **Editor registry**: a service to register editors by socket type
 - **Focus management**: move focus between editors and canvas
 
+## Implementation Notes (for next developer)
+
+### When to Show Editors
+Editors should appear for **input sockets that are not connected**. If an input socket has an incoming connection, its value comes from the connected output, so no editor is shown.
+
+### SocketComponent Modification
+Update `SocketComponent.razor` to conditionally render an editor:
+```razor
+@if (Socket.Data.IsInput && !IsConnected)
+{
+    <div class="ne-socket-editor">
+        @EditorRegistry.GetEditor(Socket.Data.TypeName)?.Render(CreateContext())
+    </div>
+}
+```
+
+### Default Editor Components to Create
+```
+NodeEditor.Blazor/Components/Editors/
+├── TextEditor.razor         # string input
+├── NumericEditor.razor      # int, float, double
+├── BoolEditor.razor         # checkbox
+├── ColorEditor.razor        # color picker (optional)
+├── DropdownEditor.razor     # enum values
+└── EditorBase.razor         # shared base class
+```
+
+### Editor Context
+```csharp
+public sealed class SocketEditorContext
+{
+    public required SocketViewModel Socket { get; init; }
+    public required NodeViewModel Node { get; init; }
+    public required Action<object?> SetValue { get; init; }
+    public object? Value => Socket.Data.Value?.GetValue<object>();
+}
+```
+
+### Value Update Flow
+1. User edits value in editor component
+2. Editor calls `Context.SetValue(newValue)`
+3. SetValue updates `SocketData.Value` via immutable record `with` pattern
+4. State change propagates to UI
+
+### Preventing Canvas Interactions
+Editors should stop propagation of pointer events to prevent node selection/drag when clicking in an input field:
+```razor
+<input @onclick:stopPropagation @onpointerdown:stopPropagation ... />
+```
+
 ## Checklist
 - [ ] Editor contract stable and documented
 - [ ] Editor updates are reflected within one render cycle
-- [ ] Default editors cover basic socket types
+- [ ] Default editors cover basic socket types (string, int, float, bool)
+- [ ] Connected inputs hide their editors
+- [ ] Focus in editor doesn't trigger canvas interactions
+- [ ] Validation errors displayed inline

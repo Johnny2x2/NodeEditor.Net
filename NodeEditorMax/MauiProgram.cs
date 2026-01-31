@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using NodeEditor.Blazor.Services;
 
 namespace NodeEditorMax
 {
@@ -15,6 +16,9 @@ namespace NodeEditorMax
                 });
 
             builder.Services.AddMauiBlazorWebView();
+            
+            // Register Node Editor services
+            builder.Services.AddNodeEditor();
 
 #if DEBUG
     		builder.Services.AddBlazorWebViewDeveloperTools();

@@ -1,5 +1,22 @@
 # Stage 10 — Integration & Testing
 
+## Status: 🟡 Partially Complete
+
+### What's Done
+- ✅ Project reference from MAUI to NodeEditor.Blazor
+- ✅ Services registered via `AddNodeEditor()` extension
+- ✅ Test page in MAUI app (`Components/Pages/Home.razor`)
+- ✅ Sample graph with 5 nodes and 5 connections
+- ✅ CSS linked in `wwwroot/index.html`
+- ✅ Windows build verified and running
+
+### What's Remaining
+- ❌ Full manual test checklist execution
+- ❌ Mobile platform testing (Android, iOS)
+- ❌ Touch gesture implementation
+- ❌ Plugin loader iOS guard verification
+- ❌ Error boundary integration
+
 ## Goal
 Integrate the new library into the MAUI host and validate key workflows.
 
@@ -66,7 +83,95 @@ The MAUI app should supply:
 - **Error surface** for execution/logging
 - **Touch-specific gestures** (pinch zoom, two-finger pan)
 
+## Implementation Notes (for next developer)
+
+### Current Integration
+The MAUI app is set up in:
+- `NodeEditorMax/MauiProgram.cs` - registers services via `AddNodeEditor()`
+- `NodeEditorMax/Components/Pages/Home.razor` - test page with sample graph
+- `NodeEditorMax/wwwroot/index.html` - includes CSS link
+- `NodeEditorMax/wwwroot/app.css` - contains `.node-editor-container` full-screen style
+
+### Running the App
+```bash
+# Windows
+dotnet run --project NodeEditorMax/NodeEditorMax.csproj -f net10.0-windows10.0.19041.0
+
+# Android (emulator or device)
+dotnet run --project NodeEditorMax/NodeEditorMax.csproj -f net10.0-android
+
+# iOS Simulator
+dotnet run --project NodeEditorMax/NodeEditorMax.csproj -f net10.0-ios
+```
+
+### Manual Test Checklist
+Run these tests on each platform:
+
+#### Basic Rendering
+- [ ] Canvas displays with dark background and grid
+- [ ] All 5 sample nodes visible
+- [ ] All 5 connections render as curves
+- [ ] Socket dots show correct colors by type
+
+#### Interaction
+- [ ] Click node to select (blue border)
+- [ ] Ctrl+click for multi-select
+- [ ] Middle mouse button + drag to pan
+- [ ] Mouse wheel to zoom in/out
+
+#### Touch (Mobile)
+- [ ] Single tap to select node
+- [ ] Two-finger drag to pan (needs implementation)
+- [ ] Pinch to zoom (needs implementation)
+
+### Touch Gesture Implementation
+For mobile, add touch gesture recognizers:
+```csharp
+// In NodeEditorCanvas.razor
+@ontouchstart="OnTouchStart"
+@ontouchmove="OnTouchMove"
+@ontouchend="OnTouchEnd"
+
+// Track touch points for pinch-zoom
+private List<TouchPoint> _activeTouches = new();
+
+private void OnTouchMove(TouchEventArgs e)
+{
+    if (e.Touches.Length == 2)
+    {
+        // Pinch zoom logic
+        var distance = GetDistance(e.Touches[0], e.Touches[1]);
+        var scale = distance / _initialPinchDistance;
+        State.Zoom = _initialZoom * scale;
+    }
+    else if (e.Touches.Length == 1 && _isPanning)
+    {
+        // Single finger pan (or node drag)
+    }
+}
+```
+
+### Error Boundary
+Wrap the canvas in an error boundary for graceful failure:
+```razor
+<ErrorBoundary>
+    <ChildContent>
+        <NodeEditorCanvas State="EditorState" />
+    </ChildContent>
+    <ErrorContent>
+        <div class="error-panel">
+            <h3>Something went wrong</h3>
+            <button @onclick="Recover">Reload</button>
+        </div>
+    </ErrorContent>
+</ErrorBoundary>
+```
+
 ## Checklist
-- [ ] Editor renders in MAUI host
-- [ ] Core flows work on at least two platforms
+- [x] Editor renders in MAUI host
+- [x] Core flows work on Windows
+- [ ] Core flows work on Android
+- [ ] Core flows work on iOS
 - [ ] Plugin loader is skipped on iOS
+- [ ] Touch gestures work on mobile
+- [ ] Error boundary catches failures

@@ -1,5 +1,19 @@
 # Stage 13 — Plugin System (Desktop/Android Only)
 
+## Status: 🟡 Partially Complete
+
+### What's Done
+- ✅ `PlatformGuard.IsPluginLoadingSupported()` in `Services/PlatformGuard.cs`
+- ✅ iOS detection and short-circuit logic
+
+### What's Remaining
+- ❌ `INodePlugin` interface contract
+- ❌ `PluginLoader` service for assembly scanning
+- ❌ Plugin directory configuration
+- ❌ Plugin manifest format
+- ❌ Version compatibility checking
+- ❌ Integration with `NodeRegistryService`
+
 ## Goal
 Add an optional plugin discovery and registration pipeline for new node packs, while explicitly disabling plugin loading on iOS.
 
@@ -73,7 +87,119 @@ if (!PlatformGuard.IsPluginLoadingSupported())
 - **Security posture** for untrusted plugins
 - **Diagnostics** for failed plugin loading
 
+## Implementation Notes (for next developer)
+
+### Current Platform Guard
+Located at `NodeEditor.Blazor/Services/PlatformGuard.cs`:
+```csharp
+public static bool IsPluginLoadingSupported()
+{
+    // iOS uses AOT compilation and doesn't support dynamic assembly loading
+    return !OperatingSystem.IsIOS();
+}
+```
+
+### Plugin Discovery Strategy
+1. Define plugin directories (configurable)
+2. Scan for DLLs in directories
+3. Load assemblies via `AssemblyLoadContext`
+4. Find types implementing `INodePlugin`
+5. Validate API version compatibility
+6. Call `plugin.Register(registry)`
+
+### Recommended Files to Create
+```
+NodeEditor.Blazor/Services/Plugins/
+├── INodePlugin.cs              # Plugin contract interface
+├── PluginManifest.cs           # Metadata for plugins
+├── PluginLoader.cs             # Assembly scanning and loading
+├── PluginLoadContext.cs        # Isolated AssemblyLoadContext
+└── PluginValidationResult.cs   # Validation outcome
+```
+
+### Plugin Contract
+```csharp
+public interface INodePlugin
+{
+    /// <summary>Plugin display name</summary>
+    string Name { get; }
+    
+    /// <summary>Unique plugin identifier</summary>
+    string Id { get; }
+    
+    /// <summary>Plugin version</summary>
+    Version Version { get; }
+    
+    /// <summary>Minimum host API version required</summary>
+    Version MinApiVersion { get; }
+    
+    /// <summary>Register nodes with the registry</summary>
+    void Register(NodeRegistryService registry);
+    
+    /// <summary>Optional cleanup when plugin is unloaded</summary>
+    void Unload() { }
+}
+```
+
+### Plugin Manifest (Optional JSON)
+```json
+{
+    "id": "com.example.mathnodes",
+    "name": "Advanced Math Nodes",
+    "version": "1.2.0",
+    "minApiVersion": "1.0.0",
+    "entryAssembly": "MathNodes.dll",
+    "category": "Math"
+}
+```
+
+### Plugin Loading Flow
+```csharp
+public class PluginLoader
+{
+    public async Task<IReadOnlyList<INodePlugin>> LoadPluginsAsync(
+        string pluginDirectory,
+        CancellationToken token = default)
+    {
+        if (!PlatformGuard.IsPluginLoadingSupported())
+        {
+            _logger.LogInformation("Plugin loading skipped (iOS)");
+            return Array.Empty<INodePlugin>();
+        }
+
+        var plugins = new List<INodePlugin>();
+        foreach (var dll in Directory.GetFiles(pluginDirectory, "*.dll"))
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                var plugin = LoadPlugin(dll);
+                if (ValidatePlugin(plugin))
+                {
+                    plugins.Add(plugin);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load plugin: {Path}", dll);
+            }
+        }
+        return plugins;
+    }
+}
+```
+
+### Security Considerations
+- Plugins run with full trust (no sandboxing in .NET)
+- Consider code signing for production
+- Log all plugin loads for audit
+- Allow disabling specific plugins via configuration
+
 ## Checklist
+- [x] Platform guard exists for iOS
 - [ ] Plugins load and register nodes on supported platforms
-- [ ] iOS build explicitly disables plugin loading
+- [ ] iOS build explicitly disables plugin loading (logged)
 - [ ] Plugin errors are surfaced in logs
+- [ ] Version compatibility checked
+- [ ] Plugin manifest validation
+- [ ] Integration with NodeRegistryService
