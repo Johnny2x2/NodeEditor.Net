@@ -124,7 +124,7 @@
 			},
 			Outputs: new[]
 			{
-				new SocketData("Value", "int", false, false)
+				new SocketData("Value_Out", "int", false, false)
 			}))
 		{
 			Position = new Point2D(200, 20)
@@ -141,7 +141,7 @@
 			},
 			Outputs: new[]
 			{
-				new SocketData("Value", "int", false, false)
+				new SocketData("Value_Out", "int", false, false)
 			}))
 		{
 			Position = new Point2D(200, 120)
@@ -208,8 +208,8 @@
 		EditorState.AddNode(printNode);
 
 		EditorState.AddConnection(new ConnectionData("node-start", "node-print", "Exit", "Enter", true));
-		EditorState.AddConnection(new ConnectionData("node-value-a", "node-math", "Value", "A", false));
-		EditorState.AddConnection(new ConnectionData("node-value-b", "node-math", "Value", "B", false));
+		EditorState.AddConnection(new ConnectionData("node-value-a", "node-math", "Value_Out", "A", false));
+		EditorState.AddConnection(new ConnectionData("node-value-b", "node-math", "Value_Out", "B", false));
 		EditorState.AddConnection(new ConnectionData("node-math", "node-tostring", "Result", "Input", false));
 		EditorState.AddConnection(new ConnectionData("node-tostring", "node-print", "Output", "Message", false));
 	}
@@ -241,9 +241,9 @@
 		}
 
 		[Node("Value", isCallable: false)]
-		public void Value(int Value, out int Output)
+		public void ValueNode(int Value, out int Value_Out)
 		{
-			Output = Value;
+			Value_Out = Value;
 		}
 
 		[Node("ToString", isCallable: false)]

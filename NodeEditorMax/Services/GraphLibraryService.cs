@@ -194,7 +194,7 @@ public sealed class GraphLibraryService
             },
             Outputs: new[]
             {
-                new SocketData("Value", "int", false, false)
+                new SocketData("Value_Out", "int", false, false)
             }))
         {
             Position = new Point2D(210, 10)
@@ -211,7 +211,7 @@ public sealed class GraphLibraryService
             },
             Outputs: new[]
             {
-                new SocketData("Value", "int", false, false)
+                new SocketData("Value_Out", "int", false, false)
             }))
         {
             Position = new Point2D(210, 120)
@@ -278,8 +278,8 @@ public sealed class GraphLibraryService
         state.AddNode(toStringNode);
 
         state.AddConnection(new ConnectionData("example-sum-start", "example-sum-print", "ExecOut", "ExecIn", true));
-        state.AddConnection(new ConnectionData("example-sum-value-a", "example-sum-add", "Value", "A", false));
-        state.AddConnection(new ConnectionData("example-sum-value-b", "example-sum-add", "Value", "B", false));
+        state.AddConnection(new ConnectionData("example-sum-value-a", "example-sum-add", "Value_Out", "A", false));
+        state.AddConnection(new ConnectionData("example-sum-value-b", "example-sum-add", "Value_Out", "B", false));
         state.AddConnection(new ConnectionData("example-sum-add", "example-sum-tostring", "Result", "Input", false));
         state.AddConnection(new ConnectionData("example-sum-tostring", "example-sum-print", "Output", "Message", false));
 
@@ -315,7 +315,7 @@ public sealed class GraphLibraryService
             },
             Outputs: new[]
             {
-                new SocketData("Value", "int", false, false)
+                new SocketData("Value_Out", "int", false, false)
             }))
         {
             Position = new Point2D(220, 120)
@@ -362,7 +362,7 @@ public sealed class GraphLibraryService
         state.AddNode(printNode);
 
         state.AddConnection(new ConnectionData("example-single-start", "example-single-print", "ExecOut", "ExecIn", true));
-        state.AddConnection(new ConnectionData("example-single-value", "example-single-tostring", "Value", "Input", false));
+        state.AddConnection(new ConnectionData("example-single-value", "example-single-tostring", "Value_Out", "Input", false));
         state.AddConnection(new ConnectionData("example-single-tostring", "example-single-print", "Output", "Message", false));
 
         return _serializer.Serialize(_serializer.Export(state));
