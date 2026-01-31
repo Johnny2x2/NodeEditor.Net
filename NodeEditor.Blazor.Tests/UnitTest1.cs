@@ -1,4 +1,4 @@
-﻿namespace NodeEditor.Blazor.Tests;
+﻿// Intentionally left empty. Template file retained for now.
 
 public class UnitTest1
 {

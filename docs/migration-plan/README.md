@@ -14,3 +14,5 @@
 11. [Stage 11 — Performance Optimization](Stage-11-Performance-Optimization.md)
 12. [Stage 12 — Documentation & Migration Guide](Stage-12-Documentation.md)
 13. [Stage 13 — Plugin System (Desktop/Android Only)](Stage-13-Plugin-System.md)
+14. [Stage 14 — Packaging, Deployment & Release](Stage-14-Packaging-Deployment.md)
+15. [Stage 15 — Accessibility, Observability & Diagnostics](Stage-15-Accessibility-Observability.md)
