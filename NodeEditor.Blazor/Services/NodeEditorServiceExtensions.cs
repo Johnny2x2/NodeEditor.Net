@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using NodeEditor.Blazor.Services.Execution;
 
 namespace NodeEditor.Blazor.Services;
 
@@ -25,6 +26,12 @@ public static class NodeEditorServiceExtensions
         
         // Register socket type resolver as singleton (shared type registry)
         services.AddSingleton<SocketTypeResolver>();
+
+        // Register execution services
+        services.AddSingleton<ExecutionPlanner>();
+        services.AddSingleton<BackgroundExecutionQueue>();
+        services.AddSingleton<BackgroundExecutionWorker>();
+        services.AddScoped<NodeExecutionService>();
         
         return services;
     }
@@ -44,6 +51,11 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<CoordinateConverter>();
         services.AddScoped<ConnectionValidator>();
         services.AddSingleton<SocketTypeResolver>();
+
+        services.AddSingleton<ExecutionPlanner>();
+        services.AddSingleton<BackgroundExecutionQueue>();
+        services.AddSingleton<BackgroundExecutionWorker>();
+        services.AddScoped<NodeExecutionService>();
         
         return services;
     }
