@@ -190,7 +190,8 @@ public sealed class NodeEditorState
     /// <param name="clearExisting">If true, clears the existing selection before selecting the node.</param>
     public void SelectNode(string nodeId, bool clearExisting = true)
     {
-        var previousSelection = SelectedNodeIds.ToHashSet();
+        // Only create a copy if there are subscribers
+        var previousSelection = SelectionChanged != null ? SelectedNodeIds.ToHashSet() : null;
 
         if (clearExisting)
         {
@@ -206,7 +207,10 @@ public sealed class NodeEditorState
         SelectedNodeIds.Add(nodeId);
         node.IsSelected = true;
 
-        SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(previousSelection, SelectedNodeIds.ToHashSet()));
+        if (previousSelection != null)
+        {
+            SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(previousSelection, SelectedNodeIds.ToHashSet()));
+        }
     }
 
     /// <summary>
@@ -216,7 +220,9 @@ public sealed class NodeEditorState
     /// <param name="nodeId">The ID of the node to toggle.</param>
     public void ToggleSelectNode(string nodeId)
     {
-        var previousSelection = SelectedNodeIds.ToHashSet();
+        // Only create a copy if there are subscribers
+        var previousSelection = SelectionChanged != null ? SelectedNodeIds.ToHashSet() : null;
+        
         var node = Nodes.FirstOrDefault(n => n.Data.Id == nodeId);
         if (node is null)
         {
@@ -234,7 +240,10 @@ public sealed class NodeEditorState
             node.IsSelected = true;
         }
 
-        SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(previousSelection, SelectedNodeIds.ToHashSet()));
+        if (previousSelection != null)
+        {
+            SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(previousSelection, SelectedNodeIds.ToHashSet()));
+        }
     }
 
     /// <summary>
@@ -242,9 +251,14 @@ public sealed class NodeEditorState
     /// </summary>
     public void ClearSelection()
     {
-        var previousSelection = SelectedNodeIds.ToHashSet();
+        // Only create a copy if there are subscribers
+        var previousSelection = SelectionChanged != null ? SelectedNodeIds.ToHashSet() : null;
         ClearSelectionInternal();
-        SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(previousSelection, new HashSet<string>()));
+        
+        if (previousSelection != null)
+        {
+            SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(previousSelection, new HashSet<string>()));
+        }
     }
 
     /// <summary>

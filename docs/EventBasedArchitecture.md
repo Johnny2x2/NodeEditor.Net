@@ -178,21 +178,33 @@ private void OnNodeAdded(object? sender, NodeEventArgs e)
 }
 ```
 
-### 4. Thread Safety
+### 4. Thread Safety and Async Operations
 
-Event handlers are invoked synchronously on the same thread as the state modification. For async operations:
+Event handlers are invoked synchronously on the same thread as the state modification. For async operations, use async Task pattern:
 
 ```csharp
-private async void OnNodeAdded(object? sender, NodeEventArgs e)
+// Create a separate async method
+private async Task OnNodeAddedAsync(NodeViewModel node)
 {
-    // Use InvokeAsync for async operations that affect UI
-    await InvokeAsync(async () =>
+    await SomeAsyncOperation();
+    StateHasChanged();
+}
+
+// Call it from the event handler
+private void OnNodeAdded(object? sender, NodeEventArgs e)
+{
+    // Fire and forget (not recommended for critical operations)
+    _ = OnNodeAddedAsync(e.Node);
+    
+    // Or use InvokeAsync for UI-critical operations
+    _ = InvokeAsync(async () =>
     {
-        await SomeAsyncOperation();
-        StateHasChanged();
+        await OnNodeAddedAsync(e.Node);
     });
 }
 ```
+
+**Important**: Never use `async void` event handlers as they can lead to unhandled exceptions. Always handle exceptions within the event handler or the async method it calls.
 
 ## Performance Considerations
 
