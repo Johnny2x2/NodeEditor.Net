@@ -11,7 +11,7 @@ public sealed class SelectionSyncTests
     {
         var state = new NodeEditorState();
         var node = new NodeViewModel(new NodeData("n1", "Test", false, false, Array.Empty<SocketData>(), Array.Empty<SocketData>()));
-        state.Nodes.Add(node);
+        state.AddNode(node);
 
         state.SelectNode("n1");
 
@@ -27,7 +27,7 @@ public sealed class SelectionSyncTests
         {
             IsSelected = true
         };
-        state.Nodes.Add(node);
+        state.AddNode(node);
         state.SelectedNodeIds.Add("n1");
 
         state.ClearSelection();
