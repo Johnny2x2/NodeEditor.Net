@@ -1,4 +1,5 @@
 using NodeEditor.Blazor.Services;
+using NodeEditor.Blazor.Services.Plugins;
 using NodeEditor.Blazor.WebHost.Components;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddNodeEditor();
 builder.Services.AddScoped<NodeEditor.Blazor.Services.Execution.BackgroundExecutionWorker>();
+builder.Services.Configure<PluginOptions>(builder.Configuration.GetSection(PluginOptions.SectionName));
 
 var app = builder.Build();
 
@@ -27,5 +29,11 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+using (var scope = app.Services.CreateScope())
+{
+    var pluginLoader = scope.ServiceProvider.GetRequiredService<PluginLoader>();
+    await pluginLoader.LoadAndRegisterAsync();
+}
 
 app.Run();

@@ -16,6 +16,9 @@ public static class NodeEditorServiceExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddNodeEditor(this IServiceCollection services)
     {
+        services.AddOptions<Plugins.PluginOptions>();
+        services.AddSingleton<Plugins.PluginLoader>();
+
         // Register state as scoped (one per user/circuit in Blazor Server, one per app in WASM)
         services.AddScoped<NodeEditorState>();
         
@@ -62,6 +65,9 @@ public static class NodeEditorServiceExtensions
         this IServiceCollection services,
         Func<IServiceProvider, NodeEditorState> stateFactory)
     {
+        services.AddOptions<Plugins.PluginOptions>();
+        services.AddSingleton<Plugins.PluginLoader>();
+
         services.AddScoped(stateFactory);
         services.AddScoped<CoordinateConverter>();
         services.AddScoped<ConnectionValidator>();

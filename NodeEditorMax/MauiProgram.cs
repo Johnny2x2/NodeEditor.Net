@@ -1,5 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NodeEditor.Blazor.Services;
+using NodeEditor.Blazor.Services.Plugins;
 
 namespace NodeEditorMax
 {
@@ -19,13 +21,26 @@ namespace NodeEditorMax
             
             // Register Node Editor services
             builder.Services.AddNodeEditor();
+            builder.Services.Configure<PluginOptions>(options =>
+            {
+                options.PluginDirectory = "plugins";
+                options.ApiVersion = new Version(1, 0, 0);
+            });
 
 #if DEBUG
     		builder.Services.AddBlazorWebViewDeveloperTools();
     		builder.Logging.AddDebug();
 #endif
 
-            return builder.Build();
+            var app = builder.Build();
+
+            using (var scope = app.Services.CreateScope())
+            {
+                var pluginLoader = scope.ServiceProvider.GetRequiredService<PluginLoader>();
+                pluginLoader.LoadAndRegisterAsync().GetAwaiter().GetResult();
+            }
+
+            return app;
         }
     }
 }

@@ -65,6 +65,16 @@
 
     <ItemGroup>
         <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
+        <ProjectReference Include="..\NodeEditor.Plugins.Sample\NodeEditor.Plugins.Sample.csproj" ReferenceOutputAssembly="false" />
     </ItemGroup>
+
+    <Target Name="CopySamplePlugin" AfterTargets="Build">
+        <ItemGroup>
+            <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\bin\$(Configuration)\net10.0\NodeEditor.Plugins.Sample.dll" />
+            <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\plugin.json" />
+        </ItemGroup>
+
+        <Copy SourceFiles="@(_SamplePluginFiles)" DestinationFolder="$(OutDir)plugins\Sample" />
+    </Target>
 
 </Project>
