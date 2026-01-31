@@ -30,7 +30,6 @@ Match or improve the visual style using CSS and theming models.
 3. Add type-based colors for sockets/connections.
 
 ## Acceptance Criteria
-- Visual quality matches WinForms version.
 - Theme can be swapped at runtime.
 
 ### Testing Parameters
