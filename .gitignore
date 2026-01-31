@@ -73,3 +73,5 @@ artifacts/
 # MAUI Specific
 **/bin/
 **/obj/
+
+.fake

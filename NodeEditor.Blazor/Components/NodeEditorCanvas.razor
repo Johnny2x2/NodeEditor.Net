@@ -1,5 +1,7 @@
 @using NodeEditor.Blazor.Services
 @implements IDisposable
+@inject CoordinateConverter CoordinateConverter
+@inject ConnectionValidator ConnectionValidator
 
 <div class="ne-canvas"
      @ref="_canvasRef"
@@ -8,7 +10,12 @@
      @onpointerup="OnPointerUp"
      @onwheel="OnWheel"
      @onwheel:preventDefault
+     @onkeydown="OnKeyDown"
      tabindex="0">
+    @if (_isSelecting)
+    {
+        <div class="ne-selection-rect" style="@SelectionRectStyle"></div>
+    }
     <div class="ne-viewport" style="@ViewportTransformStyle">
         @* Connection layer (SVG) - rendered below nodes *@
         <svg class="ne-connections" @ref="_svgRef">
@@ -22,7 +29,8 @@
             {
                 <ConnectionPath Connection="_pendingConnection"
                                 Nodes="State.Nodes"
-                                IsPending="true" />
+                                IsPending="true"
+                                PendingEndPoint="_pendingConnectionEndGraph" />
             }
         </svg>
 
@@ -33,7 +41,8 @@
                 <NodeComponent Node="node"
                                @key="node.Data.Id"
                                OnSocketPointerDown="OnSocketPointerDown"
-                               OnSocketPointerUp="OnSocketPointerUp" />
+                               OnSocketPointerUp="OnSocketPointerUp"
+                               OnNodeDragStart="OnNodeDragStart" />
             }
         </div>
     </div>
@@ -49,9 +58,16 @@
     private double _zoom = 1.0;
 
     private ConnectionData? _pendingConnection;
+    private Point2D? _pendingConnectionEndGraph;
     private bool _isDraggingNode;
     private Point2D _dragStart;
     private NodeViewModel? _draggingNode;
+
+    private bool _isSelecting;
+    private bool _selectionAdditive;
+    private Point2D _selectionStartScreen;
+    private Point2D _selectionCurrentScreen;
+    private HashSet<string> _selectionBase = new();
 
     [Parameter, EditorRequired]
     public NodeEditorState State { get; set; } = null!;
@@ -68,8 +84,22 @@
     private string ViewportTransformStyle =>
         $"transform: translate({_panOffset.X}px, {_panOffset.Y}px) scale({_zoom});";
 
+    private string SelectionRectStyle
+    {
+        get
+        {
+            var left = Math.Min(_selectionStartScreen.X, _selectionCurrentScreen.X);
+            var top = Math.Min(_selectionStartScreen.Y, _selectionCurrentScreen.Y);
+            var width = Math.Abs(_selectionCurrentScreen.X - _selectionStartScreen.X);
+            var height = Math.Abs(_selectionCurrentScreen.Y - _selectionStartScreen.Y);
+            return $"left: {left}px; top: {top}px; width: {width}px; height: {height}px;";
+        }
+    }
+
     protected override void OnInitialized()
     {
+        CoordinateConverter.SyncFromState(State);
+
         // Subscribe to state events for reactive updates
         State.NodeAdded += OnStateChanged;
         State.NodeRemoved += OnStateChanged;
@@ -96,17 +126,21 @@
     private void OnZoomChanged(object? sender, ZoomChangedEventArgs e)
     {
         _zoom = e.CurrentZoom;
+        CoordinateConverter.SyncFromState(State);
         StateHasChanged();
     }
 
     private void OnViewportChanged(object? sender, ViewportChangedEventArgs e)
     {
         _panOffset = new Point2D(e.CurrentViewport.X, e.CurrentViewport.Y);
+        CoordinateConverter.SyncFromState(State);
         StateHasChanged();
     }
 
-    private void OnPointerDown(PointerEventArgs e)
+    private async Task OnPointerDown(PointerEventArgs e)
     {
+        await _canvasRef.FocusAsync();
+
         if (e.Button == 1) // Middle mouse button for panning
         {
             _isPanning = true;
@@ -114,7 +148,7 @@
         }
         else if (e.Button == 0) // Left click on empty canvas clears selection
         {
-            State.ClearSelection();
+            BeginSelection(e);
         }
     }
 
@@ -123,22 +157,33 @@
         if (_isPanning)
         {
             _panOffset = new Point2D(e.ClientX - _panStart.X, e.ClientY - _panStart.Y);
-            StateHasChanged();
+            State.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, State.Viewport.Width, State.Viewport.Height);
         }
         else if (_isDraggingNode && _draggingNode is not null)
         {
-            var deltaX = (e.ClientX - _dragStart.X) / _zoom;
-            var deltaY = (e.ClientY - _dragStart.Y) / _zoom;
-            _draggingNode.Position = new Point2D(
-                _draggingNode.Position.X + deltaX,
-                _draggingNode.Position.Y + deltaY);
+            var screenDelta = new Point2D(e.ClientX - _dragStart.X, e.ClientY - _dragStart.Y);
+            var graphDelta = CoordinateConverter.ScreenDeltaToGraph(screenDelta);
+
+            var selectedNodes = GetSelectedNodesForDrag();
+            foreach (var node in selectedNodes)
+            {
+                node.Position = new Point2D(
+                    node.Position.X + graphDelta.X,
+                    node.Position.Y + graphDelta.Y);
+            }
+
             _dragStart = new Point2D(e.ClientX, e.ClientY);
             StateHasChanged();
         }
         else if (_pendingConnection is not null)
         {
-            // Update pending connection endpoint for preview
+            _pendingConnectionEndGraph = CoordinateConverter.ScreenToGraph(new Point2D(e.ClientX, e.ClientY));
             StateHasChanged();
+        }
+        else if (_isSelecting)
+        {
+            _selectionCurrentScreen = new Point2D(e.ClientX, e.ClientY);
+            UpdateSelectionFromRect();
         }
     }
 
@@ -148,6 +193,14 @@
         _isDraggingNode = false;
         _draggingNode = null;
         _pendingConnection = null;
+        _pendingConnectionEndGraph = null;
+
+        if (_isSelecting)
+        {
+            _selectionCurrentScreen = new Point2D(e.ClientX, e.ClientY);
+            UpdateSelectionFromRect(finalize: true);
+            _isSelecting = false;
+        }
     }
 
     private void OnWheel(WheelEventArgs e)
@@ -157,7 +210,10 @@
         
         if (Math.Abs(newZoom - _zoom) > double.Epsilon)
         {
+            var focus = new Point2D(e.ClientX, e.ClientY);
+            var newPan = CoordinateConverter.ComputeZoomCenteredPan(focus, _zoom, newZoom);
             State.Zoom = newZoom;
+            State.Viewport = new Rect2D(newPan.X, newPan.Y, State.Viewport.Width, State.Viewport.Height);
         }
     }
 
@@ -172,6 +228,7 @@
                 OutputSocketName: e.Socket.Data.Name,
                 InputSocketName: string.Empty,
                 IsExecution: e.Socket.Data.IsExecution);
+            _pendingConnectionEndGraph = CoordinateConverter.ScreenToGraph(e.Position);
         }
     }
 
@@ -189,10 +246,156 @@
             // Validate connection is not to the same node
             if (connection.OutputNodeId != connection.InputNodeId)
             {
-                State.AddConnection(connection);
+                if (IsValidConnection(connection, e.Socket))
+                {
+                    State.AddConnection(connection);
+                }
             }
         }
         _pendingConnection = null;
+        _pendingConnectionEndGraph = null;
+    }
+
+    private void OnNodeDragStart(NodePointerEventArgs e)
+    {
+        var node = State.Nodes.FirstOrDefault(n => n.Data.Id == e.NodeId);
+        if (node is null)
+        {
+            return;
+        }
+
+        _isSelecting = false;
+        _isDraggingNode = true;
+        _draggingNode = node;
+        _dragStart = e.Position;
+
+        if (!node.IsSelected)
+        {
+            State.SelectNode(node.Data.Id, clearExisting: true);
+        }
+    }
+
+    private void BeginSelection(PointerEventArgs e)
+    {
+        _isSelecting = true;
+        _selectionStartScreen = new Point2D(e.ClientX, e.ClientY);
+        _selectionCurrentScreen = _selectionStartScreen;
+        _selectionAdditive = e.CtrlKey || e.ShiftKey;
+        _selectionBase = _selectionAdditive ? State.SelectedNodeIds.ToHashSet() : new HashSet<string>();
+
+        if (!_selectionAdditive)
+        {
+            State.ClearSelection();
+        }
+    }
+
+    private void UpdateSelectionFromRect(bool finalize = false)
+    {
+        var selectionRectGraph = GetSelectionRectGraph();
+        var selected = State.Nodes
+            .Where(n => RectsIntersect(selectionRectGraph, new Rect2D(n.Position.X, n.Position.Y, n.Size.Width, n.Size.Height)))
+            .Select(n => n.Data.Id)
+            .ToHashSet();
+
+        if (_selectionAdditive)
+        {
+            selected.UnionWith(_selectionBase);
+        }
+
+        State.SelectNodes(selected, clearExisting: true);
+
+        if (finalize)
+        {
+            _selectionBase = selected;
+        }
+    }
+
+    private Rect2D GetSelectionRectGraph()
+    {
+        var left = Math.Min(_selectionStartScreen.X, _selectionCurrentScreen.X);
+        var top = Math.Min(_selectionStartScreen.Y, _selectionCurrentScreen.Y);
+        var width = Math.Abs(_selectionCurrentScreen.X - _selectionStartScreen.X);
+        var height = Math.Abs(_selectionCurrentScreen.Y - _selectionStartScreen.Y);
+
+        var screenRect = new Rect2D(left, top, width, height);
+        return CoordinateConverter.ScreenToGraph(screenRect);
+    }
+
+    private static bool RectsIntersect(Rect2D a, Rect2D b)
+    {
+        return a.X <= b.X + b.Width &&
+               a.X + a.Width >= b.X &&
+               a.Y <= b.Y + b.Height &&
+               a.Y + a.Height >= b.Y;
+    }
+
+    private IEnumerable<NodeViewModel> GetSelectedNodesForDrag()
+    {
+        if (_draggingNode is null)
+        {
+            return Array.Empty<NodeViewModel>();
+        }
+
+        if (_draggingNode.IsSelected)
+        {
+            return State.Nodes.Where(n => n.IsSelected);
+        }
+
+        return new[] { _draggingNode };
+    }
+
+    private bool IsValidConnection(ConnectionData connection, SocketViewModel targetSocket)
+    {
+        if (State.Connections.Any(c =>
+            c.InputNodeId == connection.InputNodeId &&
+            c.InputSocketName == connection.InputSocketName))
+        {
+            return false;
+        }
+
+        var sourceNode = State.Nodes.FirstOrDefault(n => n.Data.Id == connection.OutputNodeId);
+        var sourceSocket = sourceNode?.Outputs.FirstOrDefault(s => s.Data.Name == connection.OutputSocketName);
+
+        if (sourceSocket is null)
+        {
+            return false;
+        }
+
+        return ConnectionValidator.CanConnect(sourceSocket.Data, targetSocket.Data);
+    }
+
+    private void CancelInteraction()
+    {
+        _isPanning = false;
+        _isDraggingNode = false;
+        _draggingNode = null;
+        _pendingConnection = null;
+        _pendingConnectionEndGraph = null;
+        _isSelecting = false;
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Delete" or "Backspace")
+        {
+            State.RemoveSelectedNodes();
+        }
+        else if (e.Key == "Escape")
+        {
+            CancelInteraction();
+        }
+        else if (e.CtrlKey && (e.Key == "a" || e.Key == "A"))
+        {
+            State.SelectAll();
+        }
+        else if (e.CtrlKey && (e.Key == "z" || e.Key == "Z"))
+        {
+            State.RequestUndo();
+        }
+        else if (e.CtrlKey && (e.Key == "y" || e.Key == "Y"))
+        {
+            State.RequestRedo();
+        }
     }
 
     private static string GetConnectionKey(ConnectionData c) =>

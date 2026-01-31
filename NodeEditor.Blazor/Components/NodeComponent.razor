@@ -7,7 +7,8 @@
      @onpointerdown:stopPropagation
      @key="Node.Data.Id">
     
-    <div class="ne-node-header">
+            <div class="ne-node-header"
+                @onpointerdown="OnHeaderPointerDown">
         @if (Node.Data.Callable)
         {
             <span class="ne-node-exec-icon" title="Callable node">▶</span>
@@ -52,6 +53,9 @@
     [Parameter]
     public EventCallback<SocketPointerEventArgs> OnSocketPointerUp { get; set; }
 
+    [Parameter]
+    public EventCallback<NodePointerEventArgs> OnNodeDragStart { get; set; }
+
     [CascadingParameter]
     private NodeEditorState? EditorState { get; set; }
 
@@ -63,8 +67,8 @@
     {
         if (e.Button == 0 && EditorState is not null)
         {
-            // Ctrl+click for multi-select, otherwise single select
-            if (e.CtrlKey)
+            // Ctrl/Shift+click for multi-select, otherwise single select
+            if (e.CtrlKey || e.ShiftKey)
             {
                 EditorState.ToggleSelectNode(Node.Data.Id);
             }
@@ -72,6 +76,18 @@
             {
                 EditorState.SelectNode(Node.Data.Id, clearExisting: true);
             }
+        }
+    }
+
+    private async Task OnHeaderPointerDown(PointerEventArgs e)
+    {
+        if (e.Button == 0 && OnNodeDragStart.HasDelegate)
+        {
+            await OnNodeDragStart.InvokeAsync(new NodePointerEventArgs
+            {
+                NodeId = Node.Data.Id,
+                Position = new Point2D(e.ClientX, e.ClientY)
+            });
         }
     }
 }

@@ -19,6 +19,9 @@ public static class NodeEditorServiceExtensions
         
         // Register coordinate converter as scoped (tied to state)
         services.AddScoped<CoordinateConverter>();
+
+        // Register connection validator
+        services.AddScoped<ConnectionValidator>();
         
         // Register socket type resolver as singleton (shared type registry)
         services.AddSingleton<SocketTypeResolver>();
@@ -39,6 +42,7 @@ public static class NodeEditorServiceExtensions
     {
         services.AddScoped(stateFactory);
         services.AddScoped<CoordinateConverter>();
+        services.AddScoped<ConnectionValidator>();
         services.AddSingleton<SocketTypeResolver>();
         
         return services;

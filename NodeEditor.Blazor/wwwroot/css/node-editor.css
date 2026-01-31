@@ -23,6 +23,14 @@
     outline: none;
 }
 
+.ne-selection-rect {
+    position: absolute;
+    border: 1px dashed rgba(102, 153, 255, 0.9);
+    background-color: rgba(102, 153, 255, 0.15);
+    pointer-events: none;
+    z-index: 5;
+}
+
 /* ============================================
    Viewport (pan/zoom container)
    ============================================ */

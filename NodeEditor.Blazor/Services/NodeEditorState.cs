@@ -77,6 +77,18 @@ public sealed class NodeEditorState
     public event EventHandler<ZoomChangedEventArgs>? ZoomChanged;
 
     /// <summary>
+    /// Raised when an undo operation is requested.
+    /// Placeholder hook for future history support.
+    /// </summary>
+    public event EventHandler? UndoRequested;
+
+    /// <summary>
+    /// Raised when a redo operation is requested.
+    /// Placeholder hook for future history support.
+    /// </summary>
+    public event EventHandler? RedoRequested;
+
+    /// <summary>
     /// Gets the collection of all nodes in the editor.
     /// Note: Use AddNode() and RemoveNode() methods instead of modifying this collection directly
     /// to ensure events are raised properly.
@@ -156,6 +168,15 @@ public sealed class NodeEditorState
         if (node is null)
         {
             return;
+        }
+
+        var connectionsToRemove = Connections
+            .Where(c => c.OutputNodeId == nodeId || c.InputNodeId == nodeId)
+            .ToList();
+        foreach (var connection in connectionsToRemove)
+        {
+            Connections.Remove(connection);
+            ConnectionRemoved?.Invoke(this, new ConnectionEventArgs(connection));
         }
 
         Nodes.Remove(node);
@@ -260,6 +281,75 @@ public sealed class NodeEditorState
             SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(previousSelection, new HashSet<string>()));
         }
     }
+
+    /// <summary>
+    /// Selects a set of nodes and raises the <see cref="SelectionChanged"/> event.
+    /// </summary>
+    /// <param name="nodeIds">The node IDs to select.</param>
+    /// <param name="clearExisting">If true, clears existing selection first.</param>
+    public void SelectNodes(IEnumerable<string> nodeIds, bool clearExisting = true)
+    {
+        var previousSelection = SelectionChanged != null ? SelectedNodeIds.ToHashSet() : null;
+
+        if (clearExisting)
+        {
+            ClearSelectionInternal();
+        }
+
+        foreach (var nodeId in nodeIds)
+        {
+            var node = Nodes.FirstOrDefault(n => n.Data.Id == nodeId);
+            if (node is null)
+            {
+                continue;
+            }
+
+            SelectedNodeIds.Add(nodeId);
+            node.IsSelected = true;
+        }
+
+        if (previousSelection != null)
+        {
+            SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(previousSelection, SelectedNodeIds.ToHashSet()));
+        }
+    }
+
+    /// <summary>
+    /// Selects all nodes in the graph.
+    /// </summary>
+    public void SelectAll()
+    {
+        SelectNodes(Nodes.Select(n => n.Data.Id), clearExisting: true);
+    }
+
+    /// <summary>
+    /// Removes all selected nodes and their connections.
+    /// </summary>
+    public void RemoveSelectedNodes()
+    {
+        var selected = SelectedNodeIds.ToList();
+        foreach (var nodeId in selected)
+        {
+            RemoveNode(nodeId);
+        }
+
+        if (selected.Count > 0)
+        {
+            SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(selected.ToHashSet(), SelectedNodeIds.ToHashSet()));
+        }
+    }
+
+    /// <summary>
+    /// Requests an undo operation.
+    /// Placeholder hook for future history support.
+    /// </summary>
+    public void RequestUndo() => UndoRequested?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Requests a redo operation.
+    /// Placeholder hook for future history support.
+    /// </summary>
+    public void RequestRedo() => RedoRequested?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Internal method to clear selection without raising events.
