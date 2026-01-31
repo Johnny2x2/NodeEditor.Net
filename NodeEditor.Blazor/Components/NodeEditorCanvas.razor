@@ -1,0 +1,200 @@
+@using NodeEditor.Blazor.Services
+@implements IDisposable
+
+<div class="ne-canvas"
+     @ref="_canvasRef"
+     @onpointerdown="OnPointerDown"
+     @onpointermove="OnPointerMove"
+     @onpointerup="OnPointerUp"
+     @onwheel="OnWheel"
+     @onwheel:preventDefault
+     tabindex="0">
+    <div class="ne-viewport" style="@ViewportTransformStyle">
+        @* Connection layer (SVG) - rendered below nodes *@
+        <svg class="ne-connections" @ref="_svgRef">
+            @foreach (var connection in State.Connections)
+            {
+                <ConnectionPath Connection="connection"
+                                Nodes="State.Nodes"
+                                @key="@GetConnectionKey(connection)" />
+            }
+            @if (_pendingConnection is not null)
+            {
+                <ConnectionPath Connection="_pendingConnection"
+                                Nodes="State.Nodes"
+                                IsPending="true" />
+            }
+        </svg>
+
+        @* Node layer (HTML) - rendered above connections *@
+        <div class="ne-nodes">
+            @foreach (var node in State.Nodes)
+            {
+                <NodeComponent Node="node"
+                               @key="node.Data.Id"
+                               OnSocketPointerDown="OnSocketPointerDown"
+                               OnSocketPointerUp="OnSocketPointerUp" />
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private ElementReference _canvasRef;
+    private ElementReference _svgRef;
+
+    private bool _isPanning;
+    private Point2D _panStart;
+    private Point2D _panOffset = Point2D.Zero;
+    private double _zoom = 1.0;
+
+    private ConnectionData? _pendingConnection;
+    private bool _isDraggingNode;
+    private Point2D _dragStart;
+    private NodeViewModel? _draggingNode;
+
+    [Parameter, EditorRequired]
+    public NodeEditorState State { get; set; } = null!;
+
+    [Parameter]
+    public double MinZoom { get; set; } = 0.1;
+
+    [Parameter]
+    public double MaxZoom { get; set; } = 3.0;
+
+    [Parameter]
+    public double ZoomStep { get; set; } = 0.1;
+
+    private string ViewportTransformStyle =>
+        $"transform: translate({_panOffset.X}px, {_panOffset.Y}px) scale({_zoom});";
+
+    protected override void OnInitialized()
+    {
+        // Subscribe to state events for reactive updates
+        State.NodeAdded += OnStateChanged;
+        State.NodeRemoved += OnStateChanged;
+        State.ConnectionAdded += OnStateChanged;
+        State.ConnectionRemoved += OnStateChanged;
+        State.SelectionChanged += OnStateChanged;
+        State.ZoomChanged += OnZoomChanged;
+        State.ViewportChanged += OnViewportChanged;
+    }
+
+    public void Dispose()
+    {
+        State.NodeAdded -= OnStateChanged;
+        State.NodeRemoved -= OnStateChanged;
+        State.ConnectionAdded -= OnStateChanged;
+        State.ConnectionRemoved -= OnStateChanged;
+        State.SelectionChanged -= OnStateChanged;
+        State.ZoomChanged -= OnZoomChanged;
+        State.ViewportChanged -= OnViewportChanged;
+    }
+
+    private void OnStateChanged(object? sender, EventArgs e) => StateHasChanged();
+    
+    private void OnZoomChanged(object? sender, ZoomChangedEventArgs e)
+    {
+        _zoom = e.CurrentZoom;
+        StateHasChanged();
+    }
+
+    private void OnViewportChanged(object? sender, ViewportChangedEventArgs e)
+    {
+        _panOffset = new Point2D(e.CurrentViewport.X, e.CurrentViewport.Y);
+        StateHasChanged();
+    }
+
+    private void OnPointerDown(PointerEventArgs e)
+    {
+        if (e.Button == 1) // Middle mouse button for panning
+        {
+            _isPanning = true;
+            _panStart = new Point2D(e.ClientX - _panOffset.X, e.ClientY - _panOffset.Y);
+        }
+        else if (e.Button == 0) // Left click on empty canvas clears selection
+        {
+            State.ClearSelection();
+        }
+    }
+
+    private void OnPointerMove(PointerEventArgs e)
+    {
+        if (_isPanning)
+        {
+            _panOffset = new Point2D(e.ClientX - _panStart.X, e.ClientY - _panStart.Y);
+            StateHasChanged();
+        }
+        else if (_isDraggingNode && _draggingNode is not null)
+        {
+            var deltaX = (e.ClientX - _dragStart.X) / _zoom;
+            var deltaY = (e.ClientY - _dragStart.Y) / _zoom;
+            _draggingNode.Position = new Point2D(
+                _draggingNode.Position.X + deltaX,
+                _draggingNode.Position.Y + deltaY);
+            _dragStart = new Point2D(e.ClientX, e.ClientY);
+            StateHasChanged();
+        }
+        else if (_pendingConnection is not null)
+        {
+            // Update pending connection endpoint for preview
+            StateHasChanged();
+        }
+    }
+
+    private void OnPointerUp(PointerEventArgs e)
+    {
+        _isPanning = false;
+        _isDraggingNode = false;
+        _draggingNode = null;
+        _pendingConnection = null;
+    }
+
+    private void OnWheel(WheelEventArgs e)
+    {
+        var zoomDelta = e.DeltaY > 0 ? -ZoomStep : ZoomStep;
+        var newZoom = Math.Clamp(_zoom + zoomDelta, MinZoom, MaxZoom);
+        
+        if (Math.Abs(newZoom - _zoom) > double.Epsilon)
+        {
+            State.Zoom = newZoom;
+        }
+    }
+
+    private void OnSocketPointerDown(SocketPointerEventArgs e)
+    {
+        // Start creating a connection from this socket
+        if (!e.Socket.Data.IsInput)
+        {
+            _pendingConnection = new ConnectionData(
+                OutputNodeId: e.NodeId,
+                InputNodeId: string.Empty,
+                OutputSocketName: e.Socket.Data.Name,
+                InputSocketName: string.Empty,
+                IsExecution: e.Socket.Data.IsExecution);
+        }
+    }
+
+    private void OnSocketPointerUp(SocketPointerEventArgs e)
+    {
+        // Complete the connection if we have a pending one
+        if (_pendingConnection is not null && e.Socket.Data.IsInput)
+        {
+            var connection = _pendingConnection with
+            {
+                InputNodeId = e.NodeId,
+                InputSocketName = e.Socket.Data.Name
+            };
+            
+            // Validate connection is not to the same node
+            if (connection.OutputNodeId != connection.InputNodeId)
+            {
+                State.AddConnection(connection);
+            }
+        }
+        _pendingConnection = null;
+    }
+
+    private static string GetConnectionKey(ConnectionData c) =>
+        $"{c.OutputNodeId}:{c.OutputSocketName}->{c.InputNodeId}:{c.InputSocketName}";
+}

@@ -94,11 +94,36 @@ Keep **render logic** and **interaction logic** separate. Interactions should di
 ```
 
 ## Missing Architecture Gaps (to close in this stage)
-- **Coordinate conversion utilities**: screen ↔ graph coordinates for hit testing.
-- **Layout system**: node internal layout (header, sockets, editor area) with consistent padding.
-- **Connection path router**: centralized function that converts socket positions into SVG path strings.
+- ~~**Coordinate conversion utilities**: screen ↔ graph coordinates for hit testing.~~ ✅ Implemented in `CoordinateConverter.cs`
+- ~~**Layout system**: node internal layout (header, sockets, editor area) with consistent padding.~~ ✅ Implemented in `node-editor.css`
+- ~~**Connection path router**: centralized function that converts socket positions into SVG path strings.~~ ✅ Implemented in `ConnectionPath.razor`
 
 ## Checklist
-- [ ] NodeEditorCanvas renders both SVG and HTML layers
-- [ ] NodeComponent and SocketComponent render with stable keys
-- [ ] No UI logic in models; view models only
+- [x] NodeEditorCanvas renders both SVG and HTML layers
+- [x] NodeComponent and SocketComponent render with stable keys
+- [x] No UI logic in models; view models only
+
+## Implementation Summary (Completed)
+
+### Components Created
+| Component | File | Description |
+|-----------|------|-------------|
+| `NodeEditorCanvas` | `Components/NodeEditorCanvas.razor` | Root container with pan/zoom viewport, pointer handling, and cascading state |
+| `NodeComponent` | `Components/NodeComponent.razor` | Absolutely positioned node with header, inputs, and outputs |
+| `SocketComponent` | `Components/SocketComponent.razor` | Input/output pins with type-based coloring |
+| `ConnectionPath` | `Components/ConnectionPath.razor` | SVG Bezier curve connections between sockets |
+
+### Services Added
+| Service | File | Description |
+|---------|------|-------------|
+| `CoordinateConverter` | `Services/CoordinateConverter.cs` | Screen ↔ graph coordinate conversion for zoom/pan |
+
+### Styles
+| File | Description |
+|------|-------------|
+| `wwwroot/css/node-editor.css` | Full CSS for canvas, nodes, sockets, and connections |
+
+### Tests
+| Test Class | Tests | Description |
+|------------|-------|-------------|
+| `ComponentHierarchyTests` | 9 | Smoke tests for nodes, connections, coordinates, and selection |

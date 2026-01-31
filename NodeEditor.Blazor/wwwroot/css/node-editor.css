@@ -1,0 +1,253 @@
+/* Node Editor - Core Styles */
+/* Stage 03: Blazor Component Hierarchy */
+
+/* ============================================
+   Canvas Container
+   ============================================ */
+.ne-canvas {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #1e1e2e;
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+    cursor: default;
+    user-select: none;
+    touch-action: none;
+}
+
+.ne-canvas:focus {
+    outline: none;
+}
+
+/* ============================================
+   Viewport (pan/zoom container)
+   ============================================ */
+.ne-viewport {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+}
+
+/* ============================================
+   Connection Layer (SVG)
+   ============================================ */
+.ne-connections {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 10000px;
+    height: 10000px;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.ne-connection {
+    pointer-events: stroke;
+    cursor: pointer;
+    transition: stroke-width 0.15s ease;
+}
+
+.ne-connection:hover {
+    stroke-width: 5 !important;
+}
+
+.ne-connection--execution {
+    stroke: #ffffff;
+    stroke-dasharray: 8 4;
+}
+
+.ne-connection--data {
+    stroke: #88cc88;
+}
+
+.ne-connection--pending {
+    stroke-dasharray: 5 5;
+    opacity: 0.7;
+    animation: dash 0.5s linear infinite;
+}
+
+@keyframes dash {
+    to {
+        stroke-dashoffset: -10;
+    }
+}
+
+/* ============================================
+   Node Layer (HTML)
+   ============================================ */
+.ne-nodes {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* ============================================
+   Node Component
+   ============================================ */
+.ne-node {
+    position: absolute;
+    background: linear-gradient(180deg, #2d2d3d 0%, #252535 100%);
+    border: 1px solid #3d3d5c;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    min-width: 140px;
+    cursor: move;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.ne-node:hover {
+    border-color: #5d5d8c;
+}
+
+.ne-node--selected {
+    border-color: #6699ff;
+    box-shadow: 0 0 0 2px rgba(102, 153, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================
+   Node Header
+   ============================================ */
+.ne-node-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: linear-gradient(180deg, #3d3d5c 0%, #2d2d4d 100%);
+    border-radius: 7px 7px 0 0;
+    border-bottom: 1px solid #3d3d5c;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e0e0f0;
+}
+
+.ne-node-exec-icon {
+    font-size: 10px;
+    color: #88cc88;
+}
+
+.ne-node-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ============================================
+   Node Body
+   ============================================ */
+.ne-node-body {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    min-height: 24px;
+}
+
+.ne-node-inputs,
+.ne-node-outputs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ne-node-inputs {
+    align-items: flex-start;
+}
+
+.ne-node-outputs {
+    align-items: flex-end;
+}
+
+/* ============================================
+   Socket Component
+   ============================================ */
+.ne-socket {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    cursor: crosshair;
+    transition: background-color 0.15s ease;
+}
+
+.ne-socket:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.ne-socket--input {
+    flex-direction: row;
+}
+
+.ne-socket--output {
+    flex-direction: row-reverse;
+}
+
+.ne-socket-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    transition: transform 0.15s ease, border-color 0.15s ease;
+    flex-shrink: 0;
+}
+
+.ne-socket:hover .ne-socket-dot {
+    transform: scale(1.2);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.ne-socket--execution .ne-socket-dot {
+    border-radius: 2px;
+    transform: rotate(45deg);
+}
+
+.ne-socket--execution:hover .ne-socket-dot {
+    transform: rotate(45deg) scale(1.2);
+}
+
+.ne-socket-label {
+    font-size: 11px;
+    color: #b0b0c0;
+    white-space: nowrap;
+}
+
+/* ============================================
+   Execution socket special styling
+   ============================================ */
+.ne-socket--execution .ne-socket-dot {
+    background-color: transparent !important;
+    border-color: #ffffff;
+    border-width: 2px;
+}
+
+.ne-socket--execution:hover .ne-socket-dot {
+    background-color: #ffffff !important;
+}
+
+/* ============================================
+   Responsive adjustments
+   ============================================ */
+@media (max-width: 768px) {
+    .ne-node {
+        min-width: 120px;
+    }
+    
+    .ne-node-header {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+    
+    .ne-socket-label {
+        font-size: 10px;
+    }
+    
+    .ne-socket-dot {
+        width: 10px;
+        height: 10px;
+    }
+}
