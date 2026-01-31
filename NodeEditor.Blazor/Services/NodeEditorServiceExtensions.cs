@@ -27,6 +27,10 @@ public static class NodeEditorServiceExtensions
         // Register socket type resolver as singleton (shared type registry)
         services.AddSingleton<SocketTypeResolver>();
 
+        // Register node registry services
+        services.AddSingleton<Registry.NodeDiscoveryService>();
+        services.AddSingleton<Registry.NodeRegistryService>();
+
         // Register execution services
         services.AddSingleton<ExecutionPlanner>();
         services.AddSingleton<BackgroundExecutionQueue>();
@@ -51,6 +55,9 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<CoordinateConverter>();
         services.AddScoped<ConnectionValidator>();
         services.AddSingleton<SocketTypeResolver>();
+
+        services.AddSingleton<Registry.NodeDiscoveryService>();
+        services.AddSingleton<Registry.NodeRegistryService>();
 
         services.AddSingleton<ExecutionPlanner>();
         services.AddSingleton<BackgroundExecutionQueue>();

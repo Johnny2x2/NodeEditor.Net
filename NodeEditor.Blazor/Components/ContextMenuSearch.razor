@@ -1,0 +1,21 @@
+<div class="ne-context-menu-search">
+    <input class="ne-context-menu-search-input"
+           placeholder="Search nodes"
+           value="@Value"
+           @oninput="HandleInput" />
+</div>
+
+@code {
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    private async Task HandleInput(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        Value = value;
+        await ValueChanged.InvokeAsync(value);
+    }
+}

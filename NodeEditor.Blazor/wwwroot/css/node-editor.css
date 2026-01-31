@@ -238,6 +238,101 @@
 }
 
 /* ============================================
+   Context Menu
+   ============================================ */
+.ne-context-menu {
+    position: absolute;
+    z-index: 20;
+    min-width: 220px;
+    max-width: 320px;
+    max-height: 60vh;
+    overflow: hidden;
+    background: #2b2b3a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+    color: #e0e0f0;
+}
+
+.ne-context-menu-search {
+    padding: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ne-context-menu-search-input {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: #1f1f2b;
+    color: #e0e0f0;
+    font-size: 12px;
+    outline: none;
+}
+
+.ne-context-menu-search-input:focus {
+    border-color: rgba(102, 153, 255, 0.6);
+    box-shadow: 0 0 0 2px rgba(102, 153, 255, 0.2);
+}
+
+.ne-context-menu-list {
+    max-height: 52vh;
+    overflow: auto;
+    padding: 6px 0;
+}
+
+.ne-context-menu-category {
+    padding: 4px 0;
+}
+
+.ne-context-menu-category-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.55);
+    padding: 6px 12px 4px;
+}
+
+.ne-context-menu-category-items {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 6px 6px;
+}
+
+.ne-context-menu-item {
+    background: transparent;
+    border: none;
+    text-align: left;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: inherit;
+}
+
+.ne-context-menu-item:hover {
+    background: rgba(102, 153, 255, 0.15);
+}
+
+.ne-context-menu-item-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #f0f0ff;
+}
+
+.ne-context-menu-item-description {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.ne-context-menu-empty {
+    padding: 12px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* ============================================
    Responsive adjustments
    ============================================ */
 @media (max-width: 768px) {

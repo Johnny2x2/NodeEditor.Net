@@ -1,0 +1,133 @@
+@inject NodeRegistryService Registry
+@implements IDisposable
+
+@if (IsOpen)
+{
+        <div class="ne-context-menu"
+            style="@MenuStyle"
+            @onkeydown="OnKeyDown"
+            @onpointerdown:stopPropagation
+            @onpointerdown:preventDefault
+            tabindex="0"
+            @ref="_menuRef">
+        <ContextMenuSearch Value="_search" ValueChanged="OnSearchChanged" />
+        <div class="ne-context-menu-list">
+            @if (_catalog.Categories.Count == 0)
+            {
+                <div class="ne-context-menu-empty">No nodes found.</div>
+            }
+            else
+            {
+                @foreach (var category in _catalog.Categories)
+                {
+                    <div class="ne-context-menu-category">
+                        <div class="ne-context-menu-category-title">@category.Name</div>
+                        <div class="ne-context-menu-category-items">
+                            @foreach (var definition in category.Nodes)
+                            {
+                                <ContextMenuItem Definition="definition" OnSelect="OnSelectDefinition" />
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private ElementReference _menuRef;
+    private NodeCatalog _catalog = NodeCatalog.Create(Array.Empty<NodeDefinition>());
+    private string _search = string.Empty;
+    private bool _focusPending;
+
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public Point2D Position { get; set; }
+
+    [Parameter]
+    public EventCallback<NodeDefinition> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private string MenuStyle => $"left: {Position.X}px; top: {Position.Y}px;";
+
+    protected override void OnInitialized()
+    {
+        Registry.RegistryChanged += OnRegistryChanged;
+        Registry.EnsureInitialized();
+        RefreshCatalog();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen)
+        {
+            _focusPending = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusPending)
+        {
+            _focusPending = false;
+            await _menuRef.FocusAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        Registry.RegistryChanged -= OnRegistryChanged;
+    }
+
+    private void OnRegistryChanged(object? sender, EventArgs e)
+    {
+        RefreshCatalog();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RefreshCatalog()
+    {
+        _catalog = Registry.GetCatalog(_search);
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        _search = value;
+        RefreshCatalog();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnSelectDefinition(NodeDefinition definition)
+    {
+        if (OnSelect.HasDelegate)
+        {
+            await OnSelect.InvokeAsync(definition);
+        }
+
+        await CloseAsync();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await CloseAsync();
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        _search = string.Empty;
+        RefreshCatalog();
+
+        if (OnClose.HasDelegate)
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
+}

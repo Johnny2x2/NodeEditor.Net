@@ -11,11 +11,17 @@
      @onwheel="OnWheel"
      @onwheel:preventDefault
      @onkeydown="OnKeyDown"
+     @oncontextmenu="OnContextMenu"
+     @oncontextmenu:preventDefault
      tabindex="0">
     @if (_isSelecting)
     {
         <div class="ne-selection-rect" style="@SelectionRectStyle"></div>
     }
+    <ContextMenu IsOpen="_isContextMenuOpen"
+                 Position="_contextMenuScreenPosition"
+                 OnSelect="AddNodeFromDefinition"
+                 OnClose="CloseContextMenu" />
     <div class="ne-viewport" style="@ViewportTransformStyle">
         @* Connection layer (SVG) - rendered below nodes *@
         <svg class="ne-connections" @ref="_svgRef">
@@ -68,6 +74,10 @@
     private Point2D _selectionStartScreen;
     private Point2D _selectionCurrentScreen;
     private HashSet<string> _selectionBase = new();
+
+    private bool _isContextMenuOpen;
+    private Point2D _contextMenuScreenPosition = Point2D.Zero;
+    private Point2D _contextMenuGraphPosition = Point2D.Zero;
 
     [Parameter, EditorRequired]
     public NodeEditorState State { get; set; } = null!;
@@ -140,6 +150,11 @@
     private async Task OnPointerDown(PointerEventArgs e)
     {
         await _canvasRef.FocusAsync();
+
+        if (_isContextMenuOpen && e.Button == 0)
+        {
+            CloseContextMenu();
+        }
 
         if (e.Button == 1) // Middle mouse button for panning
         {
@@ -215,6 +230,14 @@
             State.Zoom = newZoom;
             State.Viewport = new Rect2D(newPan.X, newPan.Y, State.Viewport.Width, State.Viewport.Height);
         }
+    }
+
+    private void OnContextMenu(MouseEventArgs e)
+    {
+        _contextMenuScreenPosition = new Point2D(e.ClientX, e.ClientY);
+        _contextMenuGraphPosition = CoordinateConverter.ScreenToGraph(_contextMenuScreenPosition);
+        _isContextMenuOpen = true;
+        StateHasChanged();
     }
 
     private void OnSocketPointerDown(SocketPointerEventArgs e)
@@ -372,6 +395,7 @@
         _pendingConnection = null;
         _pendingConnectionEndGraph = null;
         _isSelecting = false;
+        CloseContextMenu();
     }
 
     private void OnKeyDown(KeyboardEventArgs e)
@@ -396,6 +420,22 @@
         {
             State.RequestRedo();
         }
+    }
+
+    private void AddNodeFromDefinition(NodeDefinition definition)
+    {
+        var nodeData = definition.Factory();
+        var nodeViewModel = new NodeViewModel(nodeData)
+        {
+            Position = _contextMenuGraphPosition
+        };
+
+        State.AddNode(nodeViewModel);
+    }
+
+    private void CloseContextMenu()
+    {
+        _isContextMenuOpen = false;
     }
 
     private static string GetConnectionKey(ConnectionData c) =>
