@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="NodeEditor/NodeEditor.csproj" Id="2a51d621-3e0d-4293-a2ad-964721bfff7b" />
   <Project Path="NodeEditorMax/NodeEditorMax.csproj" />
 </Solution>

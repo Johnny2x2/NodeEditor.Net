@@ -87,6 +87,7 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+    <None Include="README.md" />
     <None Include="Resources\socket.png" />
   </ItemGroup>
   <ItemGroup>
