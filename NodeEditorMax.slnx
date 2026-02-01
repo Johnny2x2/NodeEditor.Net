@@ -4,5 +4,4 @@
   <Project Path="NodeEditor.Blazor/NodeEditor.Blazor.csproj" />
   <Project Path="NodeEditor.Blazor.Tests/NodeEditor.Blazor.Tests.csproj" />
   <Project Path="NodeEditor.Plugins.Sample/NodeEditor.Plugins.Sample.csproj" />
-  <Project Path="samples/BasicNodeEditor/BasicNodeEditor.csproj" />
 </Solution>
