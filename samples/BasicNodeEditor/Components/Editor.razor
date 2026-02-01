@@ -1,0 +1,99 @@
+@page "/"
+@using NodeEditor.Blazor.Components
+@using NodeEditor.Blazor.Services
+@inject NodeEditorState State
+
+<div class="editor-container">
+    <div class="toolbar">
+        <h1>Basic Node Editor</h1>
+        <div class="toolbar-buttons">
+            <button @onclick="CreateSampleGraph">Load Sample Graph</button>
+            <button @onclick="ClearGraph">Clear</button>
+            <button @onclick="SaveGraph">Save</button>
+            <button @onclick="LoadGraph">Load</button>
+        </div>
+        <div class="info">
+            <span>Nodes: @State.Nodes.Count</span>
+            <span>Connections: @State.Connections.Count</span>
+            <span>Zoom: @State.Zoom.ToString("F2")</span>
+        </div>
+    </div>
+
+    <div class="editor-wrapper">
+        <NodeEditorCanvas />
+    </div>
+</div>
+
+@code {
+    private async Task CreateSampleGraph()
+    {
+        await State.ClearAsync();
+
+        // Create some sample nodes
+        var add1 = await State.AddNodeAsync("Math", "Add", new Point2D(100, 100));
+        var add2 = await State.AddNodeAsync("Math", "Add", new Point2D(100, 300));
+        var multiply = await State.AddNodeAsync("Math", "Multiply", new Point2D(400, 200));
+
+        // Set some input values
+        if (add1 != null)
+        {
+            await State.SetSocketValueAsync(add1.Id, "A", 5);
+            await State.SetSocketValueAsync(add1.Id, "B", 3);
+        }
+
+        if (add2 != null)
+        {
+            await State.SetSocketValueAsync(add2.Id, "A", 10);
+            await State.SetSocketValueAsync(add2.Id, "B", 2);
+        }
+
+        // Create connections
+        if (add1 != null && multiply != null)
+        {
+            await State.CreateConnectionAsync(
+                add1.Id, "Result",
+                multiply.Id, "A"
+            );
+        }
+
+        if (add2 != null && multiply != null)
+        {
+            await State.CreateConnectionAsync(
+                add2.Id, "Result",
+                multiply.Id, "B"
+            );
+        }
+    }
+
+    private async Task ClearGraph()
+    {
+        await State.ClearAsync();
+    }
+
+    private async Task SaveGraph()
+    {
+        // In a real app, you would use IGraphSerializer and save to file
+        // This is a simplified example
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Nodes = State.Nodes,
+            Connections = State.Connections
+        });
+
+        await Application.Current.MainPage.DisplayAlert(
+            "Save", 
+            "Graph saved (see console for JSON)", 
+            "OK");
+            
+        Console.WriteLine("Graph JSON:");
+        Console.WriteLine(json);
+    }
+
+    private async Task LoadGraph()
+    {
+        await Application.Current.MainPage.DisplayAlert(
+            "Load",
+            "Load functionality would restore graph from saved JSON",
+            "OK");
+    }
+}
