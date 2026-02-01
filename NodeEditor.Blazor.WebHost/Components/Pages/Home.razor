@@ -4,10 +4,12 @@
 @using NodeEditor.Blazor.Components
 @using NodeEditor.Blazor.Models
 @using NodeEditor.Blazor.Services
+@using NodeEditor.Blazor.Services.Registry
 @using NodeEditor.Blazor.ViewModels
 @using NodeEditor.Blazor.Services.Execution
 @inject NodeEditorState EditorState
 @inject NodeExecutionService ExecutionService
+@inject NodeRegistryService Registry
 
 <PageTitle>Node Editor</PageTitle>
 
@@ -15,10 +17,6 @@
 	<button @onclick="StartExecutionAsync" disabled="@_isExecuting">Start</button>
 	<button @onclick="StopExecution" disabled="@(!_isExecuting)">Stop</button>
 	<span class="execution-status">@_executionStatus</span>
-	@if (!string.IsNullOrWhiteSpace(_lastMessage))
-	{
-		<span class="execution-message">@_lastMessage</span>
-	}
 </div>
 
 <NodePropertiesPanel State="EditorState" />
@@ -31,11 +29,12 @@
 	private CancellationTokenSource? _executionCts;
 	private bool _isExecuting;
 	private string _executionStatus = "Idle";
-	private string? _lastMessage;
-	private readonly SampleNodeContext _nodeContext = new();
+	private readonly StandardNodeContext _nodeContext = new();
 
 	protected override void OnInitialized()
 	{
+		Registry.RegisterFromAssembly(typeof(StandardNodeContext).Assembly);
+
 		if (EditorState.Nodes.Count == 0)
 		{
 			CreateSampleGraph();
@@ -62,8 +61,6 @@
 
 		_isExecuting = true;
 		_executionStatus = "Running";
-		_lastMessage = null;
-		_nodeContext.Reset();
 		EditorState.ResetNodeExecutionState();
 
 		_executionCts?.Dispose();
@@ -97,7 +94,6 @@
 		finally
 		{
 			_isExecuting = false;
-			_lastMessage = _nodeContext.LastMessage;
 			await InvokeAsync(StateHasChanged);
 		}
 	}
@@ -141,165 +137,314 @@
 
 	private void CreateSampleGraph()
 	{
-		var startNode = new NodeViewModel(new NodeData(
-			Id: "node-start",
+		var execType = typeof(ExecutionPath).FullName ?? "ExecutionPath";
+		var listType = typeof(SerializableList).FullName ?? "SerializableList";
+		var intType = typeof(int).FullName ?? "System.Int32";
+		var stringType = typeof(string).FullName ?? "System.String";
+		var doubleType = typeof(double).FullName ?? "System.Double";
+
+		var startLoop = new NodeViewModel(new NodeData(
+			Id: "start-loop",
 			Name: "Start",
 			Callable: true,
 			ExecInit: true,
 			Inputs: Array.Empty<SocketData>(),
-			Outputs: new[]
-			{
-				new SocketData("Exit", typeof(ExecutionPath).FullName ?? "ExecutionPath", false, true)
-			}))
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
 		{
 			Position = new Point2D(60, 80)
 		};
 
-		var valueANode = new NodeViewModel(new NodeData(
-			Id: "node-value-a",
-			Name: "Value",
-			Callable: false,
-			ExecInit: false,
-			Inputs: new[]
-			{
-				new SocketData("Value", "int", true, false)
-			},
-			Outputs: new[]
-			{
-				new SocketData("Value_Out", "int", false, false)
-			}))
-		{
-			Position = new Point2D(200, 20)
-		};
-
-		var valueBNode = new NodeViewModel(new NodeData(
-			Id: "node-value-b",
-			Name: "Value",
-			Callable: false,
-			ExecInit: false,
-			Inputs: new[]
-			{
-				new SocketData("Value", "int", true, false)
-			},
-			Outputs: new[]
-			{
-				new SocketData("Value_Out", "int", false, false)
-			}))
-		{
-			Position = new Point2D(200, 120)
-		};
-
-		var mathNode = new NodeViewModel(new NodeData(
-			Id: "node-math",
-			Name: "Add",
-			Callable: false,
-			ExecInit: false,
-			Inputs: new[]
-			{
-				new SocketData("A", "int", true, false),
-				new SocketData("B", "int", true, false)
-			},
-			Outputs: new[]
-			{
-				new SocketData("Result", "int", false, false)
-			}))
-		{
-			Position = new Point2D(420, 70)
-		};
-
-		var toStringNode = new NodeViewModel(new NodeData(
-			Id: "node-tostring",
-			Name: "ToString",
-			Callable: false,
-			ExecInit: false,
-			Inputs: new[]
-			{
-				new SocketData("Input", "object", true, false)
-			},
-			Outputs: new[]
-			{
-				new SocketData("Output", "string", false, false)
-			}))
-		{
-			Position = new Point2D(600, 60)
-		};
-
-		var printNode = new NodeViewModel(new NodeData(
-			Id: "node-print",
-			Name: "Print",
+		var forLoop = new NodeViewModel(new NodeData(
+			Id: "for-loop",
+			Name: "For Loop Step",
 			Callable: true,
 			ExecInit: false,
 			Inputs: new[]
 			{
-				new SocketData("Enter", typeof(ExecutionPath).FullName ?? "ExecutionPath", true, true),
-				new SocketData("Message", "string", true, false)
+				new SocketData("Enter", execType, true, true),
+				new SocketData("StartValue", intType, true, false, SocketValue.FromObject(0)),
+				new SocketData("EndValue", intType, true, false, SocketValue.FromObject(4)),
+				new SocketData("Step", intType, true, false, SocketValue.FromObject(1))
 			},
 			Outputs: new[]
 			{
-				new SocketData("Exit", typeof(ExecutionPath).FullName ?? "ExecutionPath", false, true)
+				new SocketData("ExitPath", execType, false, true),
+				new SocketData("LoopPath", execType, false, true),
+				new SocketData("Index", intType, false, false)
 			}))
 		{
-			Position = new Point2D(760, 120)
+			Position = new Point2D(260, 60)
 		};
 
-		EditorState.AddNode(startNode);
-		EditorState.AddNode(valueANode);
-		EditorState.AddNode(valueBNode);
-		EditorState.AddNode(mathNode);
-		EditorState.AddNode(toStringNode);
-		EditorState.AddNode(printNode);
-
-		EditorState.AddConnection(new ConnectionData("node-start", "node-print", "Exit", "Enter", true));
-		EditorState.AddConnection(new ConnectionData("node-value-a", "node-math", "Value_Out", "A", false));
-		EditorState.AddConnection(new ConnectionData("node-value-b", "node-math", "Value_Out", "B", false));
-		EditorState.AddConnection(new ConnectionData("node-math", "node-tostring", "Result", "Input", false));
-		EditorState.AddConnection(new ConnectionData("node-tostring", "node-print", "Output", "Message", false));
-	}
-
-	private sealed class SampleNodeContext : INodeMethodContext
-	{
-		public NodeData? CurrentProcessingNode { get; set; }
-
-		public event Action<string, NodeData, ExecutionFeedbackType, object?, bool>? FeedbackInfo;
-
-		public string? LastMessage { get; private set; }
-
-		public void Reset()
+		var consumeLoop = new NodeViewModel(new NodeData(
+			Id: "consume-loop",
+			Name: "Consume",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("Value", intType, true, false)
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
 		{
-			LastMessage = null;
-		}
+			Position = new Point2D(500, 60)
+		};
 
-		[Node("Start", isCallable: true, isExecutionInitiator: true)]
-		public void Start(out ExecutionPath Exit)
+		var markerLoop = new NodeViewModel(new NodeData(
+			Id: "marker-loop",
+			Name: "Marker",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[] { new SocketData("Enter", execType, true, true) },
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
 		{
-			Exit = new ExecutionPath();
-			Exit.Signal();
-		}
+			Position = new Point2D(760, 60)
+		};
 
-		[Node("Add", isCallable: false)]
-		public void Add(int A, int B, out int Result)
+		var startList = new NodeViewModel(new NodeData(
+			Id: "start-list",
+			Name: "Start",
+			Callable: true,
+			ExecInit: true,
+			Inputs: Array.Empty<SocketData>(),
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
 		{
-			Result = A + B;
-		}
+			Position = new Point2D(60, 260)
+		};
 
-		[Node("Value", isCallable: false)]
-		public void ValueNode(int Value, out int Value_Out)
+		var listCreate = new NodeViewModel(new NodeData(
+			Id: "list-create",
+			Name: "List Create",
+			Callable: false,
+			ExecInit: false,
+			Inputs: Array.Empty<SocketData>(),
+			Outputs: new[] { new SocketData("List", listType, false, false) }))
 		{
-			Value_Out = Value;
-		}
+			Position = new Point2D(240, 240)
+		};
 
-		[Node("ToString", isCallable: false)]
-		public void ToStringNode(object Input, out string Output)
+		var listAddA = new NodeViewModel(new NodeData(
+			Id: "list-add-a",
+			Name: "List Add",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("List", listType, true, false),
+				new SocketData("Value", stringType, true, false, SocketValue.FromObject("Alpha"))
+			},
+			Outputs: new[] { new SocketData("Result", listType, false, false) }))
 		{
-			Output = Input?.ToString() ?? string.Empty;
-		}
+			Position = new Point2D(420, 220)
+		};
 
-		[Node("Print", isCallable: true)]
-		public void Print(ExecutionPath Enter, string Message, out ExecutionPath Exit)
+		var listAddB = new NodeViewModel(new NodeData(
+			Id: "list-add-b",
+			Name: "List Add",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("List", listType, true, false),
+				new SocketData("Value", stringType, true, false, SocketValue.FromObject("Beta"))
+			},
+			Outputs: new[] { new SocketData("Result", listType, false, false) }))
 		{
-			LastMessage = Message;
-			Exit = new ExecutionPath();
-			Exit.Signal();
-		}
+			Position = new Point2D(600, 220)
+		};
+
+		var listCount = new NodeViewModel(new NodeData(
+			Id: "list-count",
+			Name: "List Count",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[] { new SocketData("List", listType, true, false) },
+			Outputs: new[] { new SocketData("Count", intType, false, false) }))
+		{
+			Position = new Point2D(780, 220)
+		};
+
+		var consumeList = new NodeViewModel(new NodeData(
+			Id: "consume-list",
+			Name: "Consume",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("Value", intType, true, false)
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(980, 220)
+		};
+
+		var stringConcat = new NodeViewModel(new NodeData(
+			Id: "string-concat",
+			Name: "String Concat",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("A", stringType, true, false, SocketValue.FromObject("Loop count: ")),
+				new SocketData("B", stringType, true, false)
+			},
+			Outputs: new[] { new SocketData("Result", stringType, false, false) }))
+		{
+			Position = new Point2D(780, 320)
+		};
+
+		var stringLength = new NodeViewModel(new NodeData(
+			Id: "string-length",
+			Name: "String Length",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[] { new SocketData("Input", stringType, true, false) },
+			Outputs: new[] { new SocketData("Length", intType, false, false) }))
+		{
+			Position = new Point2D(980, 320)
+		};
+
+		var consumeString = new NodeViewModel(new NodeData(
+			Id: "consume-string",
+			Name: "Consume",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("Value", intType, true, false)
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(1180, 320)
+		};
+
+		var startParallel = new NodeViewModel(new NodeData(
+			Id: "start-parallel",
+			Name: "Start",
+			Callable: true,
+			ExecInit: true,
+			Inputs: Array.Empty<SocketData>(),
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(60, 480)
+		};
+
+		var splitParallel = new NodeViewModel(new NodeData(
+			Id: "split-parallel",
+			Name: "Parallel Split",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[] { new SocketData("Start", execType, true, true) },
+			Outputs: new[]
+			{
+				new SocketData("PathA", execType, false, true),
+				new SocketData("PathB", execType, false, true)
+			}))
+		{
+			Position = new Point2D(260, 460)
+		};
+
+		var delayA = new NodeViewModel(new NodeData(
+			Id: "delay-a",
+			Name: "Delay",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("DelayMs", intType, true, false, SocketValue.FromObject(400))
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(520, 430)
+		};
+
+		var delayB = new NodeViewModel(new NodeData(
+			Id: "delay-b",
+			Name: "Delay",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("DelayMs", intType, true, false, SocketValue.FromObject(700))
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(520, 520)
+		};
+
+		var joinParallel = new NodeViewModel(new NodeData(
+			Id: "join-parallel",
+			Name: "Parallel Join",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("PathA", execType, true, true),
+				new SocketData("PathB", execType, true, true)
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(760, 480)
+		};
+
+		var markerParallel = new NodeViewModel(new NodeData(
+			Id: "marker-parallel",
+			Name: "Marker",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[] { new SocketData("Enter", execType, true, true) },
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(980, 480)
+		};
+
+		EditorState.AddNode(startLoop);
+		EditorState.AddNode(forLoop);
+		EditorState.AddNode(consumeLoop);
+		EditorState.AddNode(markerLoop);
+		EditorState.AddNode(startList);
+		EditorState.AddNode(listCreate);
+		EditorState.AddNode(listAddA);
+		EditorState.AddNode(listAddB);
+		EditorState.AddNode(listCount);
+		EditorState.AddNode(consumeList);
+		EditorState.AddNode(stringConcat);
+		EditorState.AddNode(stringLength);
+		EditorState.AddNode(consumeString);
+		EditorState.AddNode(startParallel);
+		EditorState.AddNode(splitParallel);
+		EditorState.AddNode(delayA);
+		EditorState.AddNode(delayB);
+		EditorState.AddNode(joinParallel);
+		EditorState.AddNode(markerParallel);
+
+		EditorState.AddConnection(new ConnectionData("start-loop", "for-loop", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("for-loop", "consume-loop", "LoopPath", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("consume-loop", "for-loop", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("for-loop", "marker-loop", "ExitPath", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("for-loop", "consume-loop", "Index", "Value", false));
+
+		EditorState.AddConnection(new ConnectionData("start-list", "consume-list", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("list-create", "list-add-a", "List", "List", false));
+		EditorState.AddConnection(new ConnectionData("list-add-a", "list-add-b", "Result", "List", false));
+		EditorState.AddConnection(new ConnectionData("list-add-b", "list-count", "Result", "List", false));
+		EditorState.AddConnection(new ConnectionData("list-count", "consume-list", "Count", "Value", false));
+
+		EditorState.AddConnection(new ConnectionData("list-count", "string-concat", "Count", "B", false));
+		EditorState.AddConnection(new ConnectionData("string-concat", "string-length", "Result", "Input", false));
+		EditorState.AddConnection(new ConnectionData("start-list", "consume-string", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("string-length", "consume-string", "Length", "Value", false));
+
+		EditorState.AddConnection(new ConnectionData("start-parallel", "split-parallel", "Exit", "Start", true));
+		EditorState.AddConnection(new ConnectionData("split-parallel", "delay-a", "PathA", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("split-parallel", "delay-b", "PathB", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("delay-a", "join-parallel", "Exit", "PathA", true));
+		EditorState.AddConnection(new ConnectionData("delay-b", "join-parallel", "Exit", "PathB", true));
+		EditorState.AddConnection(new ConnectionData("join-parallel", "marker-parallel", "Exit", "Enter", true));
 	}
 }
