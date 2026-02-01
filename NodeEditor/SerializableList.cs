@@ -23,33 +23,41 @@ namespace NodeEditor
 
         public void Add(T obj)
         {
-            Values.Add(obj);
-            base.values.Add(obj);
-            itemCount++;
+            lock (SyncRoot)
+            {
+                base.values.Add(obj);
+                itemCount = base.values.Count;
+            }
         }
 
         public List<T> ReturnList()
         {
-            List<T> vals = new List<T>();
-
-            foreach (object item in base.values)
+            lock (SyncRoot)
             {
-                vals.Add((T)item);
-            }
+                List<T> vals = new List<T>();
 
-            return vals;
+                foreach (object item in base.values)
+                {
+                    vals.Add((T)item);
+                }
+
+                return vals;
+            }
         }
 
         public void UpdateList(List<T> vals)
         {
-            base.values.Clear();
-
-            foreach (T item in vals)
+            lock (SyncRoot)
             {
-                base.values.Add(item);
-            }
+                base.values.Clear();
 
-            itemCount = values.Count;
+                foreach (T item in vals)
+                {
+                    base.values.Add(item);
+                }
+
+                itemCount = values.Count;
+            }
         }
 
         private SerializedList(SerializationInfo info, StreamingContext ctx)
@@ -69,9 +77,23 @@ namespace NodeEditor
     {
         public int itemCount = 0;
 
+        private readonly object _syncRoot = new object();
         private List<object> _values = new List<object>();
 
         public List<object> values { get => _values; set => _values = value; }
+
+        public object SyncRoot => _syncRoot;
+
+        public int Count
+        {
+            get
+            {
+                lock (_syncRoot)
+                {
+                    return _values.Count;
+                }
+            }
+        }
 
         public SerializableList()
         {
@@ -79,8 +101,118 @@ namespace NodeEditor
 
         public void Add(object item)
         {
-            _values.Add(item);
-            itemCount++;
+            lock (_syncRoot)
+            {
+                _values.Add(item);
+                itemCount = _values.Count;
+            }
+        }
+
+        public bool TryGetAt(int index, out object value)
+        {
+            lock (_syncRoot)
+            {
+                if (index < 0 || index >= _values.Count)
+                {
+                    value = default!;
+                    return false;
+                }
+
+                value = _values[index];
+                return true;
+            }
+        }
+
+        public bool TrySetAt(int index, object value)
+        {
+            lock (_syncRoot)
+            {
+                if (index < 0 || index >= _values.Count)
+                {
+                    return false;
+                }
+
+                _values[index] = value;
+                return true;
+            }
+        }
+
+        public bool TryInsert(int index, object value)
+        {
+            lock (_syncRoot)
+            {
+                if (index < 0 || index > _values.Count)
+                {
+                    return false;
+                }
+
+                _values.Insert(index, value);
+                itemCount = _values.Count;
+                return true;
+            }
+        }
+
+        public bool TryRemoveAt(int index, out object value)
+        {
+            lock (_syncRoot)
+            {
+                if (index < 0 || index >= _values.Count)
+                {
+                    value = default!;
+                    return false;
+                }
+
+                value = _values[index];
+                _values.RemoveAt(index);
+                itemCount = _values.Count;
+                return true;
+            }
+        }
+
+        public bool TryRemoveValue(object value)
+        {
+            lock (_syncRoot)
+            {
+                var removed = _values.Remove(value);
+                if (removed)
+                {
+                    itemCount = _values.Count;
+                }
+                return removed;
+            }
+        }
+
+        public void Clear()
+        {
+            lock (_syncRoot)
+            {
+                _values.Clear();
+                itemCount = 0;
+            }
+        }
+
+        public bool Contains(object value)
+        {
+            lock (_syncRoot)
+            {
+                return _values.Contains(value);
+            }
+        }
+
+        public int IndexOf(object value)
+        {
+            lock (_syncRoot)
+            {
+                return _values.IndexOf(value);
+            }
+        }
+
+        public object[] Snapshot()
+        {
+            lock (_syncRoot)
+            {
+                return _values.ToArray();
+            }
         }
 
         private SerializableList(SerializationInfo info, StreamingContext ctx)
@@ -96,11 +228,14 @@ namespace NodeEditor
         [SecurityPermission(SecurityAction.LinkDemand, Flags = SecurityPermissionFlag.SerializationFormatter)]
         public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("C", values.Count);
-
-            for (int i = 0; i < values.Count; i++)
+            lock (_syncRoot)
             {
-                info.AddValue($"L{i}", values[i]);
+                info.AddValue("C", values.Count);
+
+                for (int i = 0; i < values.Count; i++)
+                {
+                    info.AddValue($"L{i}", values[i]);
+                }
             }
         }
     }

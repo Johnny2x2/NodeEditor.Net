@@ -12,18 +12,13 @@ namespace NodeEditor
             guid = CurrentProcessingNode.GetGuid();
             value = num;
 
-            if (!dynamicDict.ContainsKey(guid))
+            if (!dynamicDict.TryGetValue(guid, out var temp))
             {
-                dynamicDict.Add(guid, num);
+                dynamicDict.TryAdd(guid, num);
             }
             else
             {
-                object temp;
-
-                if (dynamicDict.TryGetValue(guid, out temp))
-                {
-                    value = temp as nNum;
-                }
+                value = temp as nNum;
             }
         }
 
@@ -42,18 +37,13 @@ namespace NodeEditor
             guid = CurrentProcessingNode.GetGuid();
             value = list;
 
-            if (!dynamicDict.ContainsKey(guid))
+            if (!dynamicDict.TryGetValue(guid, out var temp))
             {
-                dynamicDict.Add(guid, list);
+                dynamicDict.TryAdd(guid, list);
             }
             else
             {
-                object temp;
-
-                if (dynamicDict.TryGetValue(guid, out temp))
-                {
-                    value = temp as SerializableList;
-                }
+                value = temp as SerializableList;
             }
         }
 
@@ -67,21 +57,26 @@ namespace NodeEditor
         [Node("List Add", "Constants/List", "Basic", "Signal Node", true)]
         public void Add2ConstantList(string guid, object iValue, out object oValue)
         {
-            SerializableList dList = (SerializableList)dynamicDict[guid];
-            dList.Add(iValue);
+            if (dynamicDict.TryGetValue(guid, out var temp) && temp is SerializableList dList)
+            {
+                dList.Add(iValue);
+            }
             oValue = iValue;
         }
 
         [Node("Get List Element", "Constants/List", "Basic", "", false)]
         public void GetListElement(SerializableList list, nNum index, out object obj)
         {
-            obj = list.values[index.ToInt];
+            if (!list.TryGetAt(index.ToInt, out obj))
+            {
+                obj = new object();
+            }
         }
 
         [Node("List Count", "Constants/List", "Basic", "Signal Node", false)]
         public void ListSize(SerializableList list, out nNum length)
         {
-            length = new nNum(list.values.Count);
+            length = new nNum(list.Count);
         }
     }
 }

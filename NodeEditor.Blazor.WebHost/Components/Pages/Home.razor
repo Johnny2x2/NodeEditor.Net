@@ -1,4 +1,5 @@
 ﻿@page "/"
+@implements IDisposable
 @rendermode InteractiveServer
 @using NodeEditor.Blazor.Components
 @using NodeEditor.Blazor.Models
@@ -39,6 +40,17 @@
 		{
 			CreateSampleGraph();
 		}
+
+		ExecutionService.NodeStarted += OnNodeStarted;
+		ExecutionService.NodeCompleted += OnNodeCompleted;
+		ExecutionService.NodeFailed += OnNodeFailed;
+	}
+
+	public void Dispose()
+	{
+		ExecutionService.NodeStarted -= OnNodeStarted;
+		ExecutionService.NodeCompleted -= OnNodeCompleted;
+		ExecutionService.NodeFailed -= OnNodeFailed;
 	}
 
 	private async Task StartExecutionAsync()
@@ -52,6 +64,7 @@
 		_executionStatus = "Running";
 		_lastMessage = null;
 		_nodeContext.Reset();
+		EditorState.ResetNodeExecutionState();
 
 		_executionCts?.Dispose();
 		_executionCts = new CancellationTokenSource();
@@ -87,6 +100,32 @@
 			_lastMessage = _nodeContext.LastMessage;
 			await InvokeAsync(StateHasChanged);
 		}
+	}
+
+	private void OnNodeStarted(object? sender, NodeExecutionEventArgs e)
+	{
+		_ = InvokeAsync(() =>
+		{
+			EditorState.SetNodeExecuting(e.Node.Id, true);
+			EditorState.SetNodeError(e.Node.Id, false);
+		});
+	}
+
+	private void OnNodeCompleted(object? sender, NodeExecutionEventArgs e)
+	{
+		_ = InvokeAsync(() =>
+		{
+			EditorState.SetNodeExecuting(e.Node.Id, false);
+		});
+	}
+
+	private void OnNodeFailed(object? sender, NodeExecutionFailedEventArgs e)
+	{
+		_ = InvokeAsync(() =>
+		{
+			EditorState.SetNodeExecuting(e.Node.Id, false);
+			EditorState.SetNodeError(e.Node.Id, true);
+		});
 	}
 
 	private void StopExecution()

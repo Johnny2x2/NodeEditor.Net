@@ -118,6 +118,36 @@
     box-shadow: 0 0 0 2px rgba(102, 153, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
+.ne-node--executing {
+    border-color: #44ff44;
+    box-shadow: 0 0 0 2px rgba(68, 255, 68, 0.35), 0 4px 12px rgba(0, 0, 0, 0.4);
+    animation: pulse-executing 0.6s ease-in-out infinite;
+}
+
+.ne-node--error {
+    border-color: #ff4d4d;
+    box-shadow: 0 0 0 2px rgba(255, 77, 77, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+    animation: pulse-error 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-executing {
+    0%, 100% {
+        box-shadow: 0 0 0 2px rgba(68, 255, 68, 0.25), 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(68, 255, 68, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+}
+
+@keyframes pulse-error {
+    0%, 100% {
+        box-shadow: 0 0 0 2px rgba(255, 77, 77, 0.35), 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(255, 77, 77, 0.7), 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+}
+
 /* ============================================
    Node Header
    ============================================ */

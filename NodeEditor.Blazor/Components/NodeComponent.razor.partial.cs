@@ -7,6 +7,8 @@ public partial class NodeComponent
     private Point2D _lastPosition;
     private Size2D _lastSize;
     private bool _lastSelected;
+    private bool _lastExecuting;
+    private bool _lastError;
     private string? _lastName;
     private bool _lastCallable;
     private int _lastConnectionSignature;
@@ -22,6 +24,8 @@ public partial class NodeComponent
         var shouldRender = Node.Position != _lastPosition ||
                            Node.Size != _lastSize ||
                            Node.IsSelected != _lastSelected ||
+                           Node.IsExecuting != _lastExecuting ||
+                           Node.IsError != _lastError ||
                            Node.Data.Name != _lastName ||
                            Node.Data.Callable != _lastCallable ||
                            connectionSignature != _lastConnectionSignature;
@@ -31,6 +35,8 @@ public partial class NodeComponent
             _lastPosition = Node.Position;
             _lastSize = Node.Size;
             _lastSelected = Node.IsSelected;
+            _lastExecuting = Node.IsExecuting;
+            _lastError = Node.IsError;
             _lastName = Node.Data.Name;
             _lastCallable = Node.Data.Callable;
             _lastConnectionSignature = connectionSignature;

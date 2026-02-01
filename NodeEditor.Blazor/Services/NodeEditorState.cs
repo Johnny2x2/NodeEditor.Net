@@ -83,6 +83,11 @@ public sealed class NodeEditorState
     public event EventHandler? SocketValuesChanged;
 
     /// <summary>
+    /// Raised when a node execution state changes (executing or error).
+    /// </summary>
+    public event EventHandler<NodeEventArgs>? NodeExecutionStateChanged;
+
+    /// <summary>
     /// Raised when an undo operation is requested.
     /// Placeholder hook for future history support.
     /// </summary>
@@ -181,6 +186,74 @@ public sealed class NodeEditorState
         }
 
         SocketValuesChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Updates the executing state for a node and raises <see cref="NodeExecutionStateChanged"/>.
+    /// </summary>
+    public void SetNodeExecuting(string nodeId, bool isExecuting)
+    {
+        var node = Nodes.FirstOrDefault(n => n.Data.Id == nodeId);
+        if (node is null)
+        {
+            return;
+        }
+
+        if (node.IsExecuting == isExecuting)
+        {
+            return;
+        }
+
+        node.IsExecuting = isExecuting;
+        NodeExecutionStateChanged?.Invoke(this, new NodeEventArgs(node));
+    }
+
+    /// <summary>
+    /// Updates the error state for a node and raises <see cref="NodeExecutionStateChanged"/>.
+    /// </summary>
+    public void SetNodeError(string nodeId, bool isError)
+    {
+        var node = Nodes.FirstOrDefault(n => n.Data.Id == nodeId);
+        if (node is null)
+        {
+            return;
+        }
+
+        if (node.IsError == isError)
+        {
+            return;
+        }
+
+        node.IsError = isError;
+        NodeExecutionStateChanged?.Invoke(this, new NodeEventArgs(node));
+    }
+
+    /// <summary>
+    /// Clears execution and error state across all nodes.
+    /// </summary>
+    public void ResetNodeExecutionState()
+    {
+        foreach (var node in Nodes)
+        {
+            var changed = false;
+
+            if (node.IsExecuting)
+            {
+                node.IsExecuting = false;
+                changed = true;
+            }
+
+            if (node.IsError)
+            {
+                node.IsError = false;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                NodeExecutionStateChanged?.Invoke(this, new NodeEventArgs(node));
+            }
+        }
     }
 
     private double _zoom = 1.0;

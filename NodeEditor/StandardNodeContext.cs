@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.IO.Ports;
 using System.Net.Sockets;
@@ -25,7 +25,7 @@ namespace NodeEditor
 
         public event Action<string, Node, FeedbackType, object, bool> FeedbackInfo;
 
-        public Dictionary<string, object> dynamicDict = new Dictionary<string, object>();
+        public ConcurrentDictionary<string, object> dynamicDict = new ConcurrentDictionary<string, object>();
 
         public event NodeOutputEventHandler NodeOutputEvent;
 
@@ -45,6 +45,11 @@ namespace NodeEditor
         public virtual void Starter()
         {
             dynamicDict.Clear();
+        }
+
+        protected void ReportRunning(string message = "Running")
+        {
+            FeedbackInfo?.Invoke(message, CurrentProcessingNode, FeedbackType.Debug, null, false);
         }
 
         [Node("SerialMsg", "Helper", "Basic", "Sends Serial Message", true)]

@@ -9,6 +9,8 @@ public sealed class NodeViewModel : ViewModelBase
     private Point2D _position;
     private Size2D _size;
     private bool _isSelected;
+    private bool _isExecuting;
+    private bool _isError;
 
     public NodeViewModel(NodeData data)
     {
@@ -44,5 +46,17 @@ public sealed class NodeViewModel : ViewModelBase
     {
         get => _isSelected;
         set => SetProperty(ref _isSelected, value);
+    }
+
+    public bool IsExecuting
+    {
+        get => _isExecuting;
+        set => SetProperty(ref _isExecuting, value);
+    }
+
+    public bool IsError
+    {
+        get => _isError;
+        set => SetProperty(ref _isError, value);
     }
 }

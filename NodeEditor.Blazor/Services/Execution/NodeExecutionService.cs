@@ -16,6 +16,7 @@ public sealed class NodeExecutionService
 
     public event EventHandler<NodeExecutionEventArgs>? NodeStarted;
     public event EventHandler<NodeExecutionEventArgs>? NodeCompleted;
+    public event EventHandler<NodeExecutionFailedEventArgs>? NodeFailed;
     public event EventHandler<Exception>? ExecutionFailed;
     public event EventHandler? ExecutionCanceled;
     public event EventHandler<ExecutionLayerEventArgs>? LayerStarted;
@@ -242,22 +243,30 @@ public sealed class NodeExecutionService
     {
         NodeStarted?.Invoke(this, new NodeExecutionEventArgs(node));
 
-        if (feedbackContext is not null)
+        try
         {
-            feedbackContext.CurrentProcessingNode = node;
+            if (feedbackContext is not null)
+            {
+                feedbackContext.CurrentProcessingNode = node;
+            }
+
+            await ResolveInputsAsync(node, connections, nodeMap, context, invoker, feedbackContext, token).ConfigureAwait(false);
+
+            var method = invoker.Resolve(node);
+            if (method is null)
+            {
+                throw new InvalidOperationException($"No method binding found for node '{node.Name}'.");
+            }
+
+            await invoker.InvokeAsync(node, method, context, token).ConfigureAwait(false);
+
+            NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
         }
-
-        await ResolveInputsAsync(node, connections, nodeMap, context, invoker, feedbackContext, token).ConfigureAwait(false);
-
-        var method = invoker.Resolve(node);
-        if (method is null)
+        catch (Exception ex)
         {
-            throw new InvalidOperationException($"No method binding found for node '{node.Name}'.");
+            NodeFailed?.Invoke(this, new NodeExecutionFailedEventArgs(node, ex));
+            throw;
         }
-
-        await invoker.InvokeAsync(node, method, context, token).ConfigureAwait(false);
-
-        NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
     }
 
     private async Task ResolveInputsAsync(

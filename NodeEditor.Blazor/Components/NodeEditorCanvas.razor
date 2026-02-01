@@ -133,6 +133,7 @@
         State.ConnectionAdded += OnStateChanged;
         State.ConnectionRemoved += OnStateChanged;
         State.SelectionChanged += OnStateChanged;
+        State.NodeExecutionStateChanged += OnStateChanged;
         State.ZoomChanged += OnZoomChanged;
         State.ViewportChanged += OnViewportChanged;
 
@@ -146,6 +147,7 @@
         State.ConnectionAdded -= OnStateChanged;
         State.ConnectionRemoved -= OnStateChanged;
         State.SelectionChanged -= OnStateChanged;
+        State.NodeExecutionStateChanged -= OnStateChanged;
         State.ZoomChanged -= OnZoomChanged;
         State.ViewportChanged -= OnViewportChanged;
     }

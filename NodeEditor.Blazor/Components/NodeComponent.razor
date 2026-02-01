@@ -1,7 +1,7 @@
 @using NodeEditor.Blazor.ViewModels
 @using NodeEditor.Blazor.Models
 
-<div class="ne-node @(Node.IsSelected ? "ne-node--selected" : "")"
+<div class="ne-node @(Node.IsSelected ? "ne-node--selected" : "") @(Node.IsExecuting ? "ne-node--executing" : "") @(Node.IsError ? "ne-node--error" : "")"
      style="@NodeStyle"
      @onpointerdown="OnNodePointerDown"
      @onpointerdown:stopPropagation
