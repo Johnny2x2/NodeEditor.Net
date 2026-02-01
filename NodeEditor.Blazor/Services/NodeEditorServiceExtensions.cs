@@ -28,6 +28,9 @@ public static class NodeEditorServiceExtensions
         // Register connection validator
         services.AddScoped<ConnectionValidator>();
         
+        // Register touch gesture handler as scoped
+        services.AddScoped<TouchGestureHandler>();
+        
         // Register socket type resolver as singleton (shared type registry)
         services.AddSingleton<SocketTypeResolver>();
 

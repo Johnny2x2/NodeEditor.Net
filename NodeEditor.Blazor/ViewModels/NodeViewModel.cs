@@ -13,7 +13,7 @@ public sealed class NodeViewModel : ViewModelBase
     public NodeViewModel(NodeData data)
     {
         Data = data;
-        _size = new Size2D(140, 60);
+        _size = new Size2D(180, 60);
         Inputs = new ReadOnlyCollection<SocketViewModel>((data.Inputs ?? Array.Empty<SocketData>())
             .Select(socket => new SocketViewModel(socket))
             .ToList());

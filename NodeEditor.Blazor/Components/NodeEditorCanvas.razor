@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject CoordinateConverter CoordinateConverter
 @inject ConnectionValidator ConnectionValidator
+@inject TouchGestureHandler TouchGestures
 
 <div class="ne-canvas"
      @ref="_canvasRef"
@@ -13,6 +14,10 @@
      @onkeydown="OnKeyDown"
      @oncontextmenu="OnContextMenu"
      @oncontextmenu:preventDefault
+     @ontouchstart="OnTouchStart"
+     @ontouchmove="OnTouchMove"
+     @ontouchend="OnTouchEnd"
+     @ontouchcancel="OnTouchCancel"
      tabindex="0">
     @if (_isSelecting)
     {
@@ -81,6 +86,9 @@
     private bool _isContextMenuOpen;
     private Point2D _contextMenuScreenPosition = Point2D.Zero;
     private Point2D _contextMenuGraphPosition = Point2D.Zero;
+
+    private bool _isTouchGesture;
+    private double _touchZoomBase = 1.0;
 
     [Parameter, EditorRequired]
     public NodeEditorState State { get; set; } = null!;
@@ -439,6 +447,213 @@
     private void CloseContextMenu()
     {
         _isContextMenuOpen = false;
+    }
+
+    // ===== Touch Event Handlers =====
+
+    private void OnTouchStart(TouchEventArgs e)
+    {
+        _isTouchGesture = true;
+        
+        var touches = e.ChangedTouches.Select(t => 
+            new TouchPoint2D(t.Identifier, t.ClientX, t.ClientY)).ToList();
+        
+        var result = TouchGestures.OnTouchStart(touches);
+        
+        if (result != null)
+        {
+            switch (result.Type)
+            {
+                case TouchGestureHandler.TouchGestureType.DragStart:
+                    // Check if touch is on a node for dragging
+                    var graphPos = CoordinateConverter.ScreenToGraph(result.Position);
+                    var nodeAtPosition = FindNodeAtPosition(graphPos);
+                    
+                    if (nodeAtPosition != null)
+                    {
+                        _isDraggingNode = true;
+                        _draggingNode = nodeAtPosition;
+                        _dragStart = graphPos;
+                    }
+                    else
+                    {
+                        // Start pan with single touch
+                        _isPanning = true;
+                        _panStart = result.Position;
+                    }
+                    break;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private void OnTouchMove(TouchEventArgs e)
+    {
+        if (!_isTouchGesture) return;
+
+        var touches = e.Touches.Select(t => 
+            new TouchPoint2D(t.Identifier, t.ClientX, t.ClientY)).ToList();
+        
+        var result = TouchGestures.OnTouchMove(touches);
+        
+        if (result != null)
+        {
+            switch (result.Type)
+            {
+                case TouchGestureHandler.TouchGestureType.Pan:
+                    if (result.Delta.HasValue)
+                    {
+                        _panOffset = new Point2D(
+                            _panOffset.X + result.Delta.Value.X,
+                            _panOffset.Y + result.Delta.Value.Y
+                        );
+                        CoordinateConverter.PanOffset = _panOffset;
+                    }
+                    break;
+
+                case TouchGestureHandler.TouchGestureType.Zoom:
+                    if (result.ZoomDelta.HasValue && result.ZoomCenter.HasValue)
+                    {
+                        var newZoom = Math.Clamp(_touchZoomBase * result.ZoomDelta.Value, MinZoom, MaxZoom);
+                        
+                        // Zoom towards the pinch center
+                        var screenCenter = result.ZoomCenter.Value;
+                        var graphBefore = CoordinateConverter.ScreenToGraph(screenCenter);
+                        
+                        _zoom = newZoom;
+                        CoordinateConverter.Zoom = _zoom;
+                        
+                        var graphAfter = CoordinateConverter.ScreenToGraph(screenCenter);
+                        var correction = new Point2D(
+                            (graphAfter.X - graphBefore.X) * _zoom,
+                            (graphAfter.Y - graphBefore.Y) * _zoom
+                        );
+                        
+                        _panOffset = new Point2D(
+                            _panOffset.X + correction.X,
+                            _panOffset.Y + correction.Y
+                        );
+                        CoordinateConverter.PanOffset = _panOffset;
+                    }
+                    break;
+
+                case TouchGestureHandler.TouchGestureType.Drag:
+                    if (_isDraggingNode && _draggingNode != null)
+                    {
+                        var currentPos = CoordinateConverter.ScreenToGraph(result.Position);
+                        var delta = new Point2D(
+                            currentPos.X - _dragStart.X,
+                            currentPos.Y - _dragStart.Y
+                        );
+                        
+                        _draggingNode.Position = new Point2D(
+                            _draggingNode.Position.X + delta.X,
+                            _draggingNode.Position.Y + delta.Y
+                        );
+                        
+                        _dragStart = currentPos;
+                    }
+                    else if (_isPanning)
+                    {
+                        var delta = new Point2D(
+                            result.Position.X - _panStart.X,
+                            result.Position.Y - _panStart.Y
+                        );
+                        
+                        _panOffset = new Point2D(
+                            _panOffset.X + delta.X,
+                            _panOffset.Y + delta.Y
+                        );
+                        CoordinateConverter.PanOffset = _panOffset;
+                        
+                        _panStart = result.Position;
+                    }
+                    break;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private void OnTouchEnd(TouchEventArgs e)
+    {
+        if (!_isTouchGesture) return;
+
+        var remainingTouches = e.Touches.Select(t => 
+            new TouchPoint2D(t.Identifier, t.ClientX, t.ClientY)).ToList();
+        
+        var result = TouchGestures.OnTouchEnd(remainingTouches);
+        
+        if (result != null)
+        {
+            switch (result.Type)
+            {
+                case TouchGestureHandler.TouchGestureType.Tap:
+                    var graphPos = CoordinateConverter.ScreenToGraph(result.Position);
+                    var nodeAtPosition = FindNodeAtPosition(graphPos);
+                    
+                    if (nodeAtPosition != null)
+                    {
+                        State.SelectNode(nodeAtPosition.Data.Id);
+                    }
+                    else
+                    {
+                        State.ClearSelection();
+                    }
+                    break;
+
+                case TouchGestureHandler.TouchGestureType.DragEnd:
+                    _isDraggingNode = false;
+                    _draggingNode = null;
+                    _isPanning = false;
+                    _touchZoomBase = _zoom;
+                    break;
+            }
+        }
+
+        if (remainingTouches.Count == 0)
+        {
+            _isTouchGesture = false;
+            TouchGestures.Reset();
+        }
+
+        StateHasChanged();
+    }
+
+    private void OnTouchCancel(TouchEventArgs e)
+    {
+        _isTouchGesture = false;
+        _isDraggingNode = false;
+        _draggingNode = null;
+        _isPanning = false;
+        TouchGestures.Reset();
+        StateHasChanged();
+    }
+
+    private NodeViewModel? FindNodeAtPosition(Point2D graphPosition)
+    {
+        // Check nodes in reverse order (top-most first)
+        for (int i = State.Nodes.Count - 1; i >= 0; i--)
+        {
+            var node = State.Nodes[i];
+            var nodeRect = new Rect2D(
+                node.Position.X,
+                node.Position.Y,
+                node.Size.Width,
+                node.Size.Height
+            );
+
+            if (graphPosition.X >= nodeRect.X && 
+                graphPosition.X <= nodeRect.X + nodeRect.Width &&
+                graphPosition.Y >= nodeRect.Y && 
+                graphPosition.Y <= nodeRect.Y + nodeRect.Height)
+            {
+                return node;
+            }
+        }
+
+        return null;
     }
 
     private static string GetConnectionKey(ConnectionData c) =>

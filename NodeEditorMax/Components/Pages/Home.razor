@@ -43,7 +43,22 @@
 <NodePropertiesPanel State="EditorState" />
 
 <div class="node-editor-container">
-    <NodeEditorCanvas State="EditorState" />
+    <ErrorBoundary>
+        <ChildContent>
+            <NodeEditorCanvas State="EditorState" />
+        </ChildContent>
+        <ErrorContent Context="error">
+            <div class="error-panel">
+                <h3>⚠️ Editor Error</h3>
+                <p class="error-message">@error.Message</p>
+                <details class="error-details">
+                    <summary>Stack Trace</summary>
+                    <pre>@error.ToString()</pre>
+                </details>
+                <button class="btn-recover" @onclick="RecoverFromError">Reload Editor</button>
+            </div>
+        </ErrorContent>
+    </ErrorBoundary>
 </div>
 
 @code {
@@ -188,6 +203,13 @@
         {
             _graphStatus = ex.Message;
         }
+    }
+
+    private void RecoverFromError()
+    {
+        // Reset editor state to recover from error
+        EditorState.Clear();
+        StateHasChanged();
     }
 
     private sealed class SampleNodeContext : INodeMethodContext
