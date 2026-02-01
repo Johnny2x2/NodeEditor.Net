@@ -1,0 +1,8 @@
+{
+  "id": "com.nodeeditormax.llmtornado",
+  "name": "LLM Tornado Nodes",
+  "version": "0.1.0",
+  "minApiVersion": "1.0.0",
+  "entryAssembly": "NodeEditor.Plugins.LlmTornado.dll",
+  "category": "LLM"
+}

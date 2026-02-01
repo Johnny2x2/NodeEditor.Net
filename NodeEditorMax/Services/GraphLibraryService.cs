@@ -161,6 +161,11 @@ public sealed class GraphLibraryService
             "Parallel Split/Join",
             "graphs/parallel.json",
             fallback: null).ConfigureAwait(false);
+
+        await AddSampleGraphFromPackageAsync(
+            "LLM Tornado Message Demo",
+            "graphs/llmtornado-demo.json",
+            fallback: null).ConfigureAwait(false);
     }
 
     private async Task AddSampleGraphFromPackageAsync(string name, string path, string? fallback)

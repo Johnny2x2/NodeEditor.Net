@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
     <ProjectReference Include="..\NodeEditor.Plugins.Sample\NodeEditor.Plugins.Sample.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\NodeEditor.Plugins.LlmTornado\NodeEditor.Plugins.LlmTornado.csproj" />
   </ItemGroup>
 
   <Target Name="CopySamplePluginForTests" AfterTargets="Build">
@@ -32,6 +33,15 @@
     </ItemGroup>
 
     <Copy SourceFiles="@(_SamplePluginFiles)" DestinationFolder="$(OutDir)plugins\Sample" />
+  </Target>
+
+  <Target Name="CopyLlmTornadoPluginForTests" AfterTargets="Build">
+    <ItemGroup>
+      <_LlmTornadoPluginFiles Include="..\NodeEditor.Plugins.LlmTornado\bin\$(Configuration)\$(TargetFramework)\NodeEditor.Plugins.LlmTornado.dll" />
+      <_LlmTornadoPluginFiles Include="..\NodeEditor.Plugins.LlmTornado\plugin.json" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_LlmTornadoPluginFiles)" DestinationFolder="$(OutDir)plugins\LlmTornado" />
   </Target>
 
 </Project>
