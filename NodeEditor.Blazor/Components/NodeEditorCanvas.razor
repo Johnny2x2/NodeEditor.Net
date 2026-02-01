@@ -1,8 +1,11 @@
 @using NodeEditor.Blazor.Services
 @implements IDisposable
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
 @inject CoordinateConverter CoordinateConverter
 @inject ConnectionValidator ConnectionValidator
 @inject TouchGestureHandler TouchGestures
+@inject ViewportCuller ViewportCuller
 
 <div class="ne-canvas"
      @ref="_canvasRef"
@@ -30,7 +33,7 @@
     <div class="ne-viewport" style="@ViewportTransformStyle">
         @* Connection layer (SVG) - rendered below nodes *@
         <svg class="ne-connections" @ref="_svgRef">
-            @foreach (var connection in State.Connections)
+            @foreach (var connection in _visibleConnections)
             {
                 <ConnectionPath Connection="connection"
                                 Nodes="State.Nodes"
@@ -48,7 +51,7 @@
         @* Node layer (HTML) - rendered above connections *@
         <CascadingValue Value="State">
             <div class="ne-nodes">
-                @foreach (var node in State.Nodes)
+                @foreach (var node in _visibleNodes)
                 {
                     <NodeComponent Node="node"
                                    Connections="State.Connections"
@@ -90,6 +93,9 @@
     private bool _isTouchGesture;
     private double _touchZoomBase = 1.0;
 
+    private IReadOnlyList<NodeViewModel> _visibleNodes = Array.Empty<NodeViewModel>();
+    private IReadOnlyList<ConnectionData> _visibleConnections = Array.Empty<ConnectionData>();
+
     [Parameter, EditorRequired]
     public NodeEditorState State { get; set; } = null!;
 
@@ -129,6 +135,8 @@
         State.SelectionChanged += OnStateChanged;
         State.ZoomChanged += OnZoomChanged;
         State.ViewportChanged += OnViewportChanged;
+
+        UpdateCulling();
     }
 
     public void Dispose()
@@ -142,12 +150,17 @@
         State.ViewportChanged -= OnViewportChanged;
     }
 
-    private void OnStateChanged(object? sender, EventArgs e) => StateHasChanged();
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        UpdateCulling();
+        StateHasChanged();
+    }
     
     private void OnZoomChanged(object? sender, ZoomChangedEventArgs e)
     {
         _zoom = e.CurrentZoom;
         CoordinateConverter.SyncFromState(State);
+        UpdateCulling();
         StateHasChanged();
     }
 
@@ -155,6 +168,7 @@
     {
         _panOffset = new Point2D(e.CurrentViewport.X, e.CurrentViewport.Y);
         CoordinateConverter.SyncFromState(State);
+        UpdateCulling();
         StateHasChanged();
     }
 
@@ -184,6 +198,7 @@
         {
             _panOffset = new Point2D(e.ClientX - _panStart.X, e.ClientY - _panStart.Y);
             State.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, State.Viewport.Width, State.Viewport.Height);
+            UpdateCulling();
         }
         else if (_isDraggingNode && _draggingNode is not null)
         {
@@ -199,6 +214,7 @@
             }
 
             _dragStart = new Point2D(e.ClientX, e.ClientY);
+            UpdateCulling();
             StateHasChanged();
         }
         else if (_pendingConnection is not null)
@@ -327,7 +343,7 @@
     {
         var selectionRectGraph = GetSelectionRectGraph();
         var selected = State.Nodes
-            .Where(n => RectsIntersect(selectionRectGraph, new Rect2D(n.Position.X, n.Position.Y, n.Size.Width, n.Size.Height)))
+            .Where(n => selectionRectGraph.Intersects(new Rect2D(n.Position.X, n.Position.Y, n.Size.Width, n.Size.Height)))
             .Select(n => n.Data.Id)
             .ToHashSet();
 
@@ -353,14 +369,6 @@
 
         var screenRect = new Rect2D(left, top, width, height);
         return CoordinateConverter.ScreenToGraph(screenRect);
-    }
-
-    private static bool RectsIntersect(Rect2D a, Rect2D b)
-    {
-        return a.X <= b.X + b.Width &&
-               a.X + a.Width >= b.X &&
-               a.Y <= b.Y + b.Height &&
-               a.Y + a.Height >= b.Y;
     }
 
     private IEnumerable<NodeViewModel> GetSelectedNodesForDrag()
@@ -509,6 +517,7 @@
                             _panOffset.Y + result.Delta.Value.Y
                         );
                         CoordinateConverter.PanOffset = _panOffset;
+                        State.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, State.Viewport.Width, State.Viewport.Height);
                     }
                     break;
 
@@ -535,6 +544,8 @@
                             _panOffset.Y + correction.Y
                         );
                         CoordinateConverter.PanOffset = _panOffset;
+                        State.Zoom = _zoom;
+                        State.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, State.Viewport.Width, State.Viewport.Height);
                     }
                     break;
 
@@ -568,11 +579,13 @@
                         CoordinateConverter.PanOffset = _panOffset;
                         
                         _panStart = result.Position;
+                        State.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, State.Viewport.Width, State.Viewport.Height);
                     }
                     break;
             }
         }
 
+        UpdateCulling();
         StateHasChanged();
     }
 
@@ -644,10 +657,7 @@
                 node.Size.Height
             );
 
-            if (graphPosition.X >= nodeRect.X && 
-                graphPosition.X <= nodeRect.X + nodeRect.Width &&
-                graphPosition.Y >= nodeRect.Y && 
-                graphPosition.Y <= nodeRect.Y + nodeRect.Height)
+            if (nodeRect.Contains(graphPosition))
             {
                 return node;
             }
@@ -658,4 +668,22 @@
 
     private static string GetConnectionKey(ConnectionData c) =>
         $"{c.OutputNodeId}:{c.OutputSocketName}->{c.InputNodeId}:{c.InputSocketName}";
+
+    private void UpdateCulling()
+    {
+        if (State.Viewport.Width <= 0 || State.Viewport.Height <= 0)
+        {
+            _visibleNodes = State.Nodes;
+            _visibleConnections = State.Connections;
+            return;
+        }
+
+        var screenViewport = new Rect2D(0, 0, State.Viewport.Width, State.Viewport.Height);
+        var alwaysInclude = _isDraggingNode && _draggingNode is not null
+            ? new[] { _draggingNode.Data.Id }
+            : Array.Empty<string>();
+
+        _visibleNodes = ViewportCuller.GetVisibleNodes(State.Nodes, screenViewport, alwaysInclude);
+        _visibleConnections = ViewportCuller.GetVisibleConnections(State.Connections, _visibleNodes, alwaysInclude);
+    }
 }

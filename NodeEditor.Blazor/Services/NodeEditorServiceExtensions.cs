@@ -30,6 +30,9 @@ public static class NodeEditorServiceExtensions
         
         // Register touch gesture handler as scoped
         services.AddScoped<TouchGestureHandler>();
+
+        // Register viewport culling helper
+        services.AddScoped<ViewportCuller>();
         
         // Register socket type resolver as singleton (shared type registry)
         services.AddSingleton<SocketTypeResolver>();
@@ -74,6 +77,7 @@ public static class NodeEditorServiceExtensions
         services.AddScoped(stateFactory);
         services.AddScoped<CoordinateConverter>();
         services.AddScoped<ConnectionValidator>();
+        services.AddScoped<ViewportCuller>();
         services.AddSingleton<SocketTypeResolver>();
 
         services.AddSingleton<Registry.NodeDiscoveryService>();
