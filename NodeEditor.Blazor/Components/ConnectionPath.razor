@@ -99,9 +99,11 @@
         // Match layout metrics from node-editor.css
         const double headerHeight = 28;
         const double bodyPaddingTop = 8;
-        const double socketPaddingTop = 2;
-        const double socketSpacing = 24;
-        const double firstSocketOffset = headerHeight + bodyPaddingTop + socketPaddingTop + SocketDotOuterRadius;
+        const double socketPadding = 2;
+        const double socketHeight = 12;
+        const double socketGap = 4;
+        const double socketSpacing = socketHeight + (socketPadding * 2) + socketGap;
+        const double firstSocketOffset = headerHeight + bodyPaddingTop + socketPadding + (socketHeight / 2);
 
         var sockets = isInput ? node.Inputs : node.Outputs;
         var index = 0;
@@ -130,7 +132,7 @@
         return $"M {F(start.X)} {F(start.Y)} C {F(cp1.X)} {F(cp1.Y)}, {F(cp2.X)} {F(cp2.Y)}, {F(end.X)} {F(end.Y)}";
     }
 
-    private const double SocketDotOuterRadius = 8;
+    private const double SocketDotOuterRadius = 6;
     private const double SocketDotCenterOffsetX = 8 + SocketDotOuterRadius;
 
     // Format double for SVG (invariant culture, no trailing zeros)

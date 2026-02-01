@@ -93,6 +93,8 @@
     private bool _isTouchGesture;
     private double _touchZoomBase = 1.0;
 
+    private Point2D _canvasScreenOffset = Point2D.Zero;
+
     private IReadOnlyList<NodeViewModel> _visibleNodes = Array.Empty<NodeViewModel>();
     private IReadOnlyList<ConnectionData> _visibleConnections = Array.Empty<ConnectionData>();
 
@@ -140,6 +142,19 @@
         UpdateCulling();
     }
 
+    private async Task UpdateCanvasScreenOffsetAsync()
+    {
+        if (_canvasJsModule is null)
+        {
+            return;
+        }
+
+        _canvasScreenOffset = await _canvasJsModule.InvokeAsync<Point2D>("getCanvasScreenOffset", _canvasRef);
+    }
+
+    private Point2D ToCanvasPoint(Point2D clientPoint) =>
+        new(clientPoint.X - _canvasScreenOffset.X, clientPoint.Y - _canvasScreenOffset.Y);
+
     public void Dispose()
     {
         State.NodeAdded -= OnStateChanged;
@@ -177,6 +192,9 @@
     private async Task OnPointerDown(PointerEventArgs e)
     {
         await _canvasRef.FocusAsync();
+        await UpdateCanvasScreenOffsetAsync();
+
+        var canvasPoint = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
 
         if (_isContextMenuOpen && e.Button == 0)
         {
@@ -186,25 +204,27 @@
         if (e.Button == 1) // Middle mouse button for panning
         {
             _isPanning = true;
-            _panStart = new Point2D(e.ClientX - _panOffset.X, e.ClientY - _panOffset.Y);
+            _panStart = new Point2D(canvasPoint.X - _panOffset.X, canvasPoint.Y - _panOffset.Y);
         }
         else if (e.Button == 0) // Left click on empty canvas clears selection
         {
-            BeginSelection(e);
+            BeginSelection(e, canvasPoint);
         }
     }
 
     private void OnPointerMove(PointerEventArgs e)
     {
+        var canvasPoint = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
+
         if (_isPanning)
         {
-            _panOffset = new Point2D(e.ClientX - _panStart.X, e.ClientY - _panStart.Y);
+            _panOffset = new Point2D(canvasPoint.X - _panStart.X, canvasPoint.Y - _panStart.Y);
             State.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, State.Viewport.Width, State.Viewport.Height);
             UpdateCulling();
         }
         else if (_isDraggingNode && _draggingNode is not null)
         {
-            var screenDelta = new Point2D(e.ClientX - _dragStart.X, e.ClientY - _dragStart.Y);
+            var screenDelta = new Point2D(canvasPoint.X - _dragStart.X, canvasPoint.Y - _dragStart.Y);
             var graphDelta = CoordinateConverter.ScreenDeltaToGraph(screenDelta);
 
             var selectedNodes = GetSelectedNodesForDrag();
@@ -215,18 +235,18 @@
                     node.Position.Y + graphDelta.Y);
             }
 
-            _dragStart = new Point2D(e.ClientX, e.ClientY);
+            _dragStart = canvasPoint;
             UpdateCulling();
             StateHasChanged();
         }
         else if (_pendingConnection is not null)
         {
-            _pendingConnectionEndGraph = CoordinateConverter.ScreenToGraph(new Point2D(e.ClientX, e.ClientY));
+            _pendingConnectionEndGraph = CoordinateConverter.ScreenToGraph(canvasPoint);
             StateHasChanged();
         }
         else if (_isSelecting)
         {
-            _selectionCurrentScreen = new Point2D(e.ClientX, e.ClientY);
+            _selectionCurrentScreen = canvasPoint;
             UpdateSelectionFromRect();
         }
     }
@@ -241,7 +261,7 @@
 
         if (_isSelecting)
         {
-            _selectionCurrentScreen = new Point2D(e.ClientX, e.ClientY);
+            _selectionCurrentScreen = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
             UpdateSelectionFromRect(finalize: true);
             _isSelecting = false;
         }
@@ -254,7 +274,7 @@
         
         if (Math.Abs(newZoom - _zoom) > double.Epsilon)
         {
-            var focus = new Point2D(e.ClientX, e.ClientY);
+            var focus = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
             var newPan = CoordinateConverter.ComputeZoomCenteredPan(focus, _zoom, newZoom);
             State.Zoom = newZoom;
             State.Viewport = new Rect2D(newPan.X, newPan.Y, State.Viewport.Width, State.Viewport.Height);
@@ -263,7 +283,7 @@
 
     private void OnContextMenu(MouseEventArgs e)
     {
-        _contextMenuScreenPosition = new Point2D(e.ClientX, e.ClientY);
+        _contextMenuScreenPosition = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
         _contextMenuGraphPosition = CoordinateConverter.ScreenToGraph(_contextMenuScreenPosition);
         _isContextMenuOpen = true;
         StateHasChanged();
@@ -280,7 +300,8 @@
                 OutputSocketName: e.Socket.Data.Name,
                 InputSocketName: string.Empty,
                 IsExecution: e.Socket.Data.IsExecution);
-            _pendingConnectionEndGraph = CoordinateConverter.ScreenToGraph(e.Position);
+            var canvasPoint = ToCanvasPoint(e.Position);
+            _pendingConnectionEndGraph = CoordinateConverter.ScreenToGraph(canvasPoint);
         }
     }
 
@@ -319,7 +340,7 @@
         _isSelecting = false;
         _isDraggingNode = true;
         _draggingNode = node;
-        _dragStart = e.Position;
+        _dragStart = ToCanvasPoint(e.Position);
 
         if (!node.IsSelected)
         {
@@ -327,10 +348,10 @@
         }
     }
 
-    private void BeginSelection(PointerEventArgs e)
+    private void BeginSelection(PointerEventArgs e, Point2D canvasPoint)
     {
         _isSelecting = true;
-        _selectionStartScreen = new Point2D(e.ClientX, e.ClientY);
+        _selectionStartScreen = canvasPoint;
         _selectionCurrentScreen = _selectionStartScreen;
         _selectionAdditive = e.CtrlKey || e.ShiftKey;
         _selectionBase = _selectionAdditive ? State.SelectedNodeIds.ToHashSet() : new HashSet<string>();
@@ -463,10 +484,14 @@
 
     private void OnTouchStart(TouchEventArgs e)
     {
+        _ = UpdateCanvasScreenOffsetAsync();
         _isTouchGesture = true;
         
-        var touches = e.ChangedTouches.Select(t => 
-            new TouchPoint2D(t.Identifier, t.ClientX, t.ClientY)).ToList();
+        var touches = e.ChangedTouches.Select(t =>
+        {
+            var canvasPoint = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
+            return new TouchPoint2D(t.Identifier, canvasPoint.X, canvasPoint.Y);
+        }).ToList();
         
         var result = TouchGestures.OnTouchStart(touches);
         
@@ -502,8 +527,11 @@
     {
         if (!_isTouchGesture) return;
 
-        var touches = e.Touches.Select(t => 
-            new TouchPoint2D(t.Identifier, t.ClientX, t.ClientY)).ToList();
+        var touches = e.Touches.Select(t =>
+        {
+            var canvasPoint = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
+            return new TouchPoint2D(t.Identifier, canvasPoint.X, canvasPoint.Y);
+        }).ToList();
         
         var result = TouchGestures.OnTouchMove(touches);
         
@@ -595,8 +623,11 @@
     {
         if (!_isTouchGesture) return;
 
-        var remainingTouches = e.Touches.Select(t => 
-            new TouchPoint2D(t.Identifier, t.ClientX, t.ClientY)).ToList();
+        var remainingTouches = e.Touches.Select(t =>
+        {
+            var canvasPoint = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
+            return new TouchPoint2D(t.Identifier, canvasPoint.X, canvasPoint.Y);
+        }).ToList();
         
         var result = TouchGestures.OnTouchEnd(remainingTouches);
         
@@ -680,7 +711,12 @@
             return;
         }
 
-        var screenViewport = new Rect2D(0, 0, State.Viewport.Width, State.Viewport.Height);
+        const double cullPadding = 800;
+        var screenViewport = new Rect2D(
+            -cullPadding,
+            -cullPadding,
+            State.Viewport.Width + cullPadding * 2,
+            State.Viewport.Height + cullPadding * 2);
         var alwaysInclude = _isDraggingNode && _draggingNode is not null
             ? new[] { _draggingNode.Data.Id }
             : Array.Empty<string>();

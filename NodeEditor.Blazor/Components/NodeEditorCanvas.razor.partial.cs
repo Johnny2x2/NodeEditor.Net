@@ -21,6 +21,7 @@ public partial class NodeEditorCanvas
             "./_content/NodeEditor.Blazor/nodeEditorCanvas.js");
 
         await _canvasJsModule.InvokeVoidAsync("observeCanvasSize", _canvasRef, _dotNetRef);
+        await UpdateCanvasScreenOffsetAsync();
     }
 
     [JSInvokable]

@@ -1,16 +1,21 @@
 <div class="ne-context-menu-search">
     <input class="ne-context-menu-search-input"
            placeholder="Search nodes"
-           value="@Value"
-           @oninput="HandleInput" />
+            value="@Value"
+            @oninput="HandleInput"
+           @ref="_inputRef" />
 </div>
 
 @code {
+    private ElementReference _inputRef;
+
     [Parameter]
     public string Value { get; set; } = string.Empty;
 
     [Parameter]
     public EventCallback<string> ValueChanged { get; set; }
+
+    public ValueTask FocusAsync() => _inputRef.FocusAsync();
 
     private async Task HandleInput(ChangeEventArgs e)
     {

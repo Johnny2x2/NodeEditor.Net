@@ -23,3 +23,12 @@ export function disconnectCanvasObserver(element) {
     observers.delete(element);
   }
 }
+
+export function getCanvasScreenOffset(element) {
+  if (!element) {
+    return { x: 0, y: 0 };
+  }
+
+  const rect = element.getBoundingClientRect();
+  return { x: rect.left, y: rect.top };
+}
