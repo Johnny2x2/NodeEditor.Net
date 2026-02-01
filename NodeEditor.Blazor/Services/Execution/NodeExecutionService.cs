@@ -252,13 +252,13 @@ public sealed class NodeExecutionService
 
             await ResolveInputsAsync(node, connections, nodeMap, context, invoker, feedbackContext, token).ConfigureAwait(false);
 
-            var method = invoker.Resolve(node);
-            if (method is null)
+            var binding = invoker.Resolve(node);
+            if (binding is null)
             {
                 throw new InvalidOperationException($"No method binding found for node '{node.Name}'.");
             }
 
-            await invoker.InvokeAsync(node, method, context, token).ConfigureAwait(false);
+            await invoker.InvokeAsync(node, binding, context, token).ConfigureAwait(false);
 
             NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
         }

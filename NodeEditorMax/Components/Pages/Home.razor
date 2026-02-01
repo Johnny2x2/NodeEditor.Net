@@ -61,7 +61,7 @@
     private CancellationTokenSource? _executionCts;
     private bool _isExecuting;
     private string _executionStatus = "Idle";
-    private readonly StandardNodeContext _nodeContext = new();
+    private CompositeNodeContext? _nodeContext;
     private string? _selectedGraphName;
     private string? _newGraphName = "My Graph";
     private string? _graphStatus;
@@ -76,6 +76,8 @@
     protected override async Task OnInitializedAsync()
     {
         await GraphLibrary.InitializeAsync();
+
+        _nodeContext = NodeContextFactory.CreateCompositeFromLoadedAssemblies();
 
         if (GraphLibrary.Items.Count > 0)
         {
@@ -95,6 +97,8 @@
             return;
         }
 
+        _nodeContext ??= NodeContextFactory.CreateCompositeFromLoadedAssemblies();
+
         _isExecuting = true;
         _executionStatus = "Running";
 
@@ -110,7 +114,7 @@
                 executionNodes,
                 EditorState.Connections.ToList(),
                 context,
-                _nodeContext,
+                _nodeContext ?? throw new InvalidOperationException("Node context is not initialized."),
                 null,
                 _executionCts.Token).ConfigureAwait(false);
 

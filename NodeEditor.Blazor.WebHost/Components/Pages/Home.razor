@@ -43,19 +43,21 @@
 	private CancellationTokenSource? _executionCts;
 	private bool _isExecuting;
 	private string _executionStatus = "Idle";
-	private readonly StandardNodeContext _nodeContext = new();
+	private CompositeNodeContext? _nodeContext;
 	private string? _loadStatus;
 	private string _selectedPreset = "graphs/loop-list-string.json";
 	private readonly List<GraphPreset> _presets = new()
 	{
 		new GraphPreset("Loop + Lists + Strings", "graphs/loop-list-string.json"),
 		new GraphPreset("Parallel Split/Join", "graphs/parallel.json"),
-		new GraphPreset("LLM Tornado Message Demo", "graphs/llmtornado-demo.json")
+		new GraphPreset("LLM Tornado Message Demo", "graphs/llmtornado-demo.json"),
+		new GraphPreset("LLM Tornado Orchestration Demo", "graphs/llmtornado-agent-orchestration.json")
 	};
 
 	protected override async Task OnInitializedAsync()
 	{
 		Registry.RegisterFromAssembly(typeof(StandardNodeContext).Assembly);
+		_nodeContext = NodeContextFactory.CreateCompositeFromLoadedAssemblies();
 
 		if (EditorState.Nodes.Count == 0)
 		{
@@ -81,6 +83,8 @@
 			return;
 		}
 
+		_nodeContext ??= NodeContextFactory.CreateCompositeFromLoadedAssemblies();
+
 		_isExecuting = true;
 		_executionStatus = "Running";
 		EditorState.ResetNodeExecutionState();
@@ -97,7 +101,7 @@
 				executionNodes,
 				EditorState.Connections.ToList(),
 				context,
-				_nodeContext,
+				_nodeContext ?? throw new InvalidOperationException("Node context is not initialized."),
 				null,
 				_executionCts.Token).ConfigureAwait(false);
 

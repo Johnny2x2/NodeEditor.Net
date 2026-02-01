@@ -9,16 +9,18 @@ public sealed class NodeMethodInvoker
 {
     private readonly object _context;
     private readonly SocketTypeResolver _typeResolver;
-    private readonly Dictionary<string, MethodInfo> _methodMap;
+    private readonly Dictionary<string, NodeMethodBinding> _methodMap;
 
     public NodeMethodInvoker(object context, SocketTypeResolver typeResolver)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _typeResolver = typeResolver ?? throw new ArgumentNullException(nameof(typeResolver));
-        _methodMap = BuildMethodMap(context.GetType());
+        _methodMap = context is INodeContextHost host
+            ? BuildMethodMap(host.Contexts)
+            : BuildMethodMap(new[] { context });
     }
 
-    public MethodInfo? Resolve(NodeData node)
+    public NodeMethodBinding? Resolve(NodeData node)
     {
         if (_methodMap.TryGetValue(node.Name, out var method))
         {
@@ -28,14 +30,14 @@ public sealed class NodeMethodInvoker
         return null;
     }
 
-    public async Task InvokeAsync(NodeData node, MethodInfo method, INodeExecutionContext executionContext, CancellationToken token)
+    public async Task InvokeAsync(NodeData node, NodeMethodBinding binding, INodeExecutionContext executionContext, CancellationToken token)
     {
-        if (method is null)
+        if (binding is null)
         {
-            throw new ArgumentNullException(nameof(method));
+            throw new ArgumentNullException(nameof(binding));
         }
 
-        var parameters = method.GetParameters();
+        var parameters = binding.Method.GetParameters();
         var args = new object?[parameters.Length];
         var outParameters = new List<(int Index, string SocketName, Type SocketType)>();
 
@@ -71,7 +73,7 @@ public sealed class NodeMethodInvoker
             args[i] = value;
         }
 
-        var result = method.Invoke(_context, args);
+        var result = binding.Method.Invoke(binding.Target, args);
 
         if (result is Task task)
         {
@@ -172,21 +174,28 @@ public sealed class NodeMethodInvoker
         return null;
     }
 
-    private static Dictionary<string, MethodInfo> BuildMethodMap(Type contextType)
+    private static Dictionary<string, NodeMethodBinding> BuildMethodMap(IEnumerable<object> contexts)
     {
-        var map = new Dictionary<string, MethodInfo>(StringComparer.Ordinal);
-        foreach (var method in contextType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-        {
-            var attribute = method.GetCustomAttribute<NodeAttribute>();
-            if (attribute is not null)
-            {
-                map[attribute.Name] = method;
-                continue;
-            }
+        var map = new Dictionary<string, NodeMethodBinding>(StringComparer.Ordinal);
 
-            map.TryAdd(method.Name, method);
+        foreach (var context in contexts)
+        {
+            var contextType = context.GetType();
+            foreach (var method in contextType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                var attribute = method.GetCustomAttribute<NodeAttribute>();
+                if (attribute is not null)
+                {
+                    map.TryAdd(attribute.Name, new NodeMethodBinding(context, method));
+                    continue;
+                }
+
+                map.TryAdd(method.Name, new NodeMethodBinding(context, method));
+            }
         }
 
         return map;
     }
 }
+
+public sealed record NodeMethodBinding(object Target, MethodInfo Method);

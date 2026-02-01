@@ -166,6 +166,11 @@ public sealed class GraphLibraryService
             "LLM Tornado Message Demo",
             "graphs/llmtornado-demo.json",
             fallback: null).ConfigureAwait(false);
+
+        await AddSampleGraphFromPackageAsync(
+            "LLM Tornado Orchestration Demo",
+            "graphs/llmtornado-agent-orchestration.json",
+            fallback: null).ConfigureAwait(false);
     }
 
     private async Task AddSampleGraphFromPackageAsync(string name, string path, string? fallback)
