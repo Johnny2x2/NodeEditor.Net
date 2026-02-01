@@ -14,10 +14,6 @@
         <button @onclick="StartExecutionAsync" disabled="@_isExecuting">Start</button>
         <button @onclick="StopExecution" disabled="@(!_isExecuting)">Stop</button>
         <span class="execution-status">@_executionStatus</span>
-        @if (!string.IsNullOrWhiteSpace(_lastMessage))
-        {
-            <span class="execution-message">@_lastMessage</span>
-        }
     </div>
 
     <div class="graph-settings">
@@ -65,8 +61,7 @@
     private CancellationTokenSource? _executionCts;
     private bool _isExecuting;
     private string _executionStatus = "Idle";
-    private string? _lastMessage;
-    private readonly SampleNodeContext _nodeContext = new();
+    private readonly StandardNodeContext _nodeContext = new();
     private string? _selectedGraphName;
     private string? _newGraphName = "My Graph";
     private string? _graphStatus;
@@ -102,8 +97,6 @@
 
         _isExecuting = true;
         _executionStatus = "Running";
-        _lastMessage = null;
-        _nodeContext.Reset();
 
         _executionCts?.Dispose();
         _executionCts = new CancellationTokenSource();
@@ -136,7 +129,6 @@
         finally
         {
             _isExecuting = false;
-            _lastMessage = _nodeContext.LastMessage;
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -215,50 +207,4 @@
         StateHasChanged();
     }
 
-    private sealed class SampleNodeContext : INodeMethodContext
-    {
-        public NodeData? CurrentProcessingNode { get; set; }
-
-        public event Action<string, NodeData, ExecutionFeedbackType, object?, bool>? FeedbackInfo;
-
-        public string? LastMessage { get; private set; }
-
-        public void Reset()
-        {
-            LastMessage = null;
-        }
-
-        [Node("Start", isCallable: true, isExecutionInitiator: true)]
-        public void Start(out ExecutionPath ExecOut)
-        {
-            ExecOut = new ExecutionPath();
-            ExecOut.Signal();
-        }
-
-        [Node("Add", isCallable: false)]
-        public void Add(int A, int B, out int Result)
-        {
-            Result = A + B;
-        }
-
-        [Node("Print", isCallable: true)]
-        public void Print(ExecutionPath ExecIn, string Message, out ExecutionPath ExecOut)
-        {
-            LastMessage = Message;
-            ExecOut = new ExecutionPath();
-            ExecOut.Signal();
-        }
-
-        [Node("Value", isCallable: false)]
-        public void ValueNode(int Value, out int Value_Out)
-        {
-            Value_Out = Value;
-        }
-
-        [Node("ToString", isCallable: false)]
-        public void ToStringNode(object Input, out string Output)
-        {
-            Output = Input?.ToString() ?? string.Empty;
-        }
-    }
 }

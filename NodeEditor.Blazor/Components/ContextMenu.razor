@@ -10,7 +10,7 @@
             @onpointerdown:preventDefault
             tabindex="0"
             @ref="_menuRef">
-        <ContextMenuSearch Value="_search" ValueChanged="OnSearchChanged" />
+        <ContextMenuSearch Value="@_search" ValueChanged="OnSearchChanged" />
         <div class="ne-context-menu-list">
             @if (_catalog.Categories.Count == 0)
             {

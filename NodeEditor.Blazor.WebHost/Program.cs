@@ -8,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddHttpClient();
 builder.Services.AddNodeEditor();
 builder.Services.AddScoped<NodeEditor.Blazor.Services.Execution.BackgroundExecutionWorker>();
 builder.Services.Configure<PluginOptions>(builder.Configuration.GetSection(PluginOptions.SectionName));

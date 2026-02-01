@@ -1,9 +1,7 @@
 using System.Text.Json;
 using Microsoft.Maui.Storage;
-using NodeEditor.Blazor.Models;
 using NodeEditor.Blazor.Services;
 using NodeEditor.Blazor.Services.Serialization;
-using NodeEditor.Blazor.ViewModels;
 
 namespace NodeEditorMax.Services;
 
@@ -35,7 +33,7 @@ public sealed class GraphLibraryService
         var userEntries = await LoadUserEntriesAsync().ConfigureAwait(false);
 
         _items.Clear();
-        AddSampleGraphs();
+        await AddSampleGraphsAsync().ConfigureAwait(false);
 
         foreach (var entry in userEntries)
         {
@@ -152,221 +150,44 @@ public sealed class GraphLibraryService
         await File.WriteAllTextAsync(_storagePath, json).ConfigureAwait(false);
     }
 
-    private void AddSampleGraphs()
+    private async Task AddSampleGraphsAsync()
     {
-        _items.Add(new GraphLibraryItem(
-            "Example: Sum and Print",
-            BuildSumGraphJson(),
-            IsSample: true));
+        await AddSampleGraphFromPackageAsync(
+            "Loop + Lists + Strings",
+            "graphs/loop-list-string.json",
+            fallback: null).ConfigureAwait(false);
 
-        _items.Add(new GraphLibraryItem(
-            "Example: Single Value",
-            BuildSingleValueGraphJson(),
-            IsSample: true));
+        await AddSampleGraphFromPackageAsync(
+            "Parallel Split/Join",
+            "graphs/parallel.json",
+            fallback: null).ConfigureAwait(false);
     }
 
-    private string BuildSumGraphJson()
+    private async Task AddSampleGraphFromPackageAsync(string name, string path, string? fallback)
     {
-        var state = new NodeEditorState();
-
-        var startNode = new NodeViewModel(new NodeData(
-            Id: "example-sum-start",
-            Name: "Start",
-            Callable: true,
-            ExecInit: true,
-            Inputs: Array.Empty<SocketData>(),
-            Outputs: new[]
-            {
-                new SocketData("ExecOut", "execution", false, true)
-            }))
+        try
         {
-            Position = new Point2D(40, 90)
-        };
+            using var stream = await FileSystem.OpenAppPackageFileAsync(path).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var json = await reader.ReadToEndAsync().ConfigureAwait(false);
 
-        var valueANode = new NodeViewModel(new NodeData(
-            Id: "example-sum-value-a",
-            Name: "Value",
-            Callable: false,
-            ExecInit: false,
-            Inputs: new[]
+            if (!string.IsNullOrWhiteSpace(json))
             {
-                new SocketData("Value", "int", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("Value_Out", "int", false, false)
-            }))
+                _items.Add(new GraphLibraryItem(name, json, IsSample: true));
+                return;
+            }
+        }
+        catch
         {
-            Position = new Point2D(210, 10)
-        };
+            // Ignore and fall back if provided.
+        }
 
-        var valueBNode = new NodeViewModel(new NodeData(
-            Id: "example-sum-value-b",
-            Name: "Value",
-            Callable: false,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("Value", "int", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("Value_Out", "int", false, false)
-            }))
+        if (!string.IsNullOrWhiteSpace(fallback))
         {
-            Position = new Point2D(210, 120)
-        };
-
-        var addNode = new NodeViewModel(new NodeData(
-            Id: "example-sum-add",
-            Name: "Add",
-            Callable: false,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("A", "int", true, false),
-                new SocketData("B", "int", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("Result", "int", false, false)
-            }))
-        {
-            Position = new Point2D(470, 70)
-        };
-
-        var printNode = new NodeViewModel(new NodeData(
-            Id: "example-sum-print",
-            Name: "Print",
-            Callable: true,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("ExecIn", "execution", true, true),
-                new SocketData("Message", "string", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("ExecOut", "execution", false, true)
-            }))
-        {
-            Position = new Point2D(300, 210)
-        };
-
-        var toStringNode = new NodeViewModel(new NodeData(
-            Id: "example-sum-tostring",
-            Name: "ToString",
-            Callable: false,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("Input", "object", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("Output", "string", false, false)
-            }))
-        {
-            Position = new Point2D(570, 100)
-        };
-
-        state.AddNode(startNode);
-        state.AddNode(valueANode);
-        state.AddNode(valueBNode);
-        state.AddNode(addNode);
-        state.AddNode(printNode);
-        state.AddNode(toStringNode);
-
-        state.AddConnection(new ConnectionData("example-sum-start", "example-sum-print", "ExecOut", "ExecIn", true));
-        state.AddConnection(new ConnectionData("example-sum-value-a", "example-sum-add", "Value_Out", "A", false));
-        state.AddConnection(new ConnectionData("example-sum-value-b", "example-sum-add", "Value_Out", "B", false));
-        state.AddConnection(new ConnectionData("example-sum-add", "example-sum-tostring", "Result", "Input", false));
-        state.AddConnection(new ConnectionData("example-sum-tostring", "example-sum-print", "Output", "Message", false));
-
-        return _serializer.Serialize(_serializer.Export(state));
+            _items.Add(new GraphLibraryItem(name, fallback, IsSample: true));
+        }
     }
 
-    private string BuildSingleValueGraphJson()
-    {
-        var state = new NodeEditorState();
-
-        var startNode = new NodeViewModel(new NodeData(
-            Id: "example-single-start",
-            Name: "Start",
-            Callable: true,
-            ExecInit: true,
-            Inputs: Array.Empty<SocketData>(),
-            Outputs: new[]
-            {
-                new SocketData("ExecOut", "execution", false, true)
-            }))
-        {
-            Position = new Point2D(40, 80)
-        };
-
-        var valueNode = new NodeViewModel(new NodeData(
-            Id: "example-single-value",
-            Name: "Value",
-            Callable: false,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("Value", "int", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("Value_Out", "int", false, false)
-            }))
-        {
-            Position = new Point2D(220, 120)
-        };
-
-        var toStringNode = new NodeViewModel(new NodeData(
-            Id: "example-single-tostring",
-            Name: "ToString",
-            Callable: false,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("Input", "object", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("Output", "string", false, false)
-            }))
-        {
-            Position = new Point2D(440, 120)
-        };
-
-        var printNode = new NodeViewModel(new NodeData(
-            Id: "example-single-print",
-            Name: "Print",
-            Callable: true,
-            ExecInit: false,
-            Inputs: new[]
-            {
-                new SocketData("ExecIn", "execution", true, true),
-                new SocketData("Message", "string", true, false)
-            },
-            Outputs: new[]
-            {
-                new SocketData("ExecOut", "execution", false, true)
-            }))
-        {
-            Position = new Point2D(300, 220)
-        };
-
-        state.AddNode(startNode);
-        state.AddNode(valueNode);
-        state.AddNode(toStringNode);
-        state.AddNode(printNode);
-
-        state.AddConnection(new ConnectionData("example-single-start", "example-single-print", "ExecOut", "ExecIn", true));
-        state.AddConnection(new ConnectionData("example-single-value", "example-single-tostring", "Value_Out", "Input", false));
-        state.AddConnection(new ConnectionData("example-single-tostring", "example-single-print", "Output", "Message", false));
-
-        return _serializer.Serialize(_serializer.Export(state));
-    }
 }
 
 public sealed record GraphLibraryItem(string Name, string Json, bool IsSample);

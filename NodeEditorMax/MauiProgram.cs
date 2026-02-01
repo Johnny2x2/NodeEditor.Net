@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NodeEditor.Blazor.Services;
+using NodeEditor.Blazor.Services.Execution;
+using NodeEditor.Blazor.Services.Registry;
 using NodeEditor.Blazor.Services.Plugins;
 using NodeEditorMax.Services;
 
@@ -38,6 +40,9 @@ namespace NodeEditorMax
 
             using (var scope = app.Services.CreateScope())
             {
+                var registry = scope.ServiceProvider.GetRequiredService<NodeRegistryService>();
+                registry.RegisterFromAssembly(typeof(StandardNodeContext).Assembly);
+
                 var pluginLoader = scope.ServiceProvider.GetRequiredService<PluginLoader>();
                 pluginLoader.LoadAndRegisterAsync().GetAwaiter().GetResult();
             }

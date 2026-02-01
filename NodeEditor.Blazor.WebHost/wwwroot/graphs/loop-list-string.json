@@ -1,0 +1,461 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "start-loop",
+      "typeId": null,
+      "name": "Start",
+      "callable": true,
+      "execInit": true,
+      "x": 60,
+      "y": 80,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "for-loop",
+      "typeId": null,
+      "name": "For Loop Step",
+      "callable": true,
+      "execInit": false,
+      "x": 260,
+      "y": 60,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        },
+        {
+          "name": "StartValue",
+          "typeName": "System.Int32",
+          "isInput": true,
+          "isExecution": false,
+          "value": { "typeName": "System.Int32", "json": 0 }
+        },
+        {
+          "name": "EndValue",
+          "typeName": "System.Int32",
+          "isInput": true,
+          "isExecution": false,
+          "value": { "typeName": "System.Int32", "json": 4 }
+        },
+        {
+          "name": "Step",
+          "typeName": "System.Int32",
+          "isInput": true,
+          "isExecution": false,
+          "value": { "typeName": "System.Int32", "json": 1 }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ExitPath",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        },
+        {
+          "name": "LoopPath",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        },
+        {
+          "name": "Index",
+          "typeName": "System.Int32",
+          "isInput": false,
+          "isExecution": false,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "consume-loop",
+      "typeId": null,
+      "name": "Consume",
+      "callable": true,
+      "execInit": false,
+      "x": 500,
+      "y": 60,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        },
+        {
+          "name": "Value",
+          "typeName": "System.Int32",
+          "isInput": true,
+          "isExecution": false,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "marker-loop",
+      "typeId": null,
+      "name": "Marker",
+      "callable": true,
+      "execInit": false,
+      "x": 760,
+      "y": 60,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "start-list",
+      "typeId": null,
+      "name": "Start",
+      "callable": true,
+      "execInit": true,
+      "x": 60,
+      "y": 260,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "list-create",
+      "typeId": null,
+      "name": "List Create",
+      "callable": false,
+      "execInit": false,
+      "x": 240,
+      "y": 240,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "List",
+          "typeName": "NodeEditor.Blazor.Models.SerializableList",
+          "isInput": false,
+          "isExecution": false,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "list-add-a",
+      "typeId": null,
+      "name": "List Add",
+      "callable": false,
+      "execInit": false,
+      "x": 420,
+      "y": 220,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "List",
+          "typeName": "NodeEditor.Blazor.Models.SerializableList",
+          "isInput": true,
+          "isExecution": false,
+          "value": null
+        },
+        {
+          "name": "Value",
+          "typeName": "System.String",
+          "isInput": true,
+          "isExecution": false,
+          "value": { "typeName": "System.String", "json": "Alpha" }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Result",
+          "typeName": "NodeEditor.Blazor.Models.SerializableList",
+          "isInput": false,
+          "isExecution": false,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "list-add-b",
+      "typeId": null,
+      "name": "List Add",
+      "callable": false,
+      "execInit": false,
+      "x": 600,
+      "y": 220,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "List",
+          "typeName": "NodeEditor.Blazor.Models.SerializableList",
+          "isInput": true,
+          "isExecution": false,
+          "value": null
+        },
+        {
+          "name": "Value",
+          "typeName": "System.String",
+          "isInput": true,
+          "isExecution": false,
+          "value": { "typeName": "System.String", "json": "Beta" }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Result",
+          "typeName": "NodeEditor.Blazor.Models.SerializableList",
+          "isInput": false,
+          "isExecution": false,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "list-count",
+      "typeId": null,
+      "name": "List Count",
+      "callable": false,
+      "execInit": false,
+      "x": 780,
+      "y": 220,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "List",
+          "typeName": "NodeEditor.Blazor.Models.SerializableList",
+          "isInput": true,
+          "isExecution": false,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Count",
+          "typeName": "System.Int32",
+          "isInput": false,
+          "isExecution": false,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "consume-list",
+      "typeId": null,
+      "name": "Consume",
+      "callable": true,
+      "execInit": false,
+      "x": 980,
+      "y": 220,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        },
+        {
+          "name": "Value",
+          "typeName": "System.Int32",
+          "isInput": true,
+          "isExecution": false,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "string-concat",
+      "typeId": null,
+      "name": "String Concat",
+      "callable": false,
+      "execInit": false,
+      "x": 780,
+      "y": 320,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "A",
+          "typeName": "System.String",
+          "isInput": true,
+          "isExecution": false,
+          "value": { "typeName": "System.String", "json": "Loop count: " }
+        },
+        {
+          "name": "B",
+          "typeName": "System.Object",
+          "isInput": true,
+          "isExecution": false,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Result",
+          "typeName": "System.String",
+          "isInput": false,
+          "isExecution": false,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "string-length",
+      "typeId": null,
+      "name": "String Length",
+      "callable": false,
+      "execInit": false,
+      "x": 980,
+      "y": 320,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Input",
+          "typeName": "System.String",
+          "isInput": true,
+          "isExecution": false,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Length",
+          "typeName": "System.Int32",
+          "isInput": false,
+          "isExecution": false,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "consume-string",
+      "typeId": null,
+      "name": "Consume",
+      "callable": true,
+      "execInit": false,
+      "x": 1180,
+      "y": 320,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        },
+        {
+          "name": "Value",
+          "typeName": "System.Int32",
+          "isInput": true,
+          "isExecution": false,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    }
+  ],
+  "connections": [
+    { "outputNodeId": "start-loop", "outputSocketName": "Exit", "inputNodeId": "for-loop", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "for-loop", "outputSocketName": "LoopPath", "inputNodeId": "consume-loop", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "consume-loop", "outputSocketName": "Exit", "inputNodeId": "for-loop", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "for-loop", "outputSocketName": "ExitPath", "inputNodeId": "marker-loop", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "for-loop", "outputSocketName": "Index", "inputNodeId": "consume-loop", "inputSocketName": "Value", "isExecution": false },
+
+    { "outputNodeId": "start-list", "outputSocketName": "Exit", "inputNodeId": "consume-list", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "list-create", "outputSocketName": "List", "inputNodeId": "list-add-a", "inputSocketName": "List", "isExecution": false },
+    { "outputNodeId": "list-add-a", "outputSocketName": "Result", "inputNodeId": "list-add-b", "inputSocketName": "List", "isExecution": false },
+    { "outputNodeId": "list-add-b", "outputSocketName": "Result", "inputNodeId": "list-count", "inputSocketName": "List", "isExecution": false },
+    { "outputNodeId": "list-count", "outputSocketName": "Count", "inputNodeId": "consume-list", "inputSocketName": "Value", "isExecution": false },
+
+    { "outputNodeId": "list-count", "outputSocketName": "Count", "inputNodeId": "string-concat", "inputSocketName": "B", "isExecution": false },
+    { "outputNodeId": "string-concat", "outputSocketName": "Result", "inputNodeId": "string-length", "inputSocketName": "Input", "isExecution": false },
+    { "outputNodeId": "start-list", "outputSocketName": "Exit", "inputNodeId": "consume-string", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "string-length", "outputSocketName": "Length", "inputNodeId": "consume-string", "inputSocketName": "Value", "isExecution": false }
+  ],
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "width": 1600,
+    "height": 900,
+    "zoom": 1
+  },
+  "selectedNodeIds": []
+}
