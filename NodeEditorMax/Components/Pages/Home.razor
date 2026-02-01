@@ -109,16 +109,19 @@
         _executionCts = new CancellationTokenSource();
 
         var context = new NodeExecutionContext();
+        var executionNodes = EditorState.BuildExecutionNodes();
 
         try
         {
             await ExecutionService.ExecuteAsync(
-                EditorState.Nodes.Select(n => n.Data).ToList(),
+                executionNodes,
                 EditorState.Connections.ToList(),
                 context,
                 _nodeContext,
                 null,
                 _executionCts.Token).ConfigureAwait(false);
+
+            EditorState.ApplyExecutionContext(context);
 
             _executionStatus = "Completed";
         }

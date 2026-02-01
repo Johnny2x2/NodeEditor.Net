@@ -78,6 +78,7 @@
         State.SelectionChanged += OnStateChanged;
         State.NodeAdded += OnStateChanged;
         State.NodeRemoved += OnStateChanged;
+        State.SocketValuesChanged += OnStateChanged;
     }
 
     public void Dispose()
@@ -85,6 +86,7 @@
         State.SelectionChanged -= OnStateChanged;
         State.NodeAdded -= OnStateChanged;
         State.NodeRemoved -= OnStateChanged;
+        State.SocketValuesChanged -= OnStateChanged;
     }
 
     private void OnStateChanged(object? sender, EventArgs e)

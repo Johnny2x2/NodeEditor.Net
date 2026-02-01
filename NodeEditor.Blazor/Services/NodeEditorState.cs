@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 using NodeEditor.Blazor.Models;
+using NodeEditor.Blazor.Services.Execution;
 using NodeEditor.Blazor.ViewModels;
 
 namespace NodeEditor.Blazor.Services;
@@ -77,6 +78,11 @@ public sealed class NodeEditorState
     public event EventHandler<ZoomChangedEventArgs>? ZoomChanged;
 
     /// <summary>
+    /// Raised when socket values are updated (e.g., after execution).
+    /// </summary>
+    public event EventHandler? SocketValuesChanged;
+
+    /// <summary>
     /// Raised when an undo operation is requested.
     /// Placeholder hook for future history support.
     /// </summary>
@@ -106,6 +112,76 @@ public sealed class NodeEditorState
     /// Gets the set of IDs for currently selected nodes.
     /// </summary>
     public HashSet<string> SelectedNodeIds { get; } = new();
+
+    /// <summary>
+    /// Builds a snapshot of node data using the current socket values from view models.
+    /// This is useful for execution so inputs edited in the UI are respected.
+    /// </summary>
+    public IReadOnlyList<NodeData> BuildExecutionNodes()
+    {
+        return Nodes
+            .Select(node => new NodeData(
+                node.Data.Id,
+                node.Data.Name,
+                node.Data.Callable,
+                node.Data.ExecInit,
+                node.Inputs.Select(socket => socket.Data).ToList(),
+                node.Outputs.Select(socket => socket.Data).ToList(),
+                node.Data.DefinitionId))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Updates socket values from an execution context and raises <see cref="SocketValuesChanged"/>.
+    /// </summary>
+    public void ApplyExecutionContext(
+        INodeExecutionContext context,
+        bool includeInputs = true,
+        bool includeOutputs = true,
+        bool includeExecutionSockets = false)
+    {
+        if (context is null)
+        {
+            throw new ArgumentNullException(nameof(context));
+        }
+
+        foreach (var node in Nodes)
+        {
+            if (includeInputs)
+            {
+                foreach (var input in node.Inputs)
+                {
+                    if (!includeExecutionSockets && input.Data.IsExecution)
+                    {
+                        continue;
+                    }
+
+                    if (context.TryGetSocketValue(node.Data.Id, input.Data.Name, out var value))
+                    {
+                        input.SetValue(value);
+                    }
+                }
+            }
+
+            if (includeOutputs)
+            {
+                foreach (var output in node.Outputs)
+                {
+                    if (!includeExecutionSockets && output.Data.IsExecution)
+                    {
+                        continue;
+                    }
+
+                    if (context.TryGetSocketValue(node.Data.Id, output.Data.Name, out var value))
+                    {
+                        output.SetValue(value);
+                    }
+                }
+            }
+        }
+
+        SocketValuesChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     private double _zoom = 1.0;
     
