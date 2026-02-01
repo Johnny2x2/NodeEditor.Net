@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using NodeEditor.Blazor.Models;
 using NodeEditor.Blazor.Services.Execution;
 using NodeEditor.Blazor.Services.Serialization;
 
@@ -35,7 +36,13 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<ViewportCuller>();
         
         // Register socket type resolver as singleton (shared type registry)
-        services.AddSingleton<SocketTypeResolver>();
+        services.AddSingleton<SocketTypeResolver>(provider =>
+        {
+            var resolver = new SocketTypeResolver();
+            resolver.Register<ExecutionPath>();
+            resolver.Register<SerializableList>();
+            return resolver;
+        });
 
         // Register node registry services
         services.AddSingleton<Registry.NodeDiscoveryService>();
@@ -78,7 +85,13 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<CoordinateConverter>();
         services.AddScoped<ConnectionValidator>();
         services.AddScoped<ViewportCuller>();
-        services.AddSingleton<SocketTypeResolver>();
+        services.AddSingleton<SocketTypeResolver>(provider =>
+        {
+            var resolver = new SocketTypeResolver();
+            resolver.Register<ExecutionPath>();
+            resolver.Register<SerializableList>();
+            return resolver;
+        });
 
         services.AddSingleton<Registry.NodeDiscoveryService>();
         services.AddSingleton<Registry.NodeRegistryService>();
