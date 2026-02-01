@@ -66,6 +66,11 @@ public sealed class NodeEditorState
     /// Raised when the selection state changes (nodes selected or deselected).
     /// </summary>
     public event EventHandler<SelectionChangedEventArgs>? SelectionChanged;
+
+    /// <summary>
+    /// Raised when the connection selection changes.
+    /// </summary>
+    public event EventHandler<ConnectionSelectionChangedEventArgs>? ConnectionSelectionChanged;
     
     /// <summary>
     /// Raised when the viewport (visible area of the canvas) changes.
@@ -117,6 +122,11 @@ public sealed class NodeEditorState
     /// Gets the set of IDs for currently selected nodes.
     /// </summary>
     public HashSet<string> SelectedNodeIds { get; } = new();
+
+    /// <summary>
+    /// Gets the currently selected connection, if any.
+    /// </summary>
+    public ConnectionData? SelectedConnection { get; private set; }
 
     /// <summary>
     /// Builds a snapshot of node data using the current socket values from view models.
@@ -319,14 +329,7 @@ public sealed class NodeEditorState
             return;
         }
 
-        var connectionsToRemove = Connections
-            .Where(c => c.OutputNodeId == nodeId || c.InputNodeId == nodeId)
-            .ToList();
-        foreach (var connection in connectionsToRemove)
-        {
-            Connections.Remove(connection);
-            ConnectionRemoved?.Invoke(this, new ConnectionEventArgs(connection));
-        }
+        RemoveConnectionsToNode(nodeId);
 
         Nodes.Remove(node);
         SelectedNodeIds.Remove(nodeId);
@@ -349,8 +352,100 @@ public sealed class NodeEditorState
     /// <param name="connection">The connection to remove.</param>
     public void RemoveConnection(ConnectionData connection)
     {
+        if (SelectedConnection == connection)
+        {
+            ClearConnectionSelection();
+        }
+
         Connections.Remove(connection);
         ConnectionRemoved?.Invoke(this, new ConnectionEventArgs(connection));
+    }
+
+    /// <summary>
+    /// Removes all connections that touch a node (input or output).
+    /// </summary>
+    /// <param name="nodeId">The ID of the node whose connections should be removed.</param>
+    public void RemoveConnectionsToNode(string nodeId)
+    {
+        var connectionsToRemove = Connections
+            .Where(c => c.OutputNodeId == nodeId || c.InputNodeId == nodeId)
+            .ToList();
+
+        foreach (var connection in connectionsToRemove)
+        {
+            RemoveConnection(connection);
+        }
+    }
+
+    /// <summary>
+    /// Removes all connections to a specific input socket.
+    /// </summary>
+    /// <param name="nodeId">The ID of the node with the input socket.</param>
+    /// <param name="socketName">The name of the input socket.</param>
+    public void RemoveConnectionsToInput(string nodeId, string socketName)
+    {
+        var connectionsToRemove = Connections
+            .Where(c => c.InputNodeId == nodeId && c.InputSocketName == socketName)
+            .ToList();
+
+        foreach (var connection in connectionsToRemove)
+        {
+            RemoveConnection(connection);
+        }
+    }
+
+    /// <summary>
+    /// Removes all connections from a specific output socket.
+    /// </summary>
+    /// <param name="nodeId">The ID of the node with the output socket.</param>
+    /// <param name="socketName">The name of the output socket.</param>
+    public void RemoveConnectionsFromOutput(string nodeId, string socketName)
+    {
+        var connectionsToRemove = Connections
+            .Where(c => c.OutputNodeId == nodeId && c.OutputSocketName == socketName)
+            .ToList();
+
+        foreach (var connection in connectionsToRemove)
+        {
+            RemoveConnection(connection);
+        }
+    }
+
+    /// <summary>
+    /// Selects a connection and raises <see cref="ConnectionSelectionChanged"/>.
+    /// </summary>
+    /// <param name="connection">The connection to select.</param>
+    /// <param name="clearNodeSelection">If true, clears any selected nodes first.</param>
+    public void SelectConnection(ConnectionData connection, bool clearNodeSelection = true)
+    {
+        if (clearNodeSelection && SelectedNodeIds.Count > 0)
+        {
+            ClearSelection();
+        }
+
+        if (SelectedConnection == connection)
+        {
+            return;
+        }
+
+        var previous = SelectedConnection;
+        SelectedConnection = connection;
+        ConnectionSelectionChanged?.Invoke(this, new ConnectionSelectionChangedEventArgs(previous, SelectedConnection));
+    }
+
+    /// <summary>
+    /// Clears the selected connection and raises <see cref="ConnectionSelectionChanged"/>.
+    /// </summary>
+    public void ClearConnectionSelection()
+    {
+        if (SelectedConnection is null)
+        {
+            return;
+        }
+
+        var previous = SelectedConnection;
+        SelectedConnection = null;
+        ConnectionSelectionChanged?.Invoke(this, new ConnectionSelectionChangedEventArgs(previous, null));
     }
 
     /// <summary>
@@ -360,6 +455,8 @@ public sealed class NodeEditorState
     /// <param name="clearExisting">If true, clears the existing selection before selecting the node.</param>
     public void SelectNode(string nodeId, bool clearExisting = true)
     {
+        ClearConnectionSelection();
+
         // Only create a copy if there are subscribers
         var previousSelection = SelectionChanged != null ? SelectedNodeIds.ToHashSet() : null;
 
@@ -390,6 +487,8 @@ public sealed class NodeEditorState
     /// <param name="nodeId">The ID of the node to toggle.</param>
     public void ToggleSelectNode(string nodeId)
     {
+        ClearConnectionSelection();
+
         // Only create a copy if there are subscribers
         var previousSelection = SelectionChanged != null ? SelectedNodeIds.ToHashSet() : null;
         
@@ -421,6 +520,8 @@ public sealed class NodeEditorState
     /// </summary>
     public void ClearSelection()
     {
+        ClearConnectionSelection();
+
         // Only create a copy if there are subscribers
         var previousSelection = SelectionChanged != null ? SelectedNodeIds.ToHashSet() : null;
         ClearSelectionInternal();
@@ -438,6 +539,8 @@ public sealed class NodeEditorState
     /// <param name="clearExisting">If true, clears existing selection first.</param>
     public void SelectNodes(IEnumerable<string> nodeIds, bool clearExisting = true)
     {
+        ClearConnectionSelection();
+
         var previousSelection = SelectionChanged != null ? SelectedNodeIds.ToHashSet() : null;
 
         if (clearExisting)
@@ -512,6 +615,7 @@ public sealed class NodeEditorState
         }
 
         ClearSelectionInternal();
+        ClearConnectionSelection();
         Viewport = new Rect2D(0, 0, 0, 0);
         Zoom = 1.0;
     }

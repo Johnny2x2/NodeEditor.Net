@@ -13,6 +13,7 @@ public sealed class NodeEditorStateTests
         Assert.Empty(state.Nodes);
         Assert.Empty(state.Connections);
         Assert.Empty(state.SelectedNodeIds);
+        Assert.Null(state.SelectedConnection);
     }
 
     [Fact]
@@ -21,5 +22,22 @@ public sealed class NodeEditorStateTests
         var state = new NodeEditorState();
 
         Assert.Equal(new Rect2D(0, 0, 0, 0), state.Viewport);
+    }
+
+    [Fact]
+    public void RemoveConnectionsToInput_RemovesMatchingConnections()
+    {
+        var state = new NodeEditorState();
+
+        var c1 = new ConnectionData("A", "B", "Out", "In1", false);
+        var c2 = new ConnectionData("A", "B", "Out", "In2", false);
+
+        state.AddConnection(c1);
+        state.AddConnection(c2);
+
+        state.RemoveConnectionsToInput("B", "In1");
+
+        Assert.DoesNotContain(c1, state.Connections);
+        Assert.Contains(c2, state.Connections);
     }
 }

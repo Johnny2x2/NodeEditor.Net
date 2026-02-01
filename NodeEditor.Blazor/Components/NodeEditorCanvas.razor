@@ -37,6 +37,8 @@
             {
                 <ConnectionPath Connection="connection"
                                 Nodes="State.Nodes"
+                                IsSelected="State.SelectedConnection == connection"
+                                OnSelected="OnConnectionSelected"
                                 @key="@GetConnectionKey(connection)" />
             }
             @if (_pendingConnection is not null)
@@ -137,6 +139,7 @@
         State.ConnectionAdded += OnStateChanged;
         State.ConnectionRemoved += OnStateChanged;
         State.SelectionChanged += OnStateChanged;
+        State.ConnectionSelectionChanged += OnStateChanged;
         State.NodeExecutionStateChanged += OnStateChanged;
         State.ZoomChanged += OnZoomChanged;
         State.ViewportChanged += OnViewportChanged;
@@ -164,6 +167,7 @@
         State.ConnectionAdded -= OnStateChanged;
         State.ConnectionRemoved -= OnStateChanged;
         State.SelectionChanged -= OnStateChanged;
+        State.ConnectionSelectionChanged -= OnStateChanged;
         State.NodeExecutionStateChanged -= OnStateChanged;
         State.ZoomChanged -= OnZoomChanged;
         State.ViewportChanged -= OnViewportChanged;
@@ -358,6 +362,8 @@
         _selectionAdditive = e.CtrlKey || e.ShiftKey;
         _selectionBase = _selectionAdditive ? State.SelectedNodeIds.ToHashSet() : new HashSet<string>();
 
+        State.ClearConnectionSelection();
+
         if (!_selectionAdditive)
         {
             State.ClearSelection();
@@ -446,7 +452,14 @@
     {
         if (e.Key is "Delete" or "Backspace")
         {
-            State.RemoveSelectedNodes();
+            if (State.SelectedConnection is not null)
+            {
+                State.RemoveConnection(State.SelectedConnection);
+            }
+            else
+            {
+                State.RemoveSelectedNodes();
+            }
         }
         else if (e.Key == "Escape")
         {
@@ -647,6 +660,7 @@
                     }
                     else
                     {
+                        State.ClearConnectionSelection();
                         State.ClearSelection();
                     }
                     break;
@@ -699,6 +713,11 @@
         }
 
         return null;
+    }
+
+    private void OnConnectionSelected(ConnectionData connection)
+    {
+        State.SelectConnection(connection);
     }
 
     private static string GetConnectionKey(ConnectionData c) =>

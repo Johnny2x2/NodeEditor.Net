@@ -80,6 +80,11 @@
     animation: dash 0.5s linear infinite;
 }
 
+.ne-connection--selected {
+    stroke-width: 5 !important;
+    filter: drop-shadow(0 0 6px rgba(102, 153, 255, 0.6));
+}
+
 @keyframes dash {
     to {
         stroke-dashoffset: -10;

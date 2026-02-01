@@ -11,7 +11,9 @@
       data-output-node="@Connection.OutputNodeId"
       data-output-socket="@Connection.OutputSocketName"
       data-input-node="@Connection.InputNodeId"
-      data-input-socket="@Connection.InputSocketName" />
+    data-input-socket="@Connection.InputSocketName"
+    @onpointerdown="OnPointerDown"
+    @onpointerdown:stopPropagation="true" />
 
 @code {
     [Parameter, EditorRequired]
@@ -22,6 +24,12 @@
 
     [Parameter]
     public bool IsPending { get; set; }
+
+    [Parameter]
+    public bool IsSelected { get; set; }
+
+    [Parameter]
+    public EventCallback<ConnectionData> OnSelected { get; set; }
 
     [Parameter]
     public Point2D? PendingEndPoint { get; set; }
@@ -39,6 +47,9 @@
                 
             if (IsPending)
                 classes.Add("ne-connection--pending");
+
+            if (IsSelected)
+                classes.Add("ne-connection--selected");
                 
             return string.Join(" ", classes);
         }
@@ -47,6 +58,16 @@
     private string StrokeColor => Connection.IsExecution ? "#ffffff" : "#88cc88";
     
     private string StrokeWidth => IsPending ? "2" : "3";
+
+    private async Task OnPointerDown(PointerEventArgs e)
+    {
+        if (IsPending || !OnSelected.HasDelegate)
+        {
+            return;
+        }
+
+        await OnSelected.InvokeAsync(Connection);
+    }
 
     private string PathData
     {

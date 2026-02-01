@@ -45,6 +45,21 @@ public sealed class SelectionChangedEventArgs : EventArgs
 }
 
 /// <summary>
+/// Event args for connection selection changes.
+/// </summary>
+public sealed class ConnectionSelectionChangedEventArgs : EventArgs
+{
+    public ConnectionSelectionChangedEventArgs(ConnectionData? previousSelection, ConnectionData? currentSelection)
+    {
+        PreviousSelection = previousSelection;
+        CurrentSelection = currentSelection;
+    }
+
+    public ConnectionData? PreviousSelection { get; }
+    public ConnectionData? CurrentSelection { get; }
+}
+
+/// <summary>
 /// Event args for viewport changes.
 /// </summary>
 public sealed class ViewportChangedEventArgs : EventArgs
