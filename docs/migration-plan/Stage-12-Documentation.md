@@ -14,8 +14,26 @@
 - ❌ Custom node tutorial
 - ❌ Troubleshooting guide
 
+### What Should Be Done Next
+1. Write top-level README with install + minimal usage example.
+2. Generate API reference for public types (services, models, components).
+3. Create MIGRATION.md with WinForms → Blazor mapping and examples.
+4. Add a working sample project and run instructions (MAUI + WebHost).
+5. Write a custom node + custom editor tutorial using `INodeContext`.
+
 ## Goal
 Provide clear guidance for users migrating from WinForms to MAUI Blazor.
+
+## Requirements
+- Provide a top-level README with installation, configuration, and minimal usage example.
+- Publish API reference documentation for all public types and parameters.
+- Supply a migration guide with a WinForms → Blazor mapping table and step-by-step migration flow.
+- Include a working sample project with build/run instructions for MAUI and Blazor WebHost.
+- Document custom node creation and custom editor UI using `INodeContext` and RenderFragments.
+- Document `GraphSerializer` save/load usage and `GraphLibraryService` sample graph workflow.
+- Provide troubleshooting guidance for common issues (rendering, input, plugins, serialization).
+- Explicitly document plugin limitations on iOS and AOT constraints.
+- Keep docs versioned and aligned with the package version.
 
 ## Deliverables
 - Updated README for new library

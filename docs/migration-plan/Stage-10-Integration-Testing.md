@@ -5,20 +5,40 @@
 ### What's Done
 - ✅ Project reference from MAUI to NodeEditor.Blazor
 - ✅ Services registered via `AddNodeEditor()` extension
-- ✅ Test page in MAUI app (`Components/Pages/Home.razor`)
-- ✅ Sample graph with 5 nodes and 5 connections
+- ✅ MAUI host page with toolbar + editor (`Components/Pages/Home.razor`)
+- ✅ Graph save/load wired through `GraphLibraryService` + `GraphSerializer`
+- ✅ Properties panel integrated (`NodePropertiesPanel`)
 - ✅ CSS linked in `wwwroot/index.html`
-- ✅ Windows build verified and running
+- ✅ Plugin loader invoked on MAUI startup (with iOS guard in `PlatformGuard`)
 
 ### What's Remaining
 - ❌ Full manual test checklist execution
 - ❌ Mobile platform testing (Android, iOS)
 - ❌ Touch gesture implementation
-- ❌ Plugin loader iOS guard verification
 - ❌ Error boundary integration
+- ❌ Documented test results and platform matrix
+
+### What Should Be Done Next
+1. Add an error boundary around the editor surface in the MAUI host page.
+2. Implement touch gestures in `NodeEditorCanvas` (pan, pinch zoom, tap select).
+3. Run the manual test checklist on Windows + one mobile target and record results.
+4. Verify iOS startup skips plugin loading cleanly and logs the skip.
+5. Confirm save/load and execution flows in the MAUI host with sample graphs.
 
 ## Goal
 Integrate the new library into the MAUI host and validate key workflows.
+
+## Requirements
+- MAUI host exposes the editor route and toolbar shell consistently across platforms.
+- `NodeEditorCanvas` and `NodePropertiesPanel` are integrated in the MAUI host and respond to selection changes.
+- Sample graphs load via a single provider (current `GraphLibraryService`) and are usable for smoke tests.
+- Error boundary wraps the editor surface with a user-visible recovery action.
+- Touch gestures are implemented for pan, zoom, and selection (single tap select, two-finger pan, pinch zoom).
+- Plugin loading is attempted from MAUI startup and must no-op on iOS with a log entry.
+- Save/load workflow is verified end-to-end using the current `GraphSerializer` format.
+- Manual test checklist is executed on Windows and at least one mobile target with documented results.
+- A smoke test validates editor load, add/connect/move, execute, and save/load flows.
+- UI styling and CSS assets are confirmed loading in MAUI host for all platforms.
 
 ## Deliverables
 - Project reference to NodeEditor.Blazor

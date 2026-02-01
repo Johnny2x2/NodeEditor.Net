@@ -4,18 +4,36 @@
 
 ### What's Done
 - ✅ `PlatformGuard.IsPluginLoadingSupported()` in `Services/PlatformGuard.cs`
-- ✅ iOS detection and short-circuit logic
+- ✅ Plugin contracts and manifest types (`INodePlugin`, `INodeProvider`, `PluginManifest`)
+- ✅ Plugin loader with directory discovery + validation
+- ✅ iOS detection and short-circuit logging in `PluginLoader`
+- ✅ MAUI host calls `PluginLoader.LoadAndRegisterAsync()`
 
 ### What's Remaining
-- ❌ `INodePlugin` interface contract
-- ❌ `PluginLoader` service for assembly scanning
-- ❌ Plugin directory configuration
-- ❌ Plugin manifest format
-- ❌ Version compatibility checking
-- ❌ Integration with `NodeRegistryService`
+- ❌ Plugin security posture (signing/allowlist policy)
+- ❌ Deterministic ordering and idempotent registration tests
+- ❌ Public documentation + sample plugin
+- ❌ Configurable enable/disable UI or config guidance
+
+### What Should Be Done Next
+1. Add a sample plugin project and document build/deploy steps.
+2. Add tests for deterministic loading and idempotent registration.
+3. Define a security policy (allowlist, signing, or checksum validation).
+4. Document configuration (`PluginOptions`) and platform limitations.
+5. Add structured logs for load failures and validation rejects.
 
 ## Goal
 Add an optional plugin discovery and registration pipeline for new node packs, while explicitly disabling plugin loading on iOS.
+
+## Requirements
+- Plugin loading is configuration-driven (`PluginOptions.EnablePluginLoading`) and documented, with clear defaults.
+- A stable `INodePlugin` contract includes ID, name, version, and API compatibility metadata.
+- Plugin discovery supports a configurable directory and optional manifest file (`plugin.json`).
+- Validation rejects incompatible plugins with clear logs (API version + manifest checks).
+- Plugin errors are non-fatal and surfaced through structured logging.
+- iOS builds must skip discovery and loading with an explicit log entry.
+- Plugins can register nodes into categories without overriding core nodes unless explicitly allowed.
+- Plugin loader is deterministic (consistent order and idempotent registration).
 
 ## Deliverables
 - Plugin contracts: INodePlugin / INodeProvider

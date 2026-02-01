@@ -13,8 +13,25 @@
 - ❌ Frame budget metrics / diagnostics overlay
 - ❌ Memory profiling
 
+### What Should Be Done Next
+1. Implement viewport culling in `NodeEditorCanvas` using `State.Viewport` + `CoordinateConverter`.
+2. Batch connection rendering into a single SVG path where possible.
+3. Add `ShouldRender` overrides for `NodeComponent` and `ConnectionPath` with cached state.
+4. Add a dev-only diagnostics overlay for FPS, visible counts, and memory.
+5. Run a 30-minute soak test and capture memory profile results.
+
 ## Goal
 Ensure large graphs perform well in Blazor and MAUI.
+
+## Requirements
+- Maintain interactive frame rate (target 60 FPS) with 500 nodes and 800 connections on desktop.
+- Render only visible nodes and connections using viewport culling based on `NodeEditorState.Viewport` and `CoordinateConverter`.
+- Batch connection rendering to minimize DOM/SVG updates.
+- Minimize re-rendering using `ShouldRender` and cached layout calculations.
+- Avoid per-frame allocations during pan/zoom/drag.
+- Provide a dev-only diagnostics overlay for FPS, visible counts, and memory snapshots.
+- Performance instrumentation is optional and disabled by default in production.
+- JS interop usage is measured and reduced to only essential operations.
 
 ## Deliverables
 - Render throttling or batching

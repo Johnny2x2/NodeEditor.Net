@@ -7,15 +7,33 @@
 - ✅ MAUI app builds for Windows, Android, iOS, Mac Catalyst
 
 ### What's Remaining
-- ❌ NuGet package metadata in `.csproj`
+- ❌ NuGet package metadata in `NodeEditor.Blazor.csproj`
+- ❌ SourceLink + symbols package configuration
 - ❌ GitHub Actions CI workflow
 - ❌ Automated testing in CI
 - ❌ Package publishing workflow
 - ❌ Release notes template
 - ❌ CHANGELOG.md
 
+### What Should Be Done Next
+1. Add NuGet metadata to `NodeEditor.Blazor.csproj` (ID, version, license, repo, readme).
+2. Enable SourceLink and symbol packages.
+3. Add CI workflow to build, test, and pack on PRs.
+4. Add release workflow for tagged versions and NuGet publish.
+5. Create CHANGELOG.md and release notes template.
+
 ## Goal
 Prepare the library and MAUI host app for release with CI packaging, versioning, and platform distribution.
+
+## Requirements
+- NuGet package metadata is complete in `NodeEditor.Blazor.csproj` (ID, version, license, repo, tags, readme, XML docs).
+- SourceLink is enabled and symbol packages are produced.
+- Builds are deterministic and signed where applicable.
+- CI runs build, test, and pack on PRs and main.
+- Release workflow publishes artifacts and release notes from tagged versions.
+- CHANGELOG follows SemVer and includes breaking change notes.
+- Package validation verifies no WinForms/System.Drawing dependencies.
+- MAUI app packaging is verified for Windows and at least one mobile target.
 
 ## Deliverables
 - NuGet package for NodeEditor.Blazor
