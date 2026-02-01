@@ -8,9 +8,10 @@
      @onpointerdown="OnPointerDownHandler"
      @onpointerdown:stopPropagation
      @onpointerup="OnPointerUpHandler"
-     data-socket-name="@Socket.Data.Name"
-     data-socket-type="@Socket.Data.TypeName"
-     data-socket-is-input="@Socket.Data.IsInput">
+    data-node-id="@NodeId"
+    data-socket-name="@Socket.Data.Name"
+    data-socket-type="@Socket.Data.TypeName"
+    data-socket-is-input="@Socket.Data.IsInput.ToString().ToLowerInvariant()">
     
     <div class="ne-socket-dot" style="@SocketDotStyle"></div>
     

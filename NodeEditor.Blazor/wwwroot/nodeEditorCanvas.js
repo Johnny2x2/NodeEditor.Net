@@ -32,3 +32,34 @@ export function getCanvasScreenOffset(element) {
   const rect = element.getBoundingClientRect();
   return { x: rect.left, y: rect.top };
 }
+
+export function getSocketDotPositions(element) {
+  if (!element) {
+    return [];
+  }
+
+  const canvasRect = element.getBoundingClientRect();
+  const sockets = element.querySelectorAll('.ne-socket');
+  const results = [];
+
+  sockets.forEach(socket => {
+    const dot = socket.querySelector('.ne-socket-dot');
+    if (!dot) {
+      return;
+    }
+
+    const dotRect = dot.getBoundingClientRect();
+    const centerX = dotRect.left + dotRect.width / 2 - canvasRect.left;
+    const centerY = dotRect.top + dotRect.height / 2 - canvasRect.top;
+
+    results.push({
+      nodeId: socket.dataset.nodeId || '',
+      socketName: socket.dataset.socketName || '',
+      isInput: (socket.dataset.socketIsInput || '').toLowerCase() === 'true',
+      x: centerX,
+      y: centerY
+    });
+  });
+
+  return results;
+}

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components;
 using NodeEditor.Blazor.Services;
 using NodeEditor.Blazor.Services.Plugins;
 using NodeEditor.Blazor.WebHost.Components;
@@ -8,7 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddHttpClient();
+builder.Services.AddScoped(sp =>
+{
+    var nav = sp.GetRequiredService<NavigationManager>();
+    return new HttpClient { BaseAddress = new Uri(nav.BaseUri) };
+});
 builder.Services.AddNodeEditor();
 builder.Services.AddScoped<NodeEditor.Blazor.Services.Execution.BackgroundExecutionWorker>();
 builder.Services.Configure<PluginOptions>(builder.Configuration.GetSection(PluginOptions.SectionName));

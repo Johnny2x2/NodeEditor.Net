@@ -7,7 +7,11 @@
       stroke="@StrokeColor"
       stroke-width="@StrokeWidth"
       fill="none"
-      stroke-linecap="round" />
+      stroke-linecap="round"
+      data-output-node="@Connection.OutputNodeId"
+      data-output-socket="@Connection.OutputSocketName"
+      data-input-node="@Connection.InputNodeId"
+      data-input-socket="@Connection.InputSocketName" />
 
 @code {
     [Parameter, EditorRequired]
@@ -69,11 +73,18 @@
             
             if (outputSocket is not null)
             {
-                // Socket position is relative to node
-                // Output sockets are on the right side
-                start = new Point2D(
-                    startNode.Position.X + startNode.Size.Width - SocketDotCenterOffsetX,
-                    startNode.Position.Y + CalculateSocketYOffset(startNode, outputSocket, isInput: false));
+                if (outputSocket.Position != Point2D.Zero)
+                {
+                    start = outputSocket.Position;
+                }
+                else
+                {
+                    // Socket position is relative to node
+                    // Output sockets are on the right side
+                    start = new Point2D(
+                        startNode.Position.X + startNode.Size.Width - SocketDotCenterOffsetX,
+                        startNode.Position.Y + CalculateSocketYOffset(startNode, outputSocket, isInput: false));
+                }
             }
         }
 
@@ -84,10 +95,17 @@
             
             if (inputSocket is not null)
             {
-                // Input sockets are on the left side
-                end = new Point2D(
-                    endNode.Position.X + SocketDotCenterOffsetX,
-                    endNode.Position.Y + CalculateSocketYOffset(endNode, inputSocket, isInput: true));
+                if (inputSocket.Position != Point2D.Zero)
+                {
+                    end = inputSocket.Position;
+                }
+                else
+                {
+                    // Input sockets are on the left side
+                    end = new Point2D(
+                        endNode.Position.X + SocketDotCenterOffsetX,
+                        endNode.Position.Y + CalculateSocketYOffset(endNode, inputSocket, isInput: true));
+                }
             }
         }
 

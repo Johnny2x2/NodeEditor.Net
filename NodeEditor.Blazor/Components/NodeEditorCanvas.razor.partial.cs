@@ -10,18 +10,18 @@ public partial class NodeEditorCanvas
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
+        if (firstRender)
         {
-            return;
+            _dotNetRef = DotNetObjectReference.Create(this);
+            _canvasJsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/NodeEditor.Blazor/nodeEditorCanvas.js");
+
+            await _canvasJsModule.InvokeVoidAsync("observeCanvasSize", _canvasRef, _dotNetRef);
+            await UpdateCanvasScreenOffsetAsync();
         }
 
-        _dotNetRef = DotNetObjectReference.Create(this);
-        _canvasJsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import",
-            "./_content/NodeEditor.Blazor/nodeEditorCanvas.js");
-
-        await _canvasJsModule.InvokeVoidAsync("observeCanvasSize", _canvasRef, _dotNetRef);
-        await UpdateCanvasScreenOffsetAsync();
+        await UpdateSocketPositionsAsync();
     }
 
     [JSInvokable]
@@ -48,5 +48,62 @@ public partial class NodeEditorCanvas
         }
 
         _dotNetRef?.Dispose();
+    }
+
+    private sealed record class SocketDotPosition(
+        string NodeId,
+        string SocketName,
+        bool IsInput,
+        double X,
+        double Y);
+
+    private async Task UpdateSocketPositionsAsync()
+    {
+        if (_canvasJsModule is null)
+        {
+            return;
+        }
+
+        var positions = await _canvasJsModule.InvokeAsync<SocketDotPosition[]>(
+            "getSocketDotPositions",
+            _canvasRef);
+
+        if (positions.Length == 0)
+        {
+            return;
+        }
+
+        var updated = false;
+
+        foreach (var pos in positions)
+        {
+            var node = State.Nodes.FirstOrDefault(n => n.Data.Id == pos.NodeId);
+            if (node is null)
+            {
+                continue;
+            }
+
+            var sockets = pos.IsInput ? node.Inputs : node.Outputs;
+            var socket = sockets.FirstOrDefault(s => s.Data.Name == pos.SocketName);
+            if (socket is null)
+            {
+                continue;
+            }
+
+            var graphPoint = CoordinateConverter.ScreenToGraph(new Point2D(pos.X, pos.Y));
+            var key = $"{pos.NodeId}:{pos.IsInput}:{pos.SocketName}";
+
+            if (!_socketPositionCache.TryGetValue(key, out var existing) || existing != graphPoint)
+            {
+                _socketPositionCache[key] = graphPoint;
+                socket.Position = graphPoint;
+                updated = true;
+            }
+        }
+
+        if (updated)
+        {
+            await InvokeAsync(StateHasChanged);
+        }
     }
 }

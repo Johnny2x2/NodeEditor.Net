@@ -98,6 +98,8 @@
     private IReadOnlyList<NodeViewModel> _visibleNodes = Array.Empty<NodeViewModel>();
     private IReadOnlyList<ConnectionData> _visibleConnections = Array.Empty<ConnectionData>();
 
+    private readonly Dictionary<string, Point2D> _socketPositionCache = new();
+
     [Parameter, EditorRequired]
     public NodeEditorState State { get; set; } = null!;
 
