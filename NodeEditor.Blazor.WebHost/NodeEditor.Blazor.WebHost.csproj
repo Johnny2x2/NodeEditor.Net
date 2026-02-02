@@ -11,6 +11,7 @@
     <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
     <ProjectReference Include="..\NodeEditor.Plugins.Sample\NodeEditor.Plugins.Sample.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\NodeEditor.Plugins.LlmTornado\NodeEditor.Plugins.LlmTornado.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\NodeEditor.Plugins.OpenCv2\NodeEditor.Plugins.OpenCv2.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <Target Name="CopySamplePlugin" AfterTargets="Build">
@@ -29,6 +30,16 @@
     </ItemGroup>
 
     <Copy SourceFiles="@(_LlmTornadoPluginFiles)" DestinationFolder="$(OutDir)plugins\LlmTornado" />
+  </Target>
+
+  <Target Name="CopyOpenCv2Plugin" AfterTargets="Build">
+    <ItemGroup>
+      <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\bin\$(Configuration)\$(TargetFramework)\*.dll" />
+      <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\bin\$(Configuration)\$(TargetFramework)\*.deps.json" />
+      <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\plugin.json" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_OpenCv2PluginFiles)" DestinationFolder="$(OutDir)plugins\OpenCv2" />
   </Target>
 
 </Project>

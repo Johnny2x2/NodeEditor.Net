@@ -12,6 +12,7 @@ public partial class NodeComponent
     private string? _lastName;
     private bool _lastCallable;
     private int _lastConnectionSignature;
+    private int _lastPreviewSignature;
 
     protected override bool ShouldRender()
     {
@@ -21,6 +22,7 @@ public partial class NodeComponent
         }
 
         var connectionSignature = ComputeConnectionSignature();
+        var previewSignature = ComputePreviewSignature();
         var shouldRender = Node.Position != _lastPosition ||
                            Node.Size != _lastSize ||
                            Node.IsSelected != _lastSelected ||
@@ -28,7 +30,8 @@ public partial class NodeComponent
                            Node.IsError != _lastError ||
                            Node.Data.Name != _lastName ||
                            Node.Data.Callable != _lastCallable ||
-                           connectionSignature != _lastConnectionSignature;
+                   connectionSignature != _lastConnectionSignature ||
+                   previewSignature != _lastPreviewSignature;
 
         if (shouldRender)
         {
@@ -40,6 +43,7 @@ public partial class NodeComponent
             _lastName = Node.Data.Name;
             _lastCallable = Node.Data.Callable;
             _lastConnectionSignature = connectionSignature;
+            _lastPreviewSignature = previewSignature;
         }
 
         return shouldRender;
@@ -68,6 +72,21 @@ public partial class NodeComponent
             hash.Add(connection.IsExecution);
         }
 
+        return hash.ToHashCode();
+    }
+
+    private int ComputePreviewSignature()
+    {
+        var preview = GetPreviewImage();
+        if (preview is null)
+        {
+            return 0;
+        }
+
+        var hash = new HashCode();
+        hash.Add(preview.DataUrl);
+        hash.Add(preview.Width ?? 0);
+        hash.Add(preview.Height ?? 0);
         return hash.ToHashCode();
     }
 }

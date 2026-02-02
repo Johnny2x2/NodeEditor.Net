@@ -1,0 +1,8 @@
+{
+  "id": "com.nodeeditormax.opencv2",
+  "name": "OpenCV 2 Nodes",
+  "version": "1.0.0",
+  "minApiVersion": "1.0.0",
+  "entryAssembly": "NodeEditor.Plugins.OpenCv2.dll",
+  "category": "OpenCV2"
+}

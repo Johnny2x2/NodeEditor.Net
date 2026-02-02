@@ -14,6 +14,13 @@ public sealed class PluginLoadContext : AssemblyLoadContext
 
     protected override Assembly? Load(AssemblyName assemblyName)
     {
+        var defaultAssembly = AssemblyLoadContext.Default.Assemblies
+            .FirstOrDefault(assembly => string.Equals(assembly.GetName().Name, assemblyName.Name, StringComparison.OrdinalIgnoreCase));
+        if (defaultAssembly is not null)
+        {
+            return defaultAssembly;
+        }
+
         var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
         if (assemblyPath is null)
         {

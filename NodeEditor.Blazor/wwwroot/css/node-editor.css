@@ -182,6 +182,25 @@
 }
 
 /* ============================================
+   Node Preview
+   ============================================ */
+.ne-node-preview {
+    padding: 6px 8px 2px 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.ne-node-preview img {
+    max-width: 180px;
+    max-height: 140px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    object-fit: contain;
+    background: #1e1e2a;
+}
+
+/* ============================================
    Node Body
    ============================================ */
 .ne-node-body {

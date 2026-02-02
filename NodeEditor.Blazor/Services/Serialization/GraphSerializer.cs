@@ -90,12 +90,19 @@ public sealed class GraphSerializer
             state.AddConnection(connection);
         }
 
+        var viewport = dto.Viewport ?? new ViewportDto(
+            state.Viewport.X,
+            state.Viewport.Y,
+            state.Viewport.Width,
+            state.Viewport.Height,
+            state.Zoom);
+
         state.Viewport = new Rect2D(
-            dto.Viewport.X,
-            dto.Viewport.Y,
-            dto.Viewport.Width,
-            dto.Viewport.Height);
-        state.Zoom = dto.Viewport.Zoom;
+            viewport.X,
+            viewport.Y,
+            viewport.Width,
+            viewport.Height);
+        state.Zoom = viewport.Zoom;
 
         if (selected.Count > 0)
         {

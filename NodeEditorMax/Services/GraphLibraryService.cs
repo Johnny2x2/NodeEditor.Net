@@ -104,6 +104,37 @@ public sealed class GraphLibraryService
         await SaveUserEntriesAsync().ConfigureAwait(false);
     }
 
+    public async Task<GraphImportResult> LoadGraphFromFileAsync(NodeEditorState state, FileResult? file = null)
+    {
+        if (!_initialized)
+        {
+            throw new InvalidOperationException("Graph library has not been initialized.");
+        }
+
+        file ??= await FilePicker.Default.PickAsync(new PickOptions
+        {
+            PickerTitle = "Load Graph JSON",
+            FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+            {
+                { DevicePlatform.WinUI, new[] { ".json" } },
+                { DevicePlatform.Android, new[] { "application/json" } },
+                { DevicePlatform.iOS, new[] { "public.json" } },
+                { DevicePlatform.MacCatalyst, new[] { "public.json" } },
+                { DevicePlatform.Tizen, new[] { "*/*" } }
+            })
+        }).ConfigureAwait(false);
+
+        if (file is null)
+        {
+            return GraphImportResult.Empty;
+        }
+
+        var json = await File.ReadAllTextAsync(file.FullPath).ConfigureAwait(false);
+        var dto = _serializer.Deserialize(json);
+        var result = _serializer.Import(state, dto);
+        return result;
+    }
+
     private async Task<List<GraphLibraryEntry>> LoadUserEntriesAsync()
     {
         if (!File.Exists(_storagePath))
@@ -170,6 +201,11 @@ public sealed class GraphLibraryService
         await AddSampleGraphFromPackageAsync(
             "LLM Tornado Orchestration Demo",
             "graphs/llmtornado-agent-orchestration.json",
+            fallback: null).ConfigureAwait(false);
+
+        await AddSampleGraphFromPackageAsync(
+            "OpenCV2 Image Preview",
+            "graphs/opencv2-demo.json",
             fallback: null).ConfigureAwait(false);
     }
 

@@ -27,7 +27,7 @@ namespace NodeEditorMax
             builder.Services.AddScoped<GraphLibraryService>();
             builder.Services.Configure<PluginOptions>(options =>
             {
-                options.PluginDirectory = "plugins";
+                options.PluginDirectory = Path.Combine(AppContext.BaseDirectory, "plugins");
                 options.ApiVersion = new Version(1, 0, 0);
             });
 

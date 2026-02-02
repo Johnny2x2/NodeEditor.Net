@@ -75,3 +75,4 @@ artifacts/
 **/obj/
 
 .fake
+**/plugins/*

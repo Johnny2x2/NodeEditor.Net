@@ -25,6 +25,7 @@
             }
         </select>
         <button @onclick="LoadSelectedGraphAsync" disabled="@(!_canLoadGraph)">Load</button>
+        <button @onclick="LoadGraphFromFileAsync" disabled="@(!_canLoadFromFile)">Load File...</button>
 
         <input placeholder="Save as..." @bind="_newGraphName" />
         <button @onclick="SaveCurrentGraphAsync" disabled="@(!_canSaveGraph)">Save</button>
@@ -72,6 +73,9 @@
 
     private bool _canSaveGraph =>
         !_isExecuting && !string.IsNullOrWhiteSpace(_newGraphName);
+
+    private bool _canLoadFromFile =>
+        !_isExecuting && !_isLoadingGraph;
 
     protected override async Task OnInitializedAsync()
     {
@@ -169,6 +173,33 @@
             else
             {
                 _graphStatus = $"Loaded '{_selectedGraphName}'.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _graphStatus = ex.Message;
+        }
+        finally
+        {
+            _isLoadingGraph = false;
+        }
+    }
+
+    private async Task LoadGraphFromFileAsync()
+    {
+        _isLoadingGraph = true;
+        _graphStatus = null;
+
+        try
+        {
+            var result = await GraphLibrary.LoadGraphFromFileAsync(EditorState);
+            if (result.Warnings.Count > 0)
+            {
+                _graphStatus = string.Join(" ", result.Warnings);
+            }
+            else
+            {
+                _graphStatus = "Loaded graph from file.";
             }
         }
         catch (Exception ex)
