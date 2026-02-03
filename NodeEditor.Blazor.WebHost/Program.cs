@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using NodeEditor.Blazor.Services;
 using NodeEditor.Blazor.Services.Plugins;
+using NodeEditor.Blazor.Services.Plugins.Marketplace;
 using NodeEditor.Blazor.WebHost.Components;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +18,11 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddNodeEditor();
 builder.Services.AddScoped<NodeEditor.Blazor.Services.Execution.BackgroundExecutionWorker>();
 builder.Services.Configure<PluginOptions>(builder.Configuration.GetSection(PluginOptions.SectionName));
+builder.Services.Configure<MarketplaceOptions>(options =>
+{
+    options.LocalRepositoryPath = Path.GetFullPath(
+        Path.Combine(builder.Environment.ContentRootPath, ".."));
+});
 
 var app = builder.Build();
 

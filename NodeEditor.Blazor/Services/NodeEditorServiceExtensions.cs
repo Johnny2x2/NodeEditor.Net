@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NodeEditor.Blazor.Models;
 using NodeEditor.Blazor.Services.Execution;
 using NodeEditor.Blazor.Services.Serialization;
+using NodeEditor.Blazor.Services.Plugins.Marketplace;
 
 namespace NodeEditor.Blazor.Services;
 
@@ -19,6 +20,17 @@ public static class NodeEditorServiceExtensions
     {
         services.AddOptions<Plugins.PluginOptions>();
         services.AddSingleton<Plugins.PluginLoader>();
+        services.AddOptions<MarketplaceOptions>();
+        services.AddSingleton<IPluginMarketplaceCache, FileBasedMarketplaceCache>();
+        services.AddHttpClient<TokenBasedAuthProvider>();
+        services.AddScoped<IPluginMarketplaceAuthProvider>(sp => sp.GetRequiredService<TokenBasedAuthProvider>());
+        services.AddScoped<LocalPluginMarketplaceSource>();
+        services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<LocalPluginMarketplaceSource>());
+        services.AddHttpClient<RemotePluginMarketplaceSource>();
+        services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<RemotePluginMarketplaceSource>());
+        services.AddScoped<AggregatedPluginMarketplaceSource>();
+        services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<AggregatedPluginMarketplaceSource>());
+        services.AddScoped<IPluginInstallationService, PluginInstallationService>();
 
         // Register state as scoped (one per user/circuit in Blazor Server, one per app in WASM)
         services.AddScoped<NodeEditorState>();
@@ -80,6 +92,17 @@ public static class NodeEditorServiceExtensions
     {
         services.AddOptions<Plugins.PluginOptions>();
         services.AddSingleton<Plugins.PluginLoader>();
+        services.AddOptions<MarketplaceOptions>();
+        services.AddSingleton<IPluginMarketplaceCache, FileBasedMarketplaceCache>();
+        services.AddHttpClient<TokenBasedAuthProvider>();
+        services.AddScoped<IPluginMarketplaceAuthProvider>(sp => sp.GetRequiredService<TokenBasedAuthProvider>());
+        services.AddScoped<LocalPluginMarketplaceSource>();
+        services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<LocalPluginMarketplaceSource>());
+        services.AddHttpClient<RemotePluginMarketplaceSource>();
+        services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<RemotePluginMarketplaceSource>());
+        services.AddScoped<AggregatedPluginMarketplaceSource>();
+        services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<AggregatedPluginMarketplaceSource>());
+        services.AddScoped<IPluginInstallationService, PluginInstallationService>();
 
         services.AddScoped(stateFactory);
         services.AddScoped<CoordinateConverter>();

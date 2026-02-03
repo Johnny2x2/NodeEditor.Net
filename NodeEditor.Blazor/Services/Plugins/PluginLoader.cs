@@ -10,6 +10,7 @@ public sealed class PluginLoader
     private readonly NodeRegistryService _registry;
     private readonly ILogger<PluginLoader> _logger;
     private readonly PluginOptions _options;
+    private readonly Dictionary<string, LoadedPlugin> _loadedPlugins = new(StringComparer.OrdinalIgnoreCase);
 
     public PluginLoader(
         NodeRegistryService registry,
@@ -80,6 +81,62 @@ public sealed class PluginLoader
         return Task.FromResult<IReadOnlyList<INodePlugin>>(plugins);
     }
 
+    public Task UnloadPluginAsync(string pluginId)
+    {
+        if (_loadedPlugins.TryGetValue(pluginId, out var entry))
+        {
+            try
+            {
+                entry.Plugin.Unload();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Plugin '{PluginId}' threw during unload.", pluginId);
+            }
+
+            try
+            {
+                entry.LoadContext.Unload();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Plugin '{PluginId}' failed to unload context.", pluginId);
+            }
+
+            _loadedPlugins.Remove(pluginId);
+            _logger.LogInformation("Plugin '{PluginId}' unloaded.", pluginId);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task UnloadAllPluginsAsync()
+    {
+        foreach (var (pluginId, entry) in _loadedPlugins.ToList())
+        {
+            try
+            {
+                entry.Plugin.Unload();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Plugin '{PluginId}' threw during unload.", pluginId);
+            }
+
+            try
+            {
+                entry.LoadContext.Unload();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Plugin '{PluginId}' failed to unload context.", pluginId);
+            }
+        }
+
+        _loadedPlugins.Clear();
+        return Task.CompletedTask;
+    }
+
     private string ResolvePluginDirectory(string? pluginDirectory)
     {
         if (!string.IsNullOrWhiteSpace(pluginDirectory))
@@ -138,7 +195,14 @@ public sealed class PluginLoader
                     continue;
                 }
 
+                if (_loadedPlugins.ContainsKey(plugin.Id))
+                {
+                    _logger.LogInformation("Plugin '{PluginId}' is already loaded. Skipping duplicate.", plugin.Id);
+                    continue;
+                }
+
                 plugins.Add(plugin);
+                _loadedPlugins[plugin.Id] = new LoadedPlugin(plugin, loadContext);
                 _logger.LogInformation("Plugin '{PluginId}' loaded from '{AssemblyPath}'.", plugin.Id, candidate.AssemblyPath);
             }
             catch (Exception ex)
@@ -223,6 +287,8 @@ public sealed class PluginLoader
     }
 
     private sealed record PluginCandidate(string AssemblyPath, PluginManifest? Manifest);
+
+    private sealed record LoadedPlugin(INodePlugin Plugin, PluginLoadContext LoadContext);
 
     private static IEnumerable<Type> SafeGetTypes(Assembly assembly)
     {
