@@ -29,7 +29,6 @@ public static class NodeEditorServiceExtensions
         services.AddHttpClient<RemotePluginMarketplaceSource>();
         services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<RemotePluginMarketplaceSource>());
         services.AddScoped<AggregatedPluginMarketplaceSource>();
-        services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<AggregatedPluginMarketplaceSource>());
         services.AddScoped<IPluginInstallationService, PluginInstallationService>();
 
         // Register state as scoped (one per user/circuit in Blazor Server, one per app in WASM)
@@ -101,7 +100,6 @@ public static class NodeEditorServiceExtensions
         services.AddHttpClient<RemotePluginMarketplaceSource>();
         services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<RemotePluginMarketplaceSource>());
         services.AddScoped<AggregatedPluginMarketplaceSource>();
-        services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<AggregatedPluginMarketplaceSource>());
         services.AddScoped<IPluginInstallationService, PluginInstallationService>();
 
         services.AddScoped(stateFactory);

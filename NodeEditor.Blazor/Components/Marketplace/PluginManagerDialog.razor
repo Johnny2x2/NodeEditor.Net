@@ -1,7 +1,7 @@
 @namespace NodeEditor.Blazor.Components.Marketplace
 @using NodeEditor.Blazor.Services.Plugins.Marketplace
 @using NodeEditor.Blazor.Services.Plugins.Marketplace.Models
-@inject IPluginMarketplaceSource MarketplaceSource
+@inject AggregatedPluginMarketplaceSource MarketplaceSource
 @inject IPluginInstallationService InstallationService
 
 <div class="ne-plugin-manager-overlay @(IsOpen ? "ne-plugin-manager-overlay--visible" : "")"
