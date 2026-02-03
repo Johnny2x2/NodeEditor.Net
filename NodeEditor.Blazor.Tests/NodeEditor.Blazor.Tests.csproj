@@ -21,38 +21,55 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Core library -->
     <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
+
+    <!-- 
+      LLMTornado libraries for type access in tests (e.g., ChatMessage assertions).
+      These are the LIBRARIES, not the PLUGIN.
+    -->
+    <ProjectReference Include="..\..\lofcz\LLMTornado\src\LlmTornado\LlmTornado.csproj" />
+    <ProjectReference Include="..\..\lofcz\LLMTornado\src\LlmTornado.Agents\LlmTornado.Agents.csproj" />
+
+    <!-- 
+      Plugin projects - ReferenceOutputAssembly=false means:
+      - They are built (as dependencies)
+      - But NOT linked at compile time
+      - Tests load them dynamically from plugins folder
+    -->
     <ProjectReference Include="..\NodeEditor.Plugins.Sample\NodeEditor.Plugins.Sample.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\NodeEditor.Plugins.LlmTornado\NodeEditor.Plugins.LlmTornado.csproj" />
+    <ProjectReference Include="..\NodeEditor.Plugins.LlmTornado\NodeEditor.Plugins.LlmTornado.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\NodeEditor.Plugins.OpenCv2\NodeEditor.Plugins.OpenCv2.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <!-- Copy Sample plugin with all dependencies for testing -->
   <Target Name="CopySamplePluginForTests" AfterTargets="Build">
     <ItemGroup>
-      <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\bin\$(Configuration)\$(TargetFramework)\NodeEditor.Plugins.Sample.dll" />
+      <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\bin\$(Configuration)\$(TargetFramework)\*.dll" />
+      <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\bin\$(Configuration)\$(TargetFramework)\*.deps.json" />
       <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\plugin.json" />
     </ItemGroup>
-
-    <Copy SourceFiles="@(_SamplePluginFiles)" DestinationFolder="$(OutDir)plugins\Sample" />
+    <Copy SourceFiles="@(_SamplePluginFiles)" DestinationFolder="$(OutDir)plugins\Sample" SkipUnchangedFiles="true" />
   </Target>
 
+  <!-- Copy LlmTornado plugin with ALL dependencies for testing -->
   <Target Name="CopyLlmTornadoPluginForTests" AfterTargets="Build">
     <ItemGroup>
-      <_LlmTornadoPluginFiles Include="..\NodeEditor.Plugins.LlmTornado\bin\$(Configuration)\$(TargetFramework)\NodeEditor.Plugins.LlmTornado.dll" />
+      <_LlmTornadoPluginFiles Include="..\NodeEditor.Plugins.LlmTornado\bin\$(Configuration)\$(TargetFramework)\*.dll" />
+      <_LlmTornadoPluginFiles Include="..\NodeEditor.Plugins.LlmTornado\bin\$(Configuration)\$(TargetFramework)\*.deps.json" />
       <_LlmTornadoPluginFiles Include="..\NodeEditor.Plugins.LlmTornado\plugin.json" />
     </ItemGroup>
-
-    <Copy SourceFiles="@(_LlmTornadoPluginFiles)" DestinationFolder="$(OutDir)plugins\LlmTornado" />
+    <Copy SourceFiles="@(_LlmTornadoPluginFiles)" DestinationFolder="$(OutDir)plugins\LlmTornado" SkipUnchangedFiles="true" />
   </Target>
 
+  <!-- Copy OpenCv2 plugin with all dependencies for testing -->
   <Target Name="CopyOpenCv2PluginForTests" AfterTargets="Build">
     <ItemGroup>
       <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\bin\$(Configuration)\$(TargetFramework)\*.dll" />
       <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\bin\$(Configuration)\$(TargetFramework)\*.deps.json" />
       <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\plugin.json" />
     </ItemGroup>
-
-    <Copy SourceFiles="@(_OpenCv2PluginFiles)" DestinationFolder="$(OutDir)plugins\OpenCv2" />
+    <Copy SourceFiles="@(_OpenCv2PluginFiles)" DestinationFolder="$(OutDir)plugins\OpenCv2" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

@@ -61,6 +61,9 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<Registry.NodeDiscoveryService>();
         services.AddSingleton<Registry.NodeRegistryService>();
 
+        // Register node context registry for plugin contexts
+        services.AddSingleton<INodeContextRegistry, NodeContextRegistry>();
+
         // Register custom editors
         services.AddSingleton<Editors.INodeCustomEditor, Editors.TextEditorDefinition>();
         services.AddSingleton<Editors.INodeCustomEditor, Editors.NumericEditorDefinition>();

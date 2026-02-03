@@ -183,11 +183,27 @@ public sealed class NodeMethodInvoker
             var contextType = context.GetType();
             foreach (var method in contextType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
             {
+                // Try to get NodeAttribute - handle cross-context loading by checking both
+                // direct attribute and name-based matching for dynamically loaded plugins
                 var attribute = method.GetCustomAttribute<NodeAttribute>();
                 if (attribute is not null)
                 {
                     map.TryAdd(attribute.Name, new NodeMethodBinding(context, method));
                     continue;
+                }
+
+                // For cross-context compatibility, also check by attribute type name
+                var nodeAttr = method.GetCustomAttributes()
+                    .FirstOrDefault(a => a.GetType().Name == nameof(NodeAttribute));
+                if (nodeAttr is not null)
+                {
+                    // Get the Name property via reflection
+                    var nameProp = nodeAttr.GetType().GetProperty("Name");
+                    if (nameProp?.GetValue(nodeAttr) is string nodeName && !string.IsNullOrEmpty(nodeName))
+                    {
+                        map.TryAdd(nodeName, new NodeMethodBinding(context, method));
+                        continue;
+                    }
                 }
 
                 map.TryAdd(method.Name, new NodeMethodBinding(context, method));

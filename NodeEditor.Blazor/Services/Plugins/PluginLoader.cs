@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NodeEditor.Blazor.Services.Execution;
 using NodeEditor.Blazor.Services.Registry;
 
 namespace NodeEditor.Blazor.Services.Plugins;
@@ -12,6 +13,7 @@ public sealed class PluginLoader
     private readonly PluginOptions _options;
     private readonly IServiceProvider _services;
     private readonly IPluginServiceRegistry _serviceRegistry;
+    private readonly INodeContextRegistry? _contextRegistry;
     private readonly Dictionary<string, LoadedPlugin> _loadedPlugins = new(StringComparer.OrdinalIgnoreCase);
 
     public PluginLoader(
@@ -19,13 +21,15 @@ public sealed class PluginLoader
         IOptions<PluginOptions> options,
         ILogger<PluginLoader> logger,
         IServiceProvider services,
-        IPluginServiceRegistry serviceRegistry)
+        IPluginServiceRegistry serviceRegistry,
+        INodeContextRegistry? contextRegistry = null)
     {
         _registry = registry;
         _logger = logger;
         _options = options.Value;
         _services = services;
         _serviceRegistry = serviceRegistry;
+        _contextRegistry = contextRegistry;
     }
 
     public async Task<IReadOnlyList<INodePlugin>> LoadAndRegisterAsync(
@@ -71,6 +75,51 @@ public sealed class PluginLoader
         }
 
         return plugins;
+    }
+
+    private void RegisterNodeContextsFromAssembly(IEnumerable<Assembly> assemblies)
+    {
+        if (_contextRegistry is null) return;
+
+        foreach (var assembly in assemblies)
+        {
+            foreach (var type in SafeGetTypes(assembly))
+            {
+                if (type is null || type.IsAbstract || type.IsInterface)
+                {
+                    continue;
+                }
+
+                // Check both by type assignability and by interface name for cross-context compatibility
+                var isNodeContext = typeof(INodeContext).IsAssignableFrom(type) 
+                    || typeof(INodeMethodContext).IsAssignableFrom(type)
+                    || type.GetInterfaces().Any(i => i.Name == nameof(INodeContext) || i.Name == nameof(INodeMethodContext));
+
+                if (!isNodeContext)
+                {
+                    continue;
+                }
+
+                if (type.GetConstructor(Type.EmptyTypes) is null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var instance = Activator.CreateInstance(type);
+                    if (instance is not null)
+                    {
+                        _contextRegistry.Register(instance);
+                        _logger.LogInformation("Registered node context '{ContextType}' from plugin.", type.FullName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to create node context instance of type '{ContextType}'.", type.FullName);
+                }
+            }
+        }
     }
 
     public Task<IReadOnlyList<INodePlugin>> LoadPluginsAsync(
@@ -235,6 +284,9 @@ public sealed class PluginLoader
                 plugins.Add(plugin);
                 _loadedPlugins[plugin.Id] = new LoadedPlugin(plugin, loadContext);
                 _logger.LogInformation("Plugin '{PluginId}' loaded from '{AssemblyPath}'.", plugin.Id, candidate.AssemblyPath);
+
+                // Register node contexts from this assembly
+                RegisterNodeContextsFromAssembly(new[] { assembly });
             }
             catch (Exception ex)
             {

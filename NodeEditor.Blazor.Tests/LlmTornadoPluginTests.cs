@@ -2,27 +2,82 @@ using System.Reflection;
 using System.Linq;
 using System.Collections.Generic;
 using LlmTornado.Chat;
+using Microsoft.Extensions.DependencyInjection;
 using NodeEditor.Blazor.Models;
 using NodeEditor.Blazor.Services.Execution;
 using NodeEditor.Blazor.Services;
+using NodeEditor.Blazor.Services.Plugins;
 using NodeEditor.Blazor.Services.Registry;
-using NodeEditor.Plugins.LlmTornado;
 using Xunit;
 
 namespace NodeEditor.Blazor.Tests;
 
-public sealed class LlmTornadoPluginTests
+/// <summary>
+/// Tests for the LlmTornado plugin that load it DYNAMICALLY, not via compile-time reference.
+/// This validates the plugin loading mechanism works correctly with all dependencies.
+/// </summary>
+public sealed class LlmTornadoPluginTests : IAsyncLifetime
 {
+    private readonly ServiceProvider _serviceProvider;
+    private readonly PluginLoader _pluginLoader;
+    private readonly NodeRegistryService _registry;
+    private readonly NodeExecutionService _executionService;
+    private readonly INodeContextRegistry _contextRegistry;
+    private bool _pluginLoaded;
+
+    public LlmTornadoPluginTests()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<NodeDiscoveryService>();
+        services.AddSingleton<NodeRegistryService>();
+        services.AddSingleton<IPluginServiceRegistry, PluginServiceRegistry>();
+        services.AddSingleton<INodeContextRegistry, NodeContextRegistry>();
+        services.AddSingleton<PluginLoader>();
+        services.AddSingleton<ExecutionPlanner>();
+        services.AddSingleton<NodeExecutionService>();
+        services.AddSingleton<SocketTypeResolver>();
+        services.Configure<PluginOptions>(options =>
+        {
+            options.PluginDirectory = Path.Combine(AppContext.BaseDirectory, "plugins");
+            options.ApiVersion = new Version(1, 0, 0);
+            options.EnablePluginLoading = true;
+        });
+
+        _serviceProvider = services.BuildServiceProvider();
+        _pluginLoader = _serviceProvider.GetRequiredService<PluginLoader>();
+        _registry = _serviceProvider.GetRequiredService<NodeRegistryService>();
+        _executionService = _serviceProvider.GetRequiredService<NodeExecutionService>();
+        _contextRegistry = _serviceProvider.GetRequiredService<INodeContextRegistry>();
+    }
+
+    public async Task InitializeAsync()
+    {
+        // Load plugins dynamically
+        var plugins = await _pluginLoader.LoadAndRegisterAsync();
+        _pluginLoaded = plugins.Any(p => p.Id == "com.nodeeditormax.llmtornado");
+    }
+
+    public Task DisposeAsync()
+    {
+        _serviceProvider.Dispose();
+        return Task.CompletedTask;
+    }
+
+    private void SkipIfPluginNotLoaded()
+    {
+        if (!_pluginLoaded)
+        {
+            Assert.Fail("LlmTornado plugin not loaded - ensure it's built and copied to plugins folder");
+        }
+    }
+
     [Fact]
     public void PluginRegistersCoreNodes()
     {
-        var discovery = new NodeDiscoveryService();
-        var registry = new NodeRegistryService(discovery);
-        var plugin = new LlmTornadoPlugin();
+        SkipIfPluginNotLoaded();
 
-        plugin.Register(registry);
-
-        var definitions = registry.Definitions;
+        var definitions = _registry.Definitions;
         Assert.Contains(definitions, definition => definition.Name == "Create Agent");
         Assert.Contains(definitions, definition => definition.Name == "Run Agent");
         Assert.Contains(definitions, definition => definition.Name == "MCP Initialize");
@@ -33,8 +88,16 @@ public sealed class LlmTornadoPluginTests
     [Fact]
     public void AsyncNodesExposeTaskOutputs()
     {
-        var methods = typeof(LlmTornadoNodeContext)
-            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        SkipIfPluginNotLoaded();
+
+        // Get the node context type dynamically from loaded assemblies
+        var contextType = AppDomain.CurrentDomain.GetAssemblies()
+            .SelectMany(a => { try { return a.GetTypes(); } catch { return []; } })
+            .FirstOrDefault(t => t.Name == "LlmTornadoNodeContext");
+
+        Assert.NotNull(contextType);
+
+        var methods = contextType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
         var method = methods.Single(m => m.Name == "RunAgentAsync");
         Assert.Contains(method.GetParameters(), p => p.IsOut && IsTaskOf(p.ParameterType, "LlmTornado.Chat.ChatMessage"));
@@ -52,6 +115,8 @@ public sealed class LlmTornadoPluginTests
     [Fact]
     public async Task MessageNodes_TextRoundTrip_WiresCorrectly()
     {
+        SkipIfPluginNotLoaded();
+
         var nodes = new List<NodeData>
         {
             CreateUserMessageNode("msg", "Hello from nodes"),
@@ -64,10 +129,9 @@ public sealed class LlmTornadoPluginTests
         };
 
         var context = new NodeExecutionContext();
-        var service = CreateExecutor();
-        var nodeContext = new LlmTornadoNodeContext();
+        var nodeContext = _contextRegistry.CreateCompositeContext();
 
-        await service.ExecuteAsync(nodes, connections, context, nodeContext, PlannedOptions, CancellationToken.None);
+        await _executionService.ExecuteAsync(nodes, connections, context, nodeContext, PlannedOptions, CancellationToken.None);
 
         Assert.Equal("Hello from nodes", context.GetSocketValue("extract", "Text"));
     }
@@ -75,6 +139,8 @@ public sealed class LlmTornadoPluginTests
     [Fact]
     public async Task PartNodes_CreateParts_PopulatesOutputs()
     {
+        SkipIfPluginNotLoaded();
+
         var nodes = new List<NodeData>
         {
             CreateTextPartNode("textPart", "Hello"),
@@ -82,10 +148,9 @@ public sealed class LlmTornadoPluginTests
         };
 
         var context = new NodeExecutionContext();
-        var service = CreateExecutor();
-        var nodeContext = new LlmTornadoNodeContext();
+        var nodeContext = _contextRegistry.CreateCompositeContext();
 
-        await service.ExecuteAsync(nodes, Array.Empty<ConnectionData>(), context, nodeContext, PlannedOptions, CancellationToken.None);
+        await _executionService.ExecuteAsync(nodes, Array.Empty<ConnectionData>(), context, nodeContext, PlannedOptions, CancellationToken.None);
 
         var textPart = context.GetSocketValue("textPart", "Part");
         var imagePart = context.GetSocketValue("imagePart", "Part");
@@ -97,6 +162,8 @@ public sealed class LlmTornadoPluginTests
     [Fact]
     public async Task UserMessageFromParts_NodeBuildsMessage()
     {
+        SkipIfPluginNotLoaded();
+
         var parts = new List<ChatMessagePart>
         {
             new("Hello"),
@@ -111,10 +178,9 @@ public sealed class LlmTornadoPluginTests
         var context = new NodeExecutionContext();
         context.SetSocketValue("parts", "Parts", parts);
 
-        var service = CreateExecutor();
-        var nodeContext = new LlmTornadoNodeContext();
+        var nodeContext = _contextRegistry.CreateCompositeContext();
 
-        await service.ExecuteAsync(nodes, Array.Empty<ConnectionData>(), context, nodeContext, PlannedOptions, CancellationToken.None);
+        await _executionService.ExecuteAsync(nodes, Array.Empty<ConnectionData>(), context, nodeContext, PlannedOptions, CancellationToken.None);
 
         var message = context.GetSocketValue("parts", "Message");
         Assert.IsType<ChatMessage>(message);
@@ -143,9 +209,6 @@ public sealed class LlmTornadoPluginTests
                && innerType.GetGenericTypeDefinition() == typeof(List<>)
                && string.Equals(innerType.GetGenericArguments()[0].FullName, elementFullName, StringComparison.Ordinal);
     }
-
-    private static NodeExecutionService CreateExecutor()
-        => new(new ExecutionPlanner(), new SocketTypeResolver());
 
     private static NodeExecutionOptions PlannedOptions
         => new(ExecutionMode.Parallel, AllowBackground: false, MaxDegreeOfParallelism: 1);
