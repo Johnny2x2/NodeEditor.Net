@@ -1,5 +1,4 @@
 <Solution>
-  <Project Path="NodeEditorMax/NodeEditorMax.csproj" />
   <Project Path="NodeEditor.Blazor.WebHost/NodeEditor.Blazor.WebHost.csproj" />
   <Project Path="NodeEditor.Blazor/NodeEditor.Blazor.csproj" />
   <Project Path="NodeEditor.Blazor.Tests/NodeEditor.Blazor.Tests.csproj" />
