@@ -10,38 +10,63 @@ public sealed class PluginLoader
     private readonly NodeRegistryService _registry;
     private readonly ILogger<PluginLoader> _logger;
     private readonly PluginOptions _options;
+    private readonly IServiceProvider _services;
+    private readonly IPluginServiceRegistry _serviceRegistry;
     private readonly Dictionary<string, LoadedPlugin> _loadedPlugins = new(StringComparer.OrdinalIgnoreCase);
 
     public PluginLoader(
         NodeRegistryService registry,
         IOptions<PluginOptions> options,
-        ILogger<PluginLoader> logger)
+        ILogger<PluginLoader> logger,
+        IServiceProvider services,
+        IPluginServiceRegistry serviceRegistry)
     {
         _registry = registry;
         _logger = logger;
         _options = options.Value;
+        _services = services;
+        _serviceRegistry = serviceRegistry;
     }
 
     public async Task<IReadOnlyList<INodePlugin>> LoadAndRegisterAsync(
         string? pluginDirectory = null,
+        IServiceProvider? services = null,
         CancellationToken token = default)
     {
         var plugins = await LoadPluginsAsync(pluginDirectory, token).ConfigureAwait(false);
+        services ??= _services;
 
         foreach (var plugin in plugins)
         {
             try
             {
+                await plugin.OnLoadAsync(token).ConfigureAwait(false);
+
+                _serviceRegistry.RegisterServices(plugin.Id, plugin.ConfigureServices);
+
                 plugin.Register(_registry);
 
                 if (plugin is INodeProvider provider)
                 {
                     _registry.RegisterDefinitions(provider.GetNodeDefinitions());
                 }
+
+                if (services is not null)
+                {
+                    await plugin.OnInitializeAsync(services, token).ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Plugin '{PluginId}' failed during registration.", plugin.Id);
+                try
+                {
+                    plugin.OnError(ex);
+                }
+                catch (Exception errorEx)
+                {
+                    _logger.LogWarning(errorEx, "Plugin '{PluginId}' threw during error handling.", plugin.Id);
+                }
             }
         }
 
@@ -81,18 +106,21 @@ public sealed class PluginLoader
         return Task.FromResult<IReadOnlyList<INodePlugin>>(plugins);
     }
 
-    public Task UnloadPluginAsync(string pluginId)
+    public async Task UnloadPluginAsync(string pluginId, CancellationToken token = default)
     {
         if (_loadedPlugins.TryGetValue(pluginId, out var entry))
         {
             try
             {
+                await entry.Plugin.OnUnloadAsync(token).ConfigureAwait(false);
                 entry.Plugin.Unload();
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Plugin '{PluginId}' threw during unload.", pluginId);
             }
+
+            _serviceRegistry.RemoveServices(pluginId);
 
             try
             {
@@ -107,21 +135,24 @@ public sealed class PluginLoader
             _logger.LogInformation("Plugin '{PluginId}' unloaded.", pluginId);
         }
 
-        return Task.CompletedTask;
+        return;
     }
 
-    public Task UnloadAllPluginsAsync()
+    public async Task UnloadAllPluginsAsync(CancellationToken token = default)
     {
         foreach (var (pluginId, entry) in _loadedPlugins.ToList())
         {
             try
             {
+                await entry.Plugin.OnUnloadAsync(token).ConfigureAwait(false);
                 entry.Plugin.Unload();
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Plugin '{PluginId}' threw during unload.", pluginId);
             }
+
+            _serviceRegistry.RemoveServices(pluginId);
 
             try
             {
@@ -134,7 +165,7 @@ public sealed class PluginLoader
         }
 
         _loadedPlugins.Clear();
-        return Task.CompletedTask;
+        return;
     }
 
     private string ResolvePluginDirectory(string? pluginDirectory)

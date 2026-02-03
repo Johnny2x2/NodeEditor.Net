@@ -19,6 +19,7 @@ public static class NodeEditorServiceExtensions
     public static IServiceCollection AddNodeEditor(this IServiceCollection services)
     {
         services.AddOptions<Plugins.PluginOptions>();
+        services.AddSingleton<Plugins.IPluginServiceRegistry, Plugins.PluginServiceRegistry>();
         services.AddSingleton<Plugins.PluginLoader>();
         services.AddOptions<MarketplaceOptions>();
         services.AddSingleton<IPluginMarketplaceCache, FileBasedMarketplaceCache>();
@@ -33,6 +34,7 @@ public static class NodeEditorServiceExtensions
 
         // Register state as scoped (one per user/circuit in Blazor Server, one per app in WASM)
         services.AddScoped<NodeEditorState>();
+        services.AddScoped<Plugins.IPluginEventBus, Plugins.PluginEventBus>();
         
         // Register coordinate converter as scoped (tied to state)
         services.AddScoped<CoordinateConverter>();
@@ -90,6 +92,7 @@ public static class NodeEditorServiceExtensions
         Func<IServiceProvider, NodeEditorState> stateFactory)
     {
         services.AddOptions<Plugins.PluginOptions>();
+        services.AddSingleton<Plugins.IPluginServiceRegistry, Plugins.PluginServiceRegistry>();
         services.AddSingleton<Plugins.PluginLoader>();
         services.AddOptions<MarketplaceOptions>();
         services.AddSingleton<IPluginMarketplaceCache, FileBasedMarketplaceCache>();
@@ -103,6 +106,7 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<IPluginInstallationService, PluginInstallationService>();
 
         services.AddScoped(stateFactory);
+        services.AddScoped<Plugins.IPluginEventBus, Plugins.PluginEventBus>();
         services.AddScoped<CoordinateConverter>();
         services.AddScoped<ConnectionValidator>();
         services.AddScoped<ViewportCuller>();

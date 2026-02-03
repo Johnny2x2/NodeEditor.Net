@@ -9,38 +9,16 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
-    <ProjectReference Include="..\NodeEditor.Plugins.Sample\NodeEditor.Plugins.Sample.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\NodeEditor.Plugins.LlmTornado\NodeEditor.Plugins.LlmTornado.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\NodeEditor.Plugins.OpenCv2\NodeEditor.Plugins.OpenCv2.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
-  <Target Name="CopySamplePlugin" AfterTargets="Build">
-    <ItemGroup>
-      <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\bin\$(Configuration)\$(TargetFramework)\NodeEditor.Plugins.Sample.dll" />
-      <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\plugin.json" />
-    </ItemGroup>
+  <!-- 
+    Plugins are loaded dynamically at runtime from the 'plugins' folder.
+    To install a plugin:
+    1. Build the plugin project separately
+    2. Copy the plugin DLLs and plugin.json to: $(OutDir)plugins/{PluginName}/
 
-    <Copy SourceFiles="@(_SamplePluginFiles)" DestinationFolder="$(OutDir)plugins\Sample" />
-  </Target>
-
-  <Target Name="CopyLlmTornadoPlugin" AfterTargets="Build">
-    <ItemGroup>
-      <_LlmTornadoPluginFiles Include="..\NodeEditor.Plugins.LlmTornado\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <_LlmTornadoPluginFiles Include="..\NodeEditor.Plugins.LlmTornado\bin\$(Configuration)\$(TargetFramework)\*.deps.json" />
-      <_LlmTornadoPluginFiles Include="..\NodeEditor.Plugins.LlmTornado\plugin.json" />
-    </ItemGroup>
-
-    <Copy SourceFiles="@(_LlmTornadoPluginFiles)" DestinationFolder="$(OutDir)plugins\LlmTornado" />
-  </Target>
-
-  <Target Name="CopyOpenCv2Plugin" AfterTargets="Build">
-    <ItemGroup>
-      <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\bin\$(Configuration)\$(TargetFramework)\*.deps.json" />
-      <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\plugin.json" />
-    </ItemGroup>
-
-    <Copy SourceFiles="@(_OpenCv2PluginFiles)" DestinationFolder="$(OutDir)plugins\OpenCv2" />
-  </Target>
+    For development convenience, you can use the install-plugins script or
+    manually copy built plugins to the plugins folder.
+  -->
 
 </Project>

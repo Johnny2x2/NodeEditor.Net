@@ -17,11 +17,21 @@ builder.Services.AddScoped(sp =>
 });
 builder.Services.AddNodeEditor();
 builder.Services.AddScoped<NodeEditor.Blazor.Services.Execution.BackgroundExecutionWorker>();
-builder.Services.Configure<PluginOptions>(builder.Configuration.GetSection(PluginOptions.SectionName));
+
+// Configure plugin loading
+builder.Services.Configure<PluginOptions>(options =>
+{
+    // Plugins are installed here by the marketplace
+    options.PluginDirectory = "plugins";
+    options.EnablePluginLoading = true;
+});
+
+// Configure marketplace
 builder.Services.Configure<MarketplaceOptions>(options =>
 {
+    // Local repository where plugins are published for discovery
     options.LocalRepositoryPath = Path.GetFullPath(
-        Path.Combine(builder.Environment.ContentRootPath, ".."));
+        Path.Combine(builder.Environment.ContentRootPath, "..", "plugin-repository"));
 });
 
 var app = builder.Build();
