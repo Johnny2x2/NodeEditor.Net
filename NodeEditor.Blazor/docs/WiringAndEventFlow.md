@@ -14,8 +14,10 @@ This document provides detailed insight into how NodeEditor.Blazor components ar
 4. [Connection Creation Flow](#connection-creation-flow)
 5. [Node Execution Flow](#node-execution-flow)
 6. [Plugin Loading & Registration Flow](#plugin-loading--registration-flow)
-7. [Serialization & Deserialization Flow](#serialization--deserialization-flow)
-8. [Viewport & Coordinate Transformation](#viewport--coordinate-transformation)
+7. [Plugin Lifecycle Hooks](#plugin-lifecycle-hooks)
+8. [Plugin Event Bus](#plugin-event-bus)
+9. [Serialization & Deserialization Flow](#serialization--deserialization-flow)
+10. [Viewport & Coordinate Transformation](#viewport--coordinate-transformation)
 
 ---
 
@@ -32,6 +34,7 @@ graph TB
     
     subgraph "Singleton Services Created Once"
         PL[PluginLoader]
+        PSR[IPluginServiceRegistry]
         NRS[NodeRegistryService]
         NDS[NodeDiscoveryService]
         STR[SocketTypeResolver]
@@ -42,6 +45,7 @@ graph TB
     
     subgraph "Scoped Services Per User/Circuit"
         NES[NodeEditorState]
+        PEB[IPluginEventBus]
         CC[CoordinateConverter]
         CV[ConnectionValidator]
         TGH[TouchGestureHandler]
@@ -59,6 +63,7 @@ graph TB
     
     Main --> AddNodeEditor
     AddNodeEditor --> PL
+    AddNodeEditor --> PSR
     AddNodeEditor --> NRS
     AddNodeEditor --> NDS
     AddNodeEditor --> STR
@@ -67,6 +72,7 @@ graph TB
     AddNodeEditor --> BEQ
     
     AddNodeEditor --> NES
+    AddNodeEditor --> PEB
     AddNodeEditor --> CC
     AddNodeEditor --> CV
     AddNodeEditor --> TGH
@@ -83,9 +89,13 @@ graph TB
     TGH --> Canvas
     NES --> Canvas
     NES --> NodeComp
+    PEB --> Canvas
+    PSR --> PL
     
     style AddNodeEditor fill:#4a90e2,color:#fff
     style NES fill:#50c878,color:#fff
+    style PEB fill:#ff6b6b,color:#fff
+    style PSR fill:#ff6b6b,color:#fff
 ```
 
 ### Injection into Components
@@ -97,6 +107,12 @@ Each Blazor component declares dependencies at the top:
 @inject CoordinateConverter CoordinateConverter
 @inject ConnectionValidator ConnectionValidator
 @inject IJSRuntime JSRuntime
+```
+
+Plugin-aware components and services can also inject:
+
+```razor
+@inject IPluginEventBus PluginEventBus
 ```
 
 **Wiring Flow:**
@@ -553,13 +569,13 @@ The UI reflects execution state in real-time:
 sequenceDiagram
     participant App as Application Startup
     participant Loader as PluginLoader
+    participant PSR as IPluginServiceRegistry
     participant LoadCtx as PluginLoadContext
     participant Assembly as Plugin Assembly
-    participant Discovery as NodeDiscoveryService
     participant Registry as NodeRegistryService
     participant UI as UI Components
     
-    App->>Loader: LoadPluginsAsync()
+    App->>Loader: LoadAndRegisterAsync(services)
     Loader->>Loader: Discover plugin directories
     
     loop For each plugin
@@ -568,20 +584,14 @@ sequenceDiagram
         LoadCtx->>Assembly: Load plugin DLL
         Assembly-->>Loader: Assembly loaded
         
-        Loader->>Loader: Validate(assembly)
+        Loader->>Loader: Validate(plugin, manifest)
         
         alt Valid Plugin
-            Loader->>Registry: RegisterPluginAssembly(assembly)
-            Registry->>Discovery: DiscoverFromAssemblies([assembly])
-            
-            Discovery->>Assembly: Reflect types
-            loop For each INodeContext class
-                Discovery->>Discovery: Find [Node] methods
-                Discovery->>Discovery: BuildDefinition(method)
-                Discovery-->>Registry: NodeDefinition
-            end
-            
-            Registry->>Registry: MergeDefinitions()
+            Loader->>Loader: OnLoadAsync()
+            Loader->>PSR: RegisterServices(pluginId, ConfigureServices)
+            Loader->>Registry: Register(registry)
+            Loader->>Loader: Register definitions (INodeProvider)
+            Loader->>Loader: OnInitializeAsync(services)
             Registry->>UI: Raise RegistryChanged Event
             UI->>UI: Refresh context menu
             
@@ -589,6 +599,7 @@ sequenceDiagram
             Loader-->>App: Plugin loaded successfully
         else Invalid Plugin
             Loader->>Loader: Log error
+            Loader->>Loader: OnError(exception)
             Loader-->>App: Skip plugin
         end
     end
@@ -638,12 +649,84 @@ graph LR
 
 **When a plugin is loaded:**
 
-1. **Discovery** scans for `[Node]` attributes
-2. **Definitions** are created with socket information
-3. **Registry** merges new definitions with existing ones
+1. **Lifecycle** runs: `OnLoadAsync()` → `ConfigureServices()`
+2. **Registry** receives node definitions (via `Register()` and optional `INodeProvider`)
+3. **Initialization** runs: `OnInitializeAsync()`
 4. **Event** is raised: `RegistryChanged`
 5. **ContextMenu** refreshes its node catalog
 6. **User** sees new nodes in add menu
+
+---
+
+## Plugin Lifecycle Hooks
+
+Plugins now support explicit lifecycle hooks and service registration. The loader calls them in order:
+
+```mermaid
+sequenceDiagram
+    participant Loader as PluginLoader
+    participant Plugin as INodePlugin
+    participant PSR as IPluginServiceRegistry
+    participant Registry as NodeRegistryService
+    participant Host as IServiceProvider
+
+    Loader->>Plugin: OnLoadAsync()
+    Loader->>PSR: RegisterServices(pluginId, ConfigureServices)
+    Loader->>Plugin: Register(registry)
+    Loader->>Plugin: OnInitializeAsync(Host)
+    Note over Loader,Plugin: Plugin is now active
+
+    Loader->>Plugin: OnUnloadAsync()
+    Loader->>Plugin: Unload()
+    Loader->>PSR: RemoveServices(pluginId)
+```
+
+### Lifecycle Guarantees
+
+- `OnLoadAsync()` is called after the assembly is loaded and validated.
+- `ConfigureServices()` is invoked to register plugin services into a plugin-owned service provider.
+- `Register()` is called to register node definitions with the registry.
+- `OnInitializeAsync()` is called with the host `IServiceProvider` (use for shared services).
+- `OnUnloadAsync()` runs before `Unload()` and before unloading the plugin context.
+
+---
+
+## Plugin Event Bus
+
+Plugins can subscribe to editor events using `IPluginEventBus` (scoped). It is wired to `NodeEditorState` events.
+
+```mermaid
+sequenceDiagram
+    participant State as NodeEditorState
+    participant Bus as IPluginEventBus
+    participant Plugin as Plugin Subscriber
+
+    Plugin->>Bus: SubscribeNodeAdded(handler)
+    Plugin->>Bus: SubscribeConnectionAdded(handler)
+
+    State->>Bus: NodeAdded event
+    Bus->>Plugin: handler(NodeEventArgs)
+
+    State->>Bus: ConnectionAdded event
+    Bus->>Plugin: handler(ConnectionEventArgs)
+```
+
+### Event Coverage
+
+The event bus publishes all core state changes:
+
+- `NodeAdded`
+- `NodeRemoved`
+- `ConnectionAdded`
+- `ConnectionRemoved`
+- `SelectionChanged`
+- `ConnectionSelectionChanged`
+- `ViewportChanged`
+- `ZoomChanged`
+- `SocketValuesChanged`
+- `NodeExecutionStateChanged`
+
+When the bus is disposed, it unhooks from `NodeEditorState` to avoid memory leaks.
 
 ---
 

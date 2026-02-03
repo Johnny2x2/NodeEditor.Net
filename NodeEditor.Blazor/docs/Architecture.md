@@ -11,9 +11,10 @@ NodeEditor.Blazor is a comprehensive visual node editor framework built with Bla
 3. [State Management](#state-management)
 4. [Component Hierarchy](#component-hierarchy)
 5. [Registry & Plugin System](#registry--plugin-system)
-6. [Execution Engine](#execution-engine)
-7. [Serialization System](#serialization-system)
-8. [Data Flow](#data-flow)
+6. [Plugin Lifecycle & Services](#plugin-lifecycle--services)
+7. [Execution Engine](#execution-engine)
+8. [Serialization System](#serialization-system)
+9. [Data Flow](#data-flow)
 
 ---
 
@@ -45,6 +46,8 @@ graph TB
         Execution[NodeExecutionService]
         Serializer[GraphSerializer]
         PluginLoader[PluginLoader]
+        PluginEvents[IPluginEventBus]
+        PluginServices[IPluginServiceRegistry]
         CoordConv[CoordinateConverter]
         ConnValid[ConnectionValidator]
         ViewCull[ViewportCuller]
@@ -73,11 +76,15 @@ graph TB
     
     Execution --> State
     Registry --> PluginLoader
+    PluginServices --> PluginLoader
+    PluginEvents --> State
     Serializer --> Registry
     Serializer --> State
     
     style State fill:#4a90e2,color:#fff
     style Canvas fill:#50c878,color:#fff
+    style PluginEvents fill:#ff6b6b,color:#fff
+    style PluginServices fill:#ff6b6b,color:#fff
 ```
 
 ### Architectural Principles
@@ -99,6 +106,7 @@ graph LR
     subgraph "Service Lifetimes"
         subgraph "Singleton Services"
             PL[PluginLoader]
+            PSR[IPluginServiceRegistry]
             Reg[NodeRegistryService]
             Disc[NodeDiscoveryService]
             STR[SocketTypeResolver]
@@ -109,6 +117,7 @@ graph LR
         
         subgraph "Scoped Services"
             State[NodeEditorState]
+            PEB[IPluginEventBus]
             CC[CoordinateConverter]
             CV[ConnectionValidator]
             TGH[TouchGestureHandler]
@@ -120,15 +129,19 @@ graph LR
     end
     
     PL --> Reg
+    PSR --> PL
     Disc --> Reg
     STR --> NES
     EP --> NES
     Reg --> GS
     State --> CC
     State --> CV
+    State --> PEB
     
     style State fill:#4a90e2,color:#fff
     style NES fill:#ff6b6b,color:#fff
+    style PEB fill:#ff6b6b,color:#fff
+    style PSR fill:#ff6b6b,color:#fff
 ```
 
 ### Service Registration Pattern
@@ -138,6 +151,7 @@ services.AddNodeEditor() registers:
 
 Singleton Services (shared across application):
 ├── PluginLoader - manages plugin lifecycle
+├── IPluginServiceRegistry - plugin service providers
 ├── NodeRegistryService - node definition catalog
 ├── NodeDiscoveryService - discovers nodes from assemblies
 ├── SocketTypeResolver - type compatibility checking
@@ -147,6 +161,7 @@ Singleton Services (shared across application):
 
 Scoped Services (per user/circuit):
 ├── NodeEditorState - central state management
+├── IPluginEventBus - plugin event subscriptions
 ├── CoordinateConverter - screen/graph coordinate translation
 ├── ConnectionValidator - connection validation logic
 ├── TouchGestureHandler - touch/gesture processing
@@ -391,6 +406,7 @@ graph TB
     subgraph "Plugin Discovery & Loading"
         PluginDir[Plugin Directory]
         Loader[PluginLoader]
+        ServiceRegistry[IPluginServiceRegistry]
         Manifest[Plugin Manifest]
         Validation[Plugin Validation]
         LoadCtx[PluginLoadContext]
@@ -416,6 +432,7 @@ graph TB
     end
     
     PluginDir --> Loader
+    ServiceRegistry --> Loader
     Loader --> Manifest
     Manifest --> Validation
     Validation --> LoadCtx
@@ -436,6 +453,76 @@ graph TB
     style Registry fill:#4a90e2,color:#fff
     style Discovery fill:#ff6b6b,color:#fff
 ```
+
+## Plugin Lifecycle & Services
+
+Plugins now support lifecycle hooks and scoped service registration. Each plugin can provide its own service provider via `IPluginServiceRegistry` and participate in editor lifecycle via `INodePlugin` hooks.
+
+```mermaid
+sequenceDiagram
+    participant Loader as PluginLoader
+    participant Plugin as INodePlugin
+    participant PSR as IPluginServiceRegistry
+    participant Host as IServiceProvider
+
+    Loader->>Plugin: OnLoadAsync()
+    Loader->>PSR: RegisterServices(pluginId, ConfigureServices)
+    Loader->>Plugin: Register(registry)
+    Loader->>Plugin: OnInitializeAsync(Host)
+
+    Note over Loader,Plugin: Plugin active
+
+    Loader->>Plugin: OnUnloadAsync()
+    Loader->>Plugin: Unload()
+    Loader->>PSR: RemoveServices(pluginId)
+```
+
+**Key Responsibilities**
+
+- **`OnLoadAsync()`**: initialize resources after assembly load
+- **`ConfigureServices()`**: register plugin-owned services
+- **`Register()`**: register node definitions
+- **`OnInitializeAsync()`**: access host DI services
+- **`OnUnloadAsync()` / `Unload()`**: cleanup and shutdown
+
+---
+
+## Plugin Event Bus
+
+Plugins can subscribe to editor state changes through `IPluginEventBus`, which is wired to `NodeEditorState` and registered as a scoped service. This provides a safe way for plugins to react to graph changes without coupling directly to UI components.
+
+```mermaid
+sequenceDiagram
+    participant State as NodeEditorState
+    participant Bus as IPluginEventBus
+    participant Plugin as Plugin Subscriber
+
+    Plugin->>Bus: SubscribeNodeAdded(handler)
+    Plugin->>Bus: SubscribeConnectionAdded(handler)
+
+    State->>Bus: NodeAdded event
+    Bus->>Plugin: handler(NodeEventArgs)
+
+    State->>Bus: ConnectionAdded event
+    Bus->>Plugin: handler(ConnectionEventArgs)
+```
+
+**Covered Events**
+
+- `NodeAdded`
+- `NodeRemoved`
+- `ConnectionAdded`
+- `ConnectionRemoved`
+- `SelectionChanged`
+- `ConnectionSelectionChanged`
+- `ViewportChanged`
+- `ZoomChanged`
+- `SocketValuesChanged`
+- `NodeExecutionStateChanged`
+
+When the event bus is disposed, it unhooks from `NodeEditorState` to avoid memory leaks.
+
+---
 
 ### Node Definition Structure
 
@@ -459,24 +546,22 @@ NodeDefinition:
 sequenceDiagram
     participant App as Application
     participant Loader as PluginLoader
-    participant Validator as Validation
+    participant PSR as IPluginServiceRegistry
     participant Registry as NodeRegistryService
-    participant Discovery as NodeDiscoveryService
     
-    App->>Loader: LoadPluginsAsync()
+    App->>Loader: LoadAndRegisterAsync(services)
     Loader->>Loader: DiscoverCandidates()
     
     loop For each plugin
         Loader->>Loader: LoadCandidate()
-        Loader->>Validator: Validate(assembly)
-        Validator-->>Loader: ValidationResult
+        Loader->>Loader: Validate(plugin, manifest)
         
         alt Valid Plugin
-            Loader->>Registry: RegisterPluginAssembly()
-            Registry->>Discovery: DiscoverFromAssemblies()
-            Discovery->>Discovery: BuildDefinition() for each method
-            Discovery-->>Registry: List<NodeDefinition>
-            Registry->>Registry: MergeDefinitions()
+            Loader->>Loader: OnLoadAsync()
+            Loader->>PSR: RegisterServices(pluginId, ConfigureServices)
+            Loader->>Registry: Register(registry)
+            Loader->>Loader: Register definitions (INodeProvider)
+            Loader->>Loader: OnInitializeAsync(services)
             Registry->>Registry: Raise RegistryChanged Event
         end
     end

@@ -13,6 +13,7 @@ public sealed class PluginLoaderTests
         services.AddLogging();
         services.AddSingleton<NodeDiscoveryService>();
         services.AddSingleton<NodeRegistryService>();
+        services.AddSingleton<IPluginServiceRegistry, PluginServiceRegistry>();
         services.AddSingleton<PluginLoader>();
         services.Configure<PluginOptions>(options =>
         {
@@ -40,6 +41,7 @@ public sealed class PluginLoaderTests
         services.AddLogging();
         services.AddSingleton<NodeDiscoveryService>();
         services.AddSingleton<NodeRegistryService>();
+        services.AddSingleton<IPluginServiceRegistry, PluginServiceRegistry>();
         services.AddSingleton<PluginLoader>();
         services.Configure<PluginOptions>(options =>
         {

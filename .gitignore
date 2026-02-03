@@ -76,3 +76,4 @@ artifacts/
 
 .fake
 NodeEditorMax/plugins/
+TestResults/
