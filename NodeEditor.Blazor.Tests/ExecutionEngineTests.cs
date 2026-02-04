@@ -290,7 +290,9 @@ internal sealed class TestNodeContext : INodeMethodContext
 
     public NodeData? CurrentProcessingNode { get; set; }
 
+#pragma warning disable CS0067 // Event is never used
     public event Action<string, NodeData, ExecutionFeedbackType, object?, bool>? FeedbackInfo;
+#pragma warning restore CS0067
 
     public int MaxConcurrent => _max;
 

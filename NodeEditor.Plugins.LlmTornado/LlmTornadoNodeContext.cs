@@ -308,39 +308,9 @@ public sealed class LlmTornadoNodeContext : INodeMethodContext, INodeContext
             throw new ArgumentException("API key is required.", nameof(apiKey));
         }
 
-        var type = typeof(TornadoApi);
-        var constructors = type.GetConstructors();
-
-        if (!string.IsNullOrWhiteSpace(baseUrl))
-        {
-            var ctor = constructors.FirstOrDefault(c => MatchesParameters(c, typeof(string), typeof(string)))
-                       ?? constructors.FirstOrDefault(c => MatchesParameters(c, typeof(string), typeof(Uri)));
-
-            if (ctor != null)
-            {
-                var args = ctor.GetParameters().Length == 2 && ctor.GetParameters()[1].ParameterType == typeof(Uri)
-                    ? new object?[] { apiKey, new Uri(baseUrl) }
-                    : new object?[] { apiKey, baseUrl };
-                return (TornadoApi)ctor.Invoke(args);
-            }
-        }
-
-        var singleCtor = constructors.FirstOrDefault(c => MatchesParameters(c, typeof(string)));
-        if (singleCtor != null)
-        {
-            return (TornadoApi)singleCtor.Invoke(new object?[] { apiKey });
-        }
-
-        var staticFactory = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static, binder: null, types: new[] { typeof(string) }, modifiers: null)
-                   ?? type.GetMethod("FromApiKey", BindingFlags.Public | BindingFlags.Static, binder: null, types: new[] { typeof(string) }, modifiers: null)
-                   ?? type.GetMethod("FromKey", BindingFlags.Public | BindingFlags.Static, binder: null, types: new[] { typeof(string) }, modifiers: null);
-
-        if (staticFactory != null)
-        {
-            return (TornadoApi)staticFactory.Invoke(null, new object?[] { apiKey })!;
-        }
-
-        throw new InvalidOperationException("Unable to create TornadoApi instance. No supported constructor or factory method found.");
+        // TornadoApi constructor: TornadoApi(string apiKey, LLmProviders provider = LLmProviders.OpenAi)
+        // We use the default OpenAI provider
+        return new TornadoApi(apiKey);
     }
 
     private static ChatModel CreateChatModelInstance(string modelName)

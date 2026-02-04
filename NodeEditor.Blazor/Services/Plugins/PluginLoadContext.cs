@@ -3,6 +3,7 @@ using System.Runtime.Loader;
 
 namespace NodeEditor.Blazor.Services.Plugins;
 
+[System.Runtime.Versioning.UnsupportedOSPlatform("browser")]
 public sealed class PluginLoadContext : AssemblyLoadContext
 {
     private readonly AssemblyDependencyResolver _resolver;

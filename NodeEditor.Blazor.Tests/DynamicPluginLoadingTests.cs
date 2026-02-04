@@ -1,10 +1,12 @@
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NodeEditor.Blazor.Models;
 using NodeEditor.Blazor.Services;
 using NodeEditor.Blazor.Services.Execution;
 using NodeEditor.Blazor.Services.Plugins;
 using NodeEditor.Blazor.Services.Registry;
+using System.Diagnostics;
+using System.Reflection;
+using Xunit.Abstractions;
 
 namespace NodeEditor.Blazor.Tests;
 
@@ -24,9 +26,11 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
     private readonly NodeExecutionService _executionService;
     private readonly INodeContextRegistry _contextRegistry;
     private IReadOnlyList<INodePlugin>? _loadedPlugins;
+    private readonly ITestOutputHelper output;
 
-    public DynamicPluginLoadingTests()
+    public DynamicPluginLoadingTests(ITestOutputHelper output)
     {
+        this.output = output;
         // Use the plugins folder that MSBuild copies to during test build
         _testPluginsDir = Path.Combine(AppContext.BaseDirectory, "plugins");
 
@@ -344,5 +348,394 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         // Multiply: 10 * 5 = 50, Clamp(50, 0, 40) = 40
         var result = executionContext.GetSocketValue(clampNode.Id, "Result");
         Assert.Equal(40.0, result);
+    }
+
+    [Fact]
+    public async Task DynamicLoad_LlmTornadoPlugin_CanCallOpenAIApi()
+    {
+        // Get API key from environment variable
+        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        
+        // Skip if API key not available
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            output.WriteLine("SKIPPED: OPENAI_API_KEY environment variable not set");
+            return;
+        }
+
+        // Find required node definitions
+        var createApiDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Create Tornado API");
+        var createModelDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Create Chat Model");
+        var createAgentDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Create Agent");
+        var runAgentDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Run Agent");
+        var awaitMessageDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Await Chat Message");
+
+        // Skip if plugin not available
+        if (createApiDef is null || createModelDef is null || createAgentDef is null || 
+            runAgentDef is null || awaitMessageDef is null)
+        {
+            output.WriteLine("SKIPPED: LlmTornado plugin nodes not found");
+            return;
+        }
+
+        // Create nodes
+        var apiNode = createApiDef.Factory() with
+        {
+            Id = "api-1",
+            Inputs = createApiDef.Factory().Inputs.Select(s => s.Name switch
+            {
+                "ApiKey" => s with { Value = SocketValue.FromObject(apiKey) },
+                "BaseUrl" => s with { Value = SocketValue.FromObject("") },
+                _ => s
+            }).ToArray()
+        };
+
+        var modelNode = createModelDef.Factory() with
+        {
+            Id = "model-1",
+            Inputs = createModelDef.Factory().Inputs.Select(s => s.Name switch
+            {
+                "ModelName" => s with { Value = SocketValue.FromObject("gpt-4o-mini") },
+                _ => s
+            }).ToArray()
+        };
+
+        var agentNode = createAgentDef.Factory() with
+        {
+            Id = "agent-1",
+            Inputs = createAgentDef.Factory().Inputs.Select(s => s.Name switch
+            {
+                "Name" => s with { Value = SocketValue.FromObject("TestAgent") },
+                "Instructions" => s with { Value = SocketValue.FromObject("You are a helpful assistant. Always respond with exactly: 'Test successful'") },
+                "Streaming" => s with { Value = SocketValue.FromObject(false) },
+                _ => s
+            }).ToArray()
+        };
+
+        var runNode = runAgentDef.Factory() with
+        {
+            Id = "run-1",
+            Inputs = runAgentDef.Factory().Inputs.Select(s => s.Name switch
+            {
+                "Input" => s with { Value = SocketValue.FromObject("Say test successful") },
+                "AppendMessages" => s with { Value = SocketValue.FromObject(null) },
+                "Streaming" => s with { Value = SocketValue.FromObject(false) },
+                "SingleTurn" => s with { Value = SocketValue.FromObject(true) },
+                _ => s
+            }).ToArray()
+        };
+
+        var awaitNode = awaitMessageDef.Factory() with
+        {
+            Id = "await-1"
+        };
+
+        var nodes = new List<NodeData> { apiNode, modelNode, agentNode, runNode, awaitNode };
+
+        // Create connections
+        var connections = new List<ConnectionData>
+        {
+            new(apiNode.Id, modelNode.Id, "Client", "Client", false),
+            new(apiNode.Id, agentNode.Id, "Client", "Client", false),
+            new(modelNode.Id, agentNode.Id, "Model", "Model", false),
+            new(agentNode.Id, runNode.Id, "Agent", "Agent", false),
+            new(runNode.Id, awaitNode.Id, "ResultTask", "MessageTask", false),
+            new(runNode.Id, awaitNode.Id, "Exit", "Enter", true) // Execution connection
+        };
+
+        // Execute with timeout
+        var nodeContext = _contextRegistry.CreateCompositeContext();
+        var executionContext = new NodeExecutionContext();
+        
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await _executionService.ExecuteAsync(
+            nodes,
+            connections,
+            executionContext,
+            nodeContext,
+            DefaultOptions,
+            cts.Token);
+
+        // Verify the agent ran successfully
+        Assert.True(executionContext.IsNodeExecuted(runNode.Id), 
+            "Run Agent node should have been executed");
+
+        // Get the ChatMessage from await node
+        var awaitMessage = executionContext.GetSocketValue(awaitNode.Id, "Message");
+        Assert.NotNull(awaitMessage);
+        
+        // Extract text from ChatMessage using reflection
+        var contentProp = awaitMessage.GetType().GetProperty("Content");
+        Assert.NotNull(contentProp);
+        
+        var contentValue = contentProp.GetValue(awaitMessage);
+        string? responseText = contentValue as string;
+        
+        // If Content is not a string, try to get Text property
+        if (responseText == null && contentValue != null)
+        {
+            var textProp = contentValue.GetType().GetProperty("Text");
+            if (textProp != null)
+            {
+                responseText = textProp.GetValue(contentValue) as string;
+            }
+        }
+        
+        Assert.NotNull(responseText);
+        Assert.NotEmpty(responseText);
+        output.WriteLine($"OpenAI API Response: {responseText}");
+        
+        // Verify it contains expected response
+        Assert.Contains("successful", responseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task DynamicLoad_OpenCv2Plugin_CanProcessImage()
+    {
+        // Find required node definitions
+        var loadImageDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Load Image");
+        var toGrayscaleDef = _registry.Definitions.FirstOrDefault(d => d.Name == "To Grayscale");
+        var gaussianBlurDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Gaussian Blur");
+        var cannyDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Canny");
+        var getSizeDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Get Size");
+
+        // Skip if plugin not available
+        if (loadImageDef is null || toGrayscaleDef is null || gaussianBlurDef is null || 
+            cannyDef is null || getSizeDef is null)
+        {
+            output.WriteLine("SKIPPED: OpenCV2 plugin nodes not found");
+            return;
+        }
+
+        // Create a simple test image in memory (100x100 white square)
+        var testImagePath = Path.Combine(Path.GetTempPath(), $"test_image_{Guid.NewGuid()}.png");
+        try
+        {
+            // Create a simple test image using OpenCvSharp directly (we can reference it in tests)
+            using (var testImage = new OpenCvSharp.Mat(100, 100, OpenCvSharp.MatType.CV_8UC3, new OpenCvSharp.Scalar(255, 255, 255)))
+            {
+                // Draw a black rectangle in the middle
+                OpenCvSharp.Cv2.Rectangle(testImage, new OpenCvSharp.Point(25, 25), new OpenCvSharp.Point(75, 75), new OpenCvSharp.Scalar(0, 0, 0), -1);
+                OpenCvSharp.Cv2.ImWrite(testImagePath, testImage);
+            }
+
+            // Create nodes
+            var loadNode = loadImageDef.Factory() with
+            {
+                Id = "load-1",
+                Inputs = loadImageDef.Factory().Inputs.Select(s => s.Name switch
+                {
+                    "FilePath" => s with { Value = SocketValue.FromObject(testImagePath) },
+                    "Mode" => s with { Value = SocketValue.FromObject(OpenCvSharp.ImreadModes.Color) },
+                    _ => s
+                }).ToArray()
+            };
+
+            var grayNode = toGrayscaleDef.Factory() with
+            {
+                Id = "gray-1"
+            };
+
+            var blurNode = gaussianBlurDef.Factory() with
+            {
+                Id = "blur-1",
+                Inputs = gaussianBlurDef.Factory().Inputs.Select(s => s.Name switch
+                {
+                    "KernelSize" => s with { Value = SocketValue.FromObject(5) },
+                    "Sigma" => s with { Value = SocketValue.FromObject(1.5) },
+                    _ => s
+                }).ToArray()
+            };
+
+            var cannyNode = cannyDef.Factory() with
+            {
+                Id = "canny-1",
+                Inputs = cannyDef.Factory().Inputs.Select(s => s.Name switch
+                {
+                    "Threshold1" => s with { Value = SocketValue.FromObject(50.0) },
+                    "Threshold2" => s with { Value = SocketValue.FromObject(150.0) },
+                    _ => s
+                }).ToArray()
+            };
+
+            var sizeNode = getSizeDef.Factory() with
+            {
+                Id = "size-1"
+            };
+
+            var nodes = new List<NodeData> { loadNode, grayNode, blurNode, cannyNode, sizeNode };
+
+            // Create connections: Load → Gray → Blur → Canny → Size
+            var connections = new List<ConnectionData>
+            {
+                new(loadNode.Id, grayNode.Id, "Image", "Image", false),
+                new(grayNode.Id, blurNode.Id, "Result", "Image", false),
+                new(blurNode.Id, cannyNode.Id, "Result", "Image", false),
+                new(cannyNode.Id, sizeNode.Id, "Result", "Image", false)
+            };
+
+            // Execute
+            var nodeContext = _contextRegistry.CreateCompositeContext();
+            var executionContext = new NodeExecutionContext();
+
+            // Resolve data-flow nodes (they're all isCallable: false) - MUST execute in dependency order
+            await ResolveDataFlowNode(loadNode, connections, executionContext, nodeContext);
+            await ResolveDataFlowNode(grayNode, connections, executionContext, nodeContext);
+            await ResolveDataFlowNode(blurNode, connections, executionContext, nodeContext);
+            await ResolveDataFlowNode(cannyNode, connections, executionContext, nodeContext);
+            await ResolveDataFlowNode(sizeNode, connections, executionContext, nodeContext);
+
+            // Debug: Print actual output sockets for the size node
+            output.WriteLine($"Size node outputs: {string.Join(", ", sizeNode.Outputs.Select(o => o.Name))}");
+            output.WriteLine($"Size node definition ID: {sizeNode.DefinitionId}");
+
+            // Verify the final size output
+            var width = executionContext.GetSocketValue(sizeNode.Id, "Width");
+            var height = executionContext.GetSocketValue(sizeNode.Id, "Height");
+
+            output.WriteLine($"Width value: {width}, Height value: {height}");
+
+            Assert.NotNull(width);
+            Assert.NotNull(height);
+            Assert.Equal(100, width);
+            Assert.Equal(100, height);
+
+            output.WriteLine($"Successfully processed image: {width}x{height}");
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(testImagePath))
+            {
+                File.Delete(testImagePath);
+            }
+        }
+    }
+
+    private async Task ResolveDataFlowNode(
+        NodeData node,
+        List<ConnectionData> connections,
+        NodeExecutionContext executionContext,
+        INodeContext nodeContext)
+    {
+        output.WriteLine($"ResolveDataFlowNode called for node {node.Id}, DefinitionId: {node.DefinitionId}");
+        
+        // Find the method definition - parse from DefinitionId
+        // Format: "Namespace.ClassName.MethodName(ParamType1,ParamType2,...)"
+        // First split by '(' to get everything before parameters
+        // Then split that by '.' and take the last part to get just the method name
+        var methodName = node.DefinitionId != null
+            ? node.DefinitionId.Split('(')[0].Split('.')[^1]
+            : null;
+        output.WriteLine($"Extracted method name: '{methodName}'");
+
+        // Handle CompositeNodeContext - need to find the actual context that has the method
+        object? actualContext = nodeContext;
+        System.Reflection.MethodInfo? methodInfo = null;
+        
+        if (nodeContext is NodeEditor.Blazor.Services.Execution.CompositeNodeContext composite)
+        {
+            output.WriteLine($"NodeContext is CompositeNodeContext with {composite.Contexts.Count} contexts");
+            
+            // Search through all contexts for the method
+            foreach (var ctx in composite.Contexts)
+            {
+                var method = ctx.GetType().GetMethod(methodName ?? string.Empty,
+                    System.Reflection.BindingFlags.Public | 
+                    System.Reflection.BindingFlags.Instance | 
+                    System.Reflection.BindingFlags.IgnoreCase);
+                
+                if (method != null)
+                {
+                    output.WriteLine($"Found method '{methodName}' in context type: {ctx.GetType().FullName}");
+                    methodInfo = method;
+                    actualContext = ctx;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            // Single context - search directly
+            methodInfo = methodName != null
+                ? nodeContext.GetType().GetMethod(methodName, 
+                    System.Reflection.BindingFlags.Public | 
+                    System.Reflection.BindingFlags.Instance | 
+                    System.Reflection.BindingFlags.IgnoreCase)
+                : null;
+        }
+
+        output.WriteLine($"MethodInfo found: {(methodInfo != null ? methodInfo.Name : "null")}");
+        
+        if (methodInfo == null || actualContext == null) return;
+
+        // Build input value dictionary
+        var inputValues = new Dictionary<string, object?>();
+
+        // Resolve inputs from connections
+        foreach (var conn in connections.Where(c => c.InputNodeId == node.Id))
+        {
+            var sourceSocketName = conn.InputSocketName;
+            var sourceValue = executionContext.GetSocketValue(conn.OutputNodeId, conn.OutputSocketName);
+            
+            if (sourceValue != null)
+            {
+                inputValues[sourceSocketName] = sourceValue;
+            }
+        }
+
+        // Add values from node sockets if they have values and no connection
+        foreach (var input in node.Inputs.Where(i => !connections.Any(c => c.InputNodeId == node.Id && c.InputSocketName == i.Name)))
+        {
+            if (input.Value.Json.HasValue)
+            {
+                inputValues[input.Name] = input.Value.ToObject<object>();
+            }
+        }
+
+        // Build parameter array for method invocation
+        var parameters = methodInfo.GetParameters();
+        var args = new object?[parameters.Length];
+
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            var param = parameters[i];
+            if (!param.IsOut && inputValues.TryGetValue(param.Name!, out var value))
+            {
+                // Handle type conversion - if value is JsonElement, deserialize to proper type
+                if (value is System.Text.Json.JsonElement jsonElement)
+                {
+                    args[i] = System.Text.Json.JsonSerializer.Deserialize(jsonElement.GetRawText(), param.ParameterType);
+                }
+                else
+                {
+                    args[i] = value;
+                }
+            }
+        }
+
+        // Invoke the method using the actual context (not composite wrapper)
+        methodInfo.Invoke(actualContext, args);
+
+        output.WriteLine($"After method invocation, args: {string.Join(", ", args.Select((a, i) => $"[{i}]={a ?? "null"}"))}");
+
+        // Extract out parameters and store them as outputs
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            if (parameters[i].IsOut)
+            {
+                var outputName = parameters[i].Name!.TrimStart('_'); // Remove leading underscore if any
+                var outputSocket = node.Outputs.FirstOrDefault(o => 
+                    string.Equals(o.Name, outputName, StringComparison.OrdinalIgnoreCase));
+                
+                output.WriteLine($"Out param [{i}]: name='{parameters[i].Name}', value={args[i] ?? "null"}, matched socket={outputSocket?.Name ?? "none"}");
+                
+                if (outputSocket != null && args[i] != null)
+                {
+                    executionContext.SetSocketValue(node.Id, outputSocket.Name, args[i]);
+                }
+            }
+        }
     }
 }

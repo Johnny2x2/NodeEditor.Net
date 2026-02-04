@@ -17,7 +17,7 @@ public sealed partial class StandardNodeContext
     {
         ReportRunning();
         List?.Add(Value);
-        Result = List;
+        Result = List!;
     }
 
     [Node("List Insert", "Lists", "Basic", "Insert item at index.", false)]
@@ -57,7 +57,7 @@ public sealed partial class StandardNodeContext
     {
         ReportRunning();
         List?.Clear();
-        Result = List;
+        Result = List!;
     }
 
     [Node("List Contains", "Lists", "Basic", "Check if list contains value.", false)]

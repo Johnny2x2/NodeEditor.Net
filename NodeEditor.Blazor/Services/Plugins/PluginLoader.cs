@@ -46,7 +46,8 @@ public sealed class PluginLoader
             {
                 await plugin.OnLoadAsync(token).ConfigureAwait(false);
 
-                _serviceRegistry.RegisterServices(plugin.Id, plugin.ConfigureServices);
+                // Register plugin services and get the plugin's service provider
+                var pluginServices = _serviceRegistry.RegisterServices(plugin.Id, plugin.ConfigureServices);
 
                 plugin.Register(_registry);
 
@@ -55,10 +56,8 @@ public sealed class PluginLoader
                     _registry.RegisterDefinitions(provider.GetNodeDefinitions());
                 }
 
-                if (services is not null)
-                {
-                    await plugin.OnInitializeAsync(services, token).ConfigureAwait(false);
-                }
+                // Initialize plugin with its own service provider containing its configured services
+                await plugin.OnInitializeAsync(pluginServices, token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

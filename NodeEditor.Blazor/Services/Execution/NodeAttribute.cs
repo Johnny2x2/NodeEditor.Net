@@ -38,4 +38,10 @@ public sealed class NodeAttribute : Attribute
     public bool IsCallable { get; }
 
     public bool IsExecutionInitiator { get; }
+    
+    /// <summary>
+    /// Optional unique identifier for disambiguation when multiple nodes have the same Name.
+    /// This is typically set automatically during discovery based on the declaring type and method.
+    /// </summary>
+    public string? DefinitionId { get; internal set; }
 }

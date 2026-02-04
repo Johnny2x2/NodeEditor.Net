@@ -38,6 +38,7 @@ public sealed class NodeExecutionService
             return;
         }
 
+        // Both Parallel and DataFlow modes use the execution planner
         var plan = _planner.BuildPlan(nodes, connections);
         await ExecutePlannedAsync(plan, connections, context, nodeContext, effectiveOptions, token).ConfigureAwait(false);
     }
@@ -192,6 +193,34 @@ public sealed class NodeExecutionService
             {
                 entryNodes = nodes.Where(n => n.Callable).ToList();
             }
+            
+            // If no entry nodes found, fall back to data-flow execution for all nodes
+            // This allows pure computational graphs (data-flow only) to execute
+            if (entryNodes.Count == 0)
+            {
+                // Use the planner to build topological ordering
+                var plan = _planner.BuildPlan(nodes, connections);
+                foreach (var layer in plan.Layers)
+                {
+                    foreach (var node in layer.Nodes)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if (breakExecution)
+                        {
+                            break;
+                        }
+                        
+                        await ExecuteNodeAsync(node, connections, nodeMap, context, invoker, feedbackContext, token).ConfigureAwait(false);
+                    }
+                    
+                    if (breakExecution)
+                    {
+                        break;
+                    }
+                }
+                
+                return;
+            }
 
             var queue = new Queue<NodeData>(entryNodes);
 
@@ -284,13 +313,22 @@ public sealed class NodeExecutionService
             .ToDictionary(g => g.Key, g => g.ToList());
 
         var stack = new HashSet<string>(StringComparer.Ordinal);
+        var path = new Stack<string>();
 
         async Task ResolveNodeAsync(NodeData target)
         {
             if (!stack.Add(target.Id))
             {
-                return;
+                // Cycle detected - build the cycle path for error reporting
+                var cyclePath = path.Reverse().SkipWhile(id => id != target.Id).Concat(new[] { target.Id });
+                var cycleDescription = string.Join(" -> ", cyclePath.Select(id => 
+                    nodeMap.TryGetValue(id, out var n) ? $"{n.Name} ({id})" : id));
+                throw new InvalidOperationException(
+                    $"Circular dependency detected in graph: {cycleDescription}. " +
+                    "Data-flow nodes cannot have circular dependencies.");
             }
+            
+            path.Push(target.Id);
 
             foreach (var input in target.Inputs.Where(i => !i.IsExecution))
             {
@@ -322,6 +360,7 @@ public sealed class NodeExecutionService
             }
 
             stack.Remove(target.Id);
+            path.Pop();
         }
 
         await ResolveNodeAsync(node).ConfigureAwait(false);

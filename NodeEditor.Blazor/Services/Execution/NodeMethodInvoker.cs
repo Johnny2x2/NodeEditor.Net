@@ -10,18 +10,31 @@ public sealed class NodeMethodInvoker
     private readonly object _context;
     private readonly SocketTypeResolver _typeResolver;
     private readonly Dictionary<string, NodeMethodBinding> _methodMap;
+    private readonly Dictionary<string, NodeMethodBinding> _definitionIdMap;
 
     public NodeMethodInvoker(object context, SocketTypeResolver typeResolver)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _typeResolver = typeResolver ?? throw new ArgumentNullException(nameof(typeResolver));
         _methodMap = context is INodeContextHost host
-            ? BuildMethodMap(host.Contexts)
-            : BuildMethodMap(new[] { context });
+            ? BuildMethodMap(host.Contexts, out _definitionIdMap)
+            : BuildMethodMap(new[] { context }, out _definitionIdMap);
     }
 
+    /// <summary>
+    /// Resolves a node to its method binding.
+    /// Prioritizes DefinitionId lookup over Name lookup for disambiguation.
+    /// </summary>
     public NodeMethodBinding? Resolve(NodeData node)
     {
+        // Try DefinitionId first for unambiguous resolution
+        if (!string.IsNullOrEmpty(node.DefinitionId) && 
+            _definitionIdMap.TryGetValue(node.DefinitionId, out var definitionMethod))
+        {
+            return definitionMethod;
+        }
+        
+        // Fall back to Name-based lookup
         if (_methodMap.TryGetValue(node.Name, out var method))
         {
             return method;
@@ -174,21 +187,29 @@ public sealed class NodeMethodInvoker
         return null;
     }
 
-    private static Dictionary<string, NodeMethodBinding> BuildMethodMap(IEnumerable<object> contexts)
+    private static Dictionary<string, NodeMethodBinding> BuildMethodMap(
+        IEnumerable<object> contexts,
+        out Dictionary<string, NodeMethodBinding> definitionIdMap)
     {
         var map = new Dictionary<string, NodeMethodBinding>(StringComparer.Ordinal);
+        definitionIdMap = new Dictionary<string, NodeMethodBinding>(StringComparer.Ordinal);
 
         foreach (var context in contexts)
         {
             var contextType = context.GetType();
             foreach (var method in contextType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
             {
+                // Build DefinitionId for this method
+                var definitionId = BuildDefinitionId(contextType, method);
+                
                 // Try to get NodeAttribute - handle cross-context loading by checking both
                 // direct attribute and name-based matching for dynamically loaded plugins
                 var attribute = method.GetCustomAttribute<NodeAttribute>();
                 if (attribute is not null)
                 {
-                    map.TryAdd(attribute.Name, new NodeMethodBinding(context, method));
+                    var binding = new NodeMethodBinding(context, method, definitionId);
+                    map.TryAdd(attribute.Name, binding);
+                    definitionIdMap.TryAdd(definitionId, binding);
                     continue;
                 }
 
@@ -201,17 +222,55 @@ public sealed class NodeMethodInvoker
                     var nameProp = nodeAttr.GetType().GetProperty("Name");
                     if (nameProp?.GetValue(nodeAttr) is string nodeName && !string.IsNullOrEmpty(nodeName))
                     {
-                        map.TryAdd(nodeName, new NodeMethodBinding(context, method));
+                        var binding = new NodeMethodBinding(context, method, definitionId);
+                        map.TryAdd(nodeName, binding);
+                        definitionIdMap.TryAdd(definitionId, binding);
                         continue;
                     }
                 }
 
-                map.TryAdd(method.Name, new NodeMethodBinding(context, method));
+                // Fallback: use method name
+                var fallbackBinding = new NodeMethodBinding(context, method, definitionId);
+                map.TryAdd(method.Name, fallbackBinding);
+                definitionIdMap.TryAdd(definitionId, fallbackBinding);
             }
         }
 
         return map;
     }
+    
+    private static string BuildDefinitionId(Type contextType, MethodInfo method)
+    {
+        try
+        {
+            // Force eager evaluation inside try-catch to handle missing dependencies
+            var parameters = method.GetParameters()
+                .Select(p => p.ParameterType.IsByRef
+                    ? p.ParameterType.GetElementType() ?? p.ParameterType
+                    : p.ParameterType)
+                .Select(t => t.FullName ?? t.Name)
+                .ToList(); // Force eager evaluation
+
+            var signature = string.Join(",", parameters);
+            return $"{contextType.FullName}.{method.Name}({signature})";
+        }
+        catch (FileNotFoundException)
+        {
+            // If we can't load parameter types (missing dependencies), use a simpler signature
+            return $"{contextType.FullName}.{method.Name}";
+        }
+        catch (TypeLoadException)
+        {
+            // If we can't load parameter types (missing dependencies), use a simpler signature
+            return $"{contextType.FullName}.{method.Name}";
+        }
+    }
 }
 
-public sealed record NodeMethodBinding(object Target, MethodInfo Method);
+/// <summary>
+/// Represents a binding between a node and its implementation method.
+/// </summary>
+/// <param name="Target">The context instance containing the method.</param>
+/// <param name="Method">The method to invoke.</param>
+/// <param name="DefinitionId">Optional unique identifier for the node definition.</param>
+public sealed record NodeMethodBinding(object Target, MethodInfo Method, string? DefinitionId);
