@@ -53,7 +53,15 @@ public sealed class PluginLoader
 
                 if (plugin is INodeProvider provider)
                 {
-                    _registry.RegisterDefinitions(provider.GetNodeDefinitions());
+                    var providedDefinitions = provider.GetNodeDefinitions()?.ToList() ?? new List<NodeDefinition>();
+                    if (providedDefinitions.Count > 0)
+                    {
+                        _registry.RegisterDefinitions(providedDefinitions);
+                        if (_loadedPlugins.TryGetValue(plugin.Id, out var entry))
+                        {
+                            entry.ProviderDefinitions.AddRange(providedDefinitions);
+                        }
+                    }
                 }
 
                 // Initialize plugin with its own service provider containing its configured services
@@ -76,9 +84,10 @@ public sealed class PluginLoader
         return plugins;
     }
 
-    private void RegisterNodeContextsFromAssembly(IEnumerable<Assembly> assemblies)
+    private List<object> RegisterNodeContextsFromAssembly(IEnumerable<Assembly> assemblies)
     {
-        if (_contextRegistry is null) return;
+        var instances = new List<object>();
+        if (_contextRegistry is null) return instances;
 
         foreach (var assembly in assemblies)
         {
@@ -110,6 +119,7 @@ public sealed class PluginLoader
                     if (instance is not null)
                     {
                         _contextRegistry.Register(instance);
+                        instances.Add(instance);
                         _logger.LogInformation("Registered node context '{ContextType}' from plugin.", type.FullName);
                     }
                 }
@@ -119,6 +129,8 @@ public sealed class PluginLoader
                 }
             }
         }
+
+        return instances;
     }
 
     public Task<IReadOnlyList<INodePlugin>> LoadPluginsAsync(
@@ -168,6 +180,21 @@ public sealed class PluginLoader
                 _logger.LogWarning(ex, "Plugin '{PluginId}' threw during unload.", pluginId);
             }
 
+            if (_contextRegistry is not null && entry.ContextInstances.Count > 0)
+            {
+                foreach (var context in entry.ContextInstances)
+                {
+                    _contextRegistry.Unregister(context);
+                }
+            }
+
+            if (entry.ProviderDefinitions.Count > 0)
+            {
+                _registry.RemoveDefinitions(entry.ProviderDefinitions);
+            }
+
+            _registry.RemoveDefinitionsFromAssembly(entry.Assembly);
+
             _serviceRegistry.RemoveServices(pluginId);
 
             try
@@ -199,6 +226,21 @@ public sealed class PluginLoader
             {
                 _logger.LogWarning(ex, "Plugin '{PluginId}' threw during unload.", pluginId);
             }
+
+            if (_contextRegistry is not null && entry.ContextInstances.Count > 0)
+            {
+                foreach (var context in entry.ContextInstances)
+                {
+                    _contextRegistry.Unregister(context);
+                }
+            }
+
+            if (entry.ProviderDefinitions.Count > 0)
+            {
+                _registry.RemoveDefinitions(entry.ProviderDefinitions);
+            }
+
+            _registry.RemoveDefinitionsFromAssembly(entry.Assembly);
 
             _serviceRegistry.RemoveServices(pluginId);
 
@@ -281,11 +323,9 @@ public sealed class PluginLoader
                 }
 
                 plugins.Add(plugin);
-                _loadedPlugins[plugin.Id] = new LoadedPlugin(plugin, loadContext);
+                var contexts = RegisterNodeContextsFromAssembly(new[] { assembly });
+                _loadedPlugins[plugin.Id] = new LoadedPlugin(plugin, loadContext, assembly, contexts);
                 _logger.LogInformation("Plugin '{PluginId}' loaded from '{AssemblyPath}'.", plugin.Id, candidate.AssemblyPath);
-
-                // Register node contexts from this assembly
-                RegisterNodeContextsFromAssembly(new[] { assembly });
             }
             catch (Exception ex)
             {
@@ -370,7 +410,22 @@ public sealed class PluginLoader
 
     private sealed record PluginCandidate(string AssemblyPath, PluginManifest? Manifest);
 
-    private sealed record LoadedPlugin(INodePlugin Plugin, PluginLoadContext LoadContext);
+    private sealed class LoadedPlugin
+    {
+        public LoadedPlugin(INodePlugin plugin, PluginLoadContext loadContext, Assembly assembly, List<object> contextInstances)
+        {
+            Plugin = plugin;
+            LoadContext = loadContext;
+            Assembly = assembly;
+            ContextInstances = contextInstances;
+        }
+
+        public INodePlugin Plugin { get; }
+        public PluginLoadContext LoadContext { get; }
+        public Assembly Assembly { get; }
+        public List<object> ContextInstances { get; }
+        public List<NodeDefinition> ProviderDefinitions { get; } = new();
+    }
 
     private static IEnumerable<Type> SafeGetTypes(Assembly assembly)
     {

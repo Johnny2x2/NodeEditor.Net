@@ -22,8 +22,9 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Find all plugin projects (projects with plugin.json)
 $PluginProjects = @(
     "NodeEditor.Plugins.Sample\NodeEditor.Plugins.Sample.csproj",
-    "NodeEditor.Plugins.LlmTornado\NodeEditor.Plugins.LlmTornado.csproj",
-    "NodeEditor.Plugins.OpenCv2\NodeEditor.Plugins.OpenCv2.csproj"
+    "NodeEditor.Plugins.OpenCv2\NodeEditor.Plugins.OpenCv2.csproj",
+    "NodeEditor.Plugins.TestA\NodeEditor.Plugins.TestA.csproj",
+    "NodeEditor.Plugins.TestB\NodeEditor.Plugins.TestB.csproj"
 )
 
 Write-Host "Publishing all plugins to local repository..." -ForegroundColor Cyan

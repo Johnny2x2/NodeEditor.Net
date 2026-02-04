@@ -71,6 +71,53 @@ public sealed class NodeRegistryService
         _initialized = true;
     }
 
+    public int RemoveDefinitions(IEnumerable<NodeDefinition> definitions)
+    {
+        if (definitions is null)
+        {
+            throw new ArgumentNullException(nameof(definitions));
+        }
+
+        var ids = new HashSet<string>(definitions.Select(d => d.Id), StringComparer.Ordinal);
+        if (ids.Count == 0)
+        {
+            return 0;
+        }
+
+        var removed = 0;
+        lock (_lock)
+        {
+            for (var i = _definitions.Count - 1; i >= 0; i--)
+            {
+                if (!ids.Contains(_definitions[i].Id))
+                {
+                    continue;
+                }
+
+                _definitions.RemoveAt(i);
+                removed++;
+            }
+        }
+
+        if (removed > 0)
+        {
+            RegistryChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        return removed;
+    }
+
+    public int RemoveDefinitionsFromAssembly(Assembly assembly)
+    {
+        if (assembly is null)
+        {
+            throw new ArgumentNullException(nameof(assembly));
+        }
+
+        var discovered = _discovery.DiscoverFromAssemblies(new[] { assembly });
+        return RemoveDefinitions(discovered);
+    }
+
     public NodeCatalog GetCatalog(string? search = null)
     {
         var definitions = Definitions;

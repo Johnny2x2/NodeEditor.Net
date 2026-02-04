@@ -20,8 +20,6 @@
 .EXAMPLE
     ./publish-plugin.ps1 -PluginProject NodeEditor.Plugins.Sample/NodeEditor.Plugins.Sample.csproj
     
-.EXAMPLE
-    ./publish-plugin.ps1 -PluginProject NodeEditor.Plugins.LlmTornado/NodeEditor.Plugins.LlmTornado.csproj -Configuration Debug
 #>
 
 param(
