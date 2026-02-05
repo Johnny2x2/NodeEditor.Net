@@ -88,3 +88,31 @@ public sealed class ZoomChangedEventArgs : EventArgs
     public double PreviousZoom { get; }
     public double CurrentZoom { get; }
 }
+
+/// <summary>
+/// Event args for graph variable changes.
+/// </summary>
+public sealed class GraphVariableEventArgs : EventArgs
+{
+    public GraphVariableEventArgs(GraphVariable variable)
+    {
+        Variable = variable;
+    }
+
+    public GraphVariable Variable { get; }
+}
+
+/// <summary>
+/// Event args for graph variable updates (rename, type change, default value change).
+/// </summary>
+public sealed class GraphVariableChangedEventArgs : EventArgs
+{
+    public GraphVariableChangedEventArgs(GraphVariable previousVariable, GraphVariable currentVariable)
+    {
+        PreviousVariable = previousVariable;
+        CurrentVariable = currentVariable;
+    }
+
+    public GraphVariable PreviousVariable { get; }
+    public GraphVariable CurrentVariable { get; }
+}

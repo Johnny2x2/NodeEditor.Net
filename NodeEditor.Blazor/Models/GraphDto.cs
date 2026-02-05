@@ -5,7 +5,8 @@ public sealed record class GraphDto(
     List<NodeDto> Nodes,
     List<ConnectionDto> Connections,
     ViewportDto Viewport,
-    List<string> SelectedNodeIds);
+    List<string> SelectedNodeIds,
+    List<GraphVariableDto>? Variables = null);
 
 public sealed record class NodeDto(
     string Id,
@@ -33,3 +34,9 @@ public sealed record class ViewportDto(
     double Width,
     double Height,
     double Zoom);
+
+public sealed record class GraphVariableDto(
+    string Id,
+    string Name,
+    string TypeName,
+    SocketValue? DefaultValue = null);

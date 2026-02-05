@@ -84,7 +84,8 @@
                 OnToggleSelectNode();
                 return;
             }
-            else
+
+            if (!Node.IsSelected)
             {
                 OnSelectNode();
             }

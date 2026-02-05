@@ -84,6 +84,9 @@ public static class NodeEditorServiceExtensions
         // Register serialization services
         services.AddSingleton<GraphSchemaMigrator>();
         services.AddScoped<GraphSerializer>();
+
+        // Register variable node factory (bridges graph variables to node definitions)
+        services.AddScoped<VariableNodeFactory>();
         
         return services;
     }
@@ -146,6 +149,9 @@ public static class NodeEditorServiceExtensions
 
         services.AddSingleton<GraphSchemaMigrator>();
         services.AddScoped<GraphSerializer>();
+
+        // Register variable node factory (bridges graph variables to node definitions)
+        services.AddScoped<VariableNodeFactory>();
         
         return services;
     }

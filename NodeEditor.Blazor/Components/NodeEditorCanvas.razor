@@ -6,6 +6,7 @@
 @inject ConnectionValidator ConnectionValidator
 @inject TouchGestureHandler TouchGestures
 @inject ViewportCuller ViewportCuller
+@inject NodeRegistryService _registry
 
 <div class="ne-canvas"
      @ref="_canvasRef"
@@ -17,6 +18,10 @@
      @onkeydown="OnKeyDown"
      @oncontextmenu="OnContextMenu"
      @oncontextmenu:preventDefault
+     @ondragover="OnDragOver"
+     @ondragover:preventDefault
+     @ondrop="OnDrop"
+     @ondrop:preventDefault
      @ontouchstart="OnTouchStart"
      @ontouchmove="OnTouchMove"
      @ontouchend="OnTouchEnd"
@@ -107,6 +112,9 @@
     private bool _isTouchGesture;
     private double _touchZoomBase = 1.0;
 
+    // Variable drag-and-drop state (set via VariablesPanel callback)
+    private VariableDragData? _pendingVariableDrag;
+
     private Point2D _canvasScreenOffset = Point2D.Zero;
 
     private IReadOnlyList<NodeViewModel> _visibleNodes = Array.Empty<NodeViewModel>();
@@ -125,6 +133,15 @@
 
     [Parameter]
     public double ZoomStep { get; set; } = 0.1;
+
+    /// <summary>
+    /// Call this method from the parent when the VariablesPanel raises its OnVariableDrag callback
+    /// to inform the canvas which variable is being dragged.
+    /// </summary>
+    public void SetPendingVariableDrag(VariableDragData? data)
+    {
+        _pendingVariableDrag = data;
+    }
 
     private string ViewportTransformStyle =>
         $"transform: translate({_panOffset.X}px, {_panOffset.Y}px) scale({_zoom});";
@@ -512,6 +529,51 @@
     private void CloseContextMenu()
     {
         _isContextMenuOpen = false;
+    }
+
+    // ===== Variable Drag & Drop =====
+
+    private void OnDragOver(DragEventArgs e)
+    {
+        // Allow drop only if we have a pending variable drag
+        if (_pendingVariableDrag is not null)
+        {
+            e.DataTransfer.DropEffect = "copy";
+        }
+    }
+
+    private async Task OnDrop(DragEventArgs e)
+    {
+        if (_pendingVariableDrag is null) return;
+
+        await UpdateCanvasScreenOffsetAsync();
+
+        var canvasPoint = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
+        var graphPosition = CoordinateConverter.ScreenToGraph(canvasPoint);
+
+        var variableId = _pendingVariableDrag.VariableId;
+        var variable = State.FindVariable(variableId);
+        _pendingVariableDrag = null;
+
+        if (variable is null) return;
+
+        // Hold Alt key to create a Set node, otherwise create a Get node
+        var isSetNode = e.AltKey;
+        var definitionId = isSetNode ? variable.SetDefinitionId : variable.GetDefinitionId;
+
+        // Find the matching definition from the registry
+        var definition = _registry?.Definitions.FirstOrDefault(
+            d => d.Id.Equals(definitionId, StringComparison.Ordinal));
+
+        if (definition is null) return;
+
+        var nodeData = definition.Factory();
+        var nodeViewModel = new NodeViewModel(nodeData)
+        {
+            Position = graphPosition
+        };
+
+        State.AddNode(nodeViewModel);
     }
 
     // ===== Touch Event Handlers =====

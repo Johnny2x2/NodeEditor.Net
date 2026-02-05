@@ -40,7 +40,8 @@ public sealed class GraphSerializer
                 state.Viewport.Width,
                 state.Viewport.Height,
                 state.Zoom),
-            SelectedNodeIds: state.SelectedNodeIds.ToList());
+            SelectedNodeIds: state.SelectedNodeIds.ToList(),
+            Variables: state.Variables.Select(ToDto).ToList());
     }
 
     public GraphImportResult Import(NodeEditorState state, GraphDto dto)
@@ -69,8 +70,17 @@ public sealed class GraphSerializer
         var nodes = dto.Nodes ?? new List<NodeDto>();
         var connections = dto.Connections ?? new List<ConnectionDto>();
         var selected = dto.SelectedNodeIds ?? new List<string>();
+        var variables = dto.Variables ?? new List<GraphVariableDto>();
 
         state.Clear();
+
+        // Import variables first so that VariableNodeFactory can register definitions
+        // before nodes referencing them are created
+        foreach (var varDto in variables)
+        {
+            var variable = new GraphVariable(varDto.Id, varDto.Name, varDto.TypeName, varDto.DefaultValue);
+            state.AddVariable(variable);
+        }
 
         var nodeMap = new Dictionary<string, NodeViewModel>(StringComparer.Ordinal);
         foreach (var nodeDto in nodes)
@@ -261,5 +271,14 @@ public sealed class GraphSerializer
             connection.InputNodeId,
             connection.InputSocketName,
             connection.IsExecution);
+    }
+
+    private static GraphVariableDto ToDto(GraphVariable variable)
+    {
+        return new GraphVariableDto(
+            variable.Id,
+            variable.Name,
+            variable.TypeName,
+            variable.DefaultValue);
     }
 }

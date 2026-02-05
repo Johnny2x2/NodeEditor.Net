@@ -13,6 +13,7 @@
 @inject NodeExecutionService ExecutionService
 @inject NodeRegistryService Registry
 @inject GraphSerializer GraphSerializer
+@inject VariableNodeFactory VariableNodeFactory
 @inject HttpClient Http
 
 <PageTitle>Node Editor</PageTitle>
@@ -20,6 +21,7 @@
 <div class="node-editor-toolbar">
 	<button @onclick="StartExecutionAsync" disabled="@_isExecuting">Start</button>
 	<button @onclick="StopExecution" disabled="@(!_isExecuting)">Stop</button>
+	<button @onclick="CreateNewGraph" disabled="@_isExecuting">New</button>
 	<select @bind="_selectedPreset" disabled="@_isExecuting">
 		@foreach (var preset in _presets)
 		{
@@ -43,12 +45,14 @@
 <PluginManagerDialog @bind-IsOpen="_isPluginManagerOpen" OnClosed="OnPluginManagerClosed" />
 
 <NodePropertiesPanel State="EditorState" />
+<VariablesPanel State="EditorState" OnVariableDrag="OnVariableDragStarted" />
 
 <div class="node-editor-container">
-	<NodeEditorCanvas State="EditorState" />
+	<NodeEditorCanvas @ref="_canvasRef" State="EditorState" />
 </div>
 
 @code {
+	private NodeEditorCanvas? _canvasRef;
 	private CancellationTokenSource? _executionCts;
 	private bool _isExecuting;
 	private string _executionStatus = "Idle";
@@ -62,15 +66,13 @@
 		new GraphPreset("Parallel Split/Join", "graphs/parallel.json")
 	};
 
-	protected override async Task OnInitializedAsync()
+	protected override void OnInitialized()
 	{
 		Registry.RegisterFromAssembly(typeof(StandardNodeContext).Assembly);
 		_nodeContext = NodeContextFactory.CreateCompositeFromLoadedAssemblies();
 
-		if (EditorState.Nodes.Count == 0)
-		{
-			await LoadSelectedPresetAsync();
-		}
+		// Ensure the VariableNodeFactory is initialized (subscribes to state events)
+		_ = VariableNodeFactory;
 
 		ExecutionService.NodeStarted += OnNodeStarted;
 		ExecutionService.NodeCompleted += OnNodeCompleted;
@@ -78,6 +80,11 @@
 	}
 
 	private void OpenPluginManager() => _isPluginManagerOpen = true;
+
+	private void OnVariableDragStarted(VariableDragData data)
+	{
+		_canvasRef?.SetPendingVariableDrag(data);
+	}
 
 	private void OnPluginManagerClosed()
 	{
@@ -110,6 +117,10 @@
 		_executionCts = new CancellationTokenSource();
 
 		var context = new NodeExecutionContext();
+
+		// Seed graph variables into the execution context
+		VariableNodeExecutor.SeedVariables(context, EditorState.Variables);
+
 		var executionNodes = EditorState.BuildExecutionNodes();
 
 		try
@@ -176,6 +187,14 @@
 
 		_executionStatus = "Canceling";
 		_executionCts?.Cancel();
+	}
+
+	private void CreateNewGraph()
+	{
+		EditorState.Clear();
+		EditorState.ResetNodeExecutionState();
+		_executionStatus = "Idle";
+		_loadStatus = "New graph.";
 	}
 
 	private async Task LoadSelectedPresetAsync()

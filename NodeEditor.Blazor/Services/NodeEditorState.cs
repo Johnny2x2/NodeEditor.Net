@@ -105,6 +105,21 @@ public sealed class NodeEditorState
     public event EventHandler? RedoRequested;
 
     /// <summary>
+    /// Raised when a graph variable is added.
+    /// </summary>
+    public event EventHandler<GraphVariableEventArgs>? VariableAdded;
+
+    /// <summary>
+    /// Raised when a graph variable is removed.
+    /// </summary>
+    public event EventHandler<GraphVariableEventArgs>? VariableRemoved;
+
+    /// <summary>
+    /// Raised when a graph variable is updated (name, type, or default value changed).
+    /// </summary>
+    public event EventHandler<GraphVariableChangedEventArgs>? VariableChanged;
+
+    /// <summary>
     /// Gets the collection of all nodes in the editor.
     /// Note: Use AddNode() and RemoveNode() methods instead of modifying this collection directly
     /// to ensure events are raised properly.
@@ -117,6 +132,13 @@ public sealed class NodeEditorState
     /// directly to ensure events are raised properly.
     /// </summary>
     public ObservableCollection<ConnectionData> Connections { get; } = new();
+
+    /// <summary>
+    /// Gets the collection of all graph variables.
+    /// Note: Use AddVariable(), RemoveVariable(), and UpdateVariable() methods instead of
+    /// modifying this collection directly to ensure events are raised properly.
+    /// </summary>
+    public ObservableCollection<GraphVariable> Variables { get; } = new();
 
     /// <summary>
     /// Gets the set of IDs for currently selected nodes.
@@ -603,6 +625,120 @@ public sealed class NodeEditorState
     /// </summary>
     public void RequestRedo() => RedoRequested?.Invoke(this, EventArgs.Empty);
 
+    // ===== Graph Variables =====
+
+    /// <summary>
+    /// Adds a graph variable.
+    /// </summary>
+    public void AddVariable(GraphVariable variable)
+    {
+        if (variable is null) throw new ArgumentNullException(nameof(variable));
+        Variables.Add(variable);
+        VariableAdded?.Invoke(this, new GraphVariableEventArgs(variable));
+    }
+
+    /// <summary>
+    /// Removes a graph variable by its ID. Also removes any Get/Set Variable nodes referencing it.
+    /// </summary>
+    public void RemoveVariable(string variableId)
+    {
+        var variable = Variables.FirstOrDefault(v => v.Id == variableId);
+        if (variable is null) return;
+
+        // Remove any nodes that reference this variable
+        var getDefId = variable.GetDefinitionId;
+        var setDefId = variable.SetDefinitionId;
+        var nodesToRemove = Nodes
+            .Where(n => n.Data.DefinitionId == getDefId || n.Data.DefinitionId == setDefId)
+            .Select(n => n.Data.Id)
+            .ToList();
+        foreach (var nodeId in nodesToRemove)
+        {
+            RemoveNode(nodeId);
+        }
+
+        Variables.Remove(variable);
+        VariableRemoved?.Invoke(this, new GraphVariableEventArgs(variable));
+    }
+
+    /// <summary>
+    /// Updates an existing graph variable (rename, type change, default value).
+    /// Existing Get/Set nodes are updated to reflect the new name.
+    /// </summary>
+    public void UpdateVariable(GraphVariable updated)
+    {
+        if (updated is null) throw new ArgumentNullException(nameof(updated));
+
+        var index = -1;
+        for (var i = 0; i < Variables.Count; i++)
+        {
+            if (Variables[i].Id == updated.Id)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0) return;
+
+        var previous = Variables[index];
+        Variables[index] = updated;
+
+        // If type changed, disconnect invalid connections on referencing nodes
+        if (previous.TypeName != updated.TypeName)
+        {
+            var getDefId = updated.GetDefinitionId;
+            var setDefId = updated.SetDefinitionId;
+            var affectedNodes = Nodes
+                .Where(n => n.Data.DefinitionId == getDefId || n.Data.DefinitionId == setDefId)
+                .ToList();
+
+            foreach (var node in affectedNodes)
+            {
+                RemoveConnectionsToNode(node.Data.Id);
+            }
+        }
+
+        // Update node names if renamed by replacing the node VM
+        if (previous.Name != updated.Name)
+        {
+            var getDefId = updated.GetDefinitionId;
+            var setDefId = updated.SetDefinitionId;
+            var nodesToRebuild = Nodes
+                .Where(n => n.Data.DefinitionId == getDefId || n.Data.DefinitionId == setDefId)
+                .ToList();
+
+            foreach (var oldNode in nodesToRebuild)
+            {
+                var isGet = oldNode.Data.DefinitionId == getDefId;
+                var newName = isGet ? "Get " + updated.Name : "Set " + updated.Name;
+                var newData = oldNode.Data with { Name = newName };
+                var newNode = new NodeViewModel(newData)
+                {
+                    Position = oldNode.Position,
+                    Size = oldNode.Size,
+                    IsSelected = oldNode.IsSelected
+                };
+
+                var idx = Nodes.IndexOf(oldNode);
+                if (idx >= 0)
+                {
+                    Nodes[idx] = newNode;
+                }
+            }
+        }
+
+        VariableChanged?.Invoke(this, new GraphVariableChangedEventArgs(previous, updated));
+    }
+
+    /// <summary>
+    /// Finds a graph variable by its ID.
+    /// </summary>
+    public GraphVariable? FindVariable(string variableId)
+    {
+        return Variables.FirstOrDefault(v => v.Id == variableId);
+    }
+
     /// <summary>
     /// Clears all nodes, connections, selections, and resets viewport/zoom.
     /// </summary>
@@ -616,6 +752,7 @@ public sealed class NodeEditorState
 
         ClearSelectionInternal();
         ClearConnectionSelection();
+        Variables.Clear();
         Viewport = new Rect2D(0, 0, 0, 0);
         Zoom = 1.0;
     }

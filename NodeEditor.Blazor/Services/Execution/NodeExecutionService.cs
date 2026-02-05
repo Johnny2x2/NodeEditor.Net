@@ -281,6 +281,14 @@ public sealed class NodeExecutionService
 
             await ResolveInputsAsync(node, connections, nodeMap, context, invoker, feedbackContext, token).ConfigureAwait(false);
 
+            // Handle variable nodes (Get/Set Variable) which have no method binding
+            if (VariableNodeExecutor.IsVariableNode(node))
+            {
+                VariableNodeExecutor.Execute(node, context);
+                NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
+                return;
+            }
+
             var binding = invoker.Resolve(node);
             if (binding is null)
             {

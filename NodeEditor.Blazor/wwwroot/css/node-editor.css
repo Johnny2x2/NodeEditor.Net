@@ -1507,3 +1507,258 @@
     font-size: 13px;
     color: #c8cff5;
 }
+
+/* ============================================
+   Variables Panel
+   ============================================ */
+.ne-variables-panel {
+    position: fixed;
+    top: 48px;
+    left: 12px;
+    width: 230px;
+    max-height: calc(100vh - 72px);
+    overflow: auto;
+    background: rgba(30, 30, 46, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    padding: 10px 12px;
+    color: #e0e0f0;
+    z-index: 12;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.ne-variables-panel--collapsed {
+    width: auto;
+    min-width: 110px;
+}
+
+.ne-variables-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    user-select: none;
+}
+
+.ne-variables-header-icon {
+    font-size: 9px;
+    width: 12px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.ne-variables-add-btn {
+    margin-left: auto;
+    background: rgba(100, 180, 255, 0.15);
+    color: #7cb8ff;
+    border: 1px solid rgba(100, 180, 255, 0.25);
+    border-radius: 4px;
+    width: 22px;
+    height: 22px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.ne-variables-add-btn:hover {
+    background: rgba(100, 180, 255, 0.25);
+    border-color: rgba(100, 180, 255, 0.5);
+}
+
+.ne-variables-empty {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    padding: 8px 0;
+    text-align: center;
+}
+
+/* Add form */
+.ne-variables-add-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ne-variables-input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #e0e0f0;
+    padding: 5px 8px;
+    font-size: 12px;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.ne-variables-input:focus {
+    border-color: rgba(100, 180, 255, 0.4);
+}
+
+.ne-variables-input--inline {
+    padding: 2px 5px;
+    font-size: 11px;
+    flex: 1;
+    min-width: 0;
+}
+
+.ne-variables-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #e0e0f0;
+    padding: 4px 6px;
+    font-size: 11px;
+    outline: none;
+}
+
+.ne-variables-add-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.ne-variables-btn {
+    flex: 1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.15s;
+}
+
+.ne-variables-btn--confirm {
+    background: rgba(100, 200, 120, 0.2);
+    color: #7ccc8a;
+    border-color: rgba(100, 200, 120, 0.25);
+}
+
+.ne-variables-btn--confirm:hover {
+    background: rgba(100, 200, 120, 0.35);
+}
+
+.ne-variables-btn--cancel {
+    background: rgba(255, 100, 100, 0.12);
+    color: #e08888;
+    border-color: rgba(255, 100, 100, 0.2);
+}
+
+.ne-variables-btn--cancel:hover {
+    background: rgba(255, 100, 100, 0.25);
+}
+
+/* Variable list items */
+.ne-variables-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ne-variables-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    cursor: grab;
+    transition: background 0.12s, border-color 0.12s;
+    user-select: none;
+}
+
+.ne-variables-item:hover {
+    background: rgba(100, 180, 255, 0.08);
+    border-color: rgba(100, 180, 255, 0.15);
+}
+
+.ne-variables-item:active {
+    cursor: grabbing;
+    background: rgba(100, 180, 255, 0.15);
+}
+
+.ne-variables-name {
+    flex: 1;
+    font-size: 11px;
+    font-weight: 500;
+    color: #d0d8f0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* Type badges */
+.ne-variables-type-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+}
+
+.ne-variables-type-badge--number {
+    background: rgba(100, 180, 255, 0.15);
+    color: #7cb8ff;
+}
+
+.ne-variables-type-badge--int {
+    background: rgba(100, 200, 120, 0.15);
+    color: #88cc88;
+}
+
+.ne-variables-type-badge--string {
+    background: rgba(255, 140, 180, 0.15);
+    color: #ffaacc;
+}
+
+.ne-variables-type-badge--bool {
+    background: rgba(255, 100, 100, 0.15);
+    color: #ff8888;
+}
+
+.ne-variables-type-badge--object {
+    background: rgba(180, 180, 180, 0.15);
+    color: #aaaaaa;
+}
+
+.ne-variables-type-badge--unknown {
+    background: rgba(255, 220, 100, 0.15);
+    color: #ddcc66;
+}
+
+.ne-variables-delete-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px;
+    border-radius: 3px;
+    transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+}
+
+.ne-variables-delete-btn:hover {
+    color: #ff6666;
+    background: rgba(255, 100, 100, 0.12);
+}
