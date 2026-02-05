@@ -1628,6 +1628,12 @@
     outline: none;
 }
 
+.ne-variables-select--inline {
+    max-width: 86px;
+    padding: 2px 4px;
+    font-size: 10px;
+}
+
 .ne-variables-add-actions {
     display: flex;
     gap: 6px;
@@ -1761,4 +1767,12 @@
 .ne-variables-delete-btn:hover {
     color: #ff6666;
     background: rgba(255, 100, 100, 0.12);
+}
+
+.ne-variables-editor {
+    margin: 4px 0 10px 0;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }

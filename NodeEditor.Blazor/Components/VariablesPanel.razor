@@ -1,6 +1,9 @@
 @using NodeEditor.Blazor.Models
+@using NodeEditor.Blazor.Services.Editors
 @using NodeEditor.Blazor.ViewModels
 @implements IDisposable
+
+@inject NodeEditorCustomEditorRegistry EditorRegistry
 
 <div class="ne-variables-panel @(_isCollapsed ? "ne-variables-panel--collapsed" : "")">
     <div class="ne-variables-header" @onclick="ToggleCollapse">
@@ -65,6 +68,15 @@
                         </span>
                     }
 
+                    <select class="ne-variables-select ne-variables-select--inline"
+                            @onchange="@(e => OnVariableTypeChanged(variable, e?.Value?.ToString()))">
+                        <option value="System.Double" selected="@(variable.TypeName == "System.Double")">Number</option>
+                        <option value="System.Int32" selected="@(variable.TypeName == "System.Int32")">Integer</option>
+                        <option value="System.String" selected="@(variable.TypeName == "System.String")">String</option>
+                        <option value="System.Boolean" selected="@(variable.TypeName == "System.Boolean")">Boolean</option>
+                        <option value="System.Object" selected="@(variable.TypeName == "System.Object")">Object</option>
+                    </select>
+
                     <span class="ne-variables-type-badge ne-variables-type-badge--@GetTypeClass(variable.TypeName)">
                         @GetTypeFriendlyName(variable.TypeName)
                     </span>
@@ -73,6 +85,10 @@
                             @onclick="@(() => DeleteVariable(variable.Id))"
                             @onclick:stopPropagation="true"
                             title="Delete variable">✕</button>
+                </div>
+
+                <div class="ne-variables-editor">
+                    @RenderVariableEditor(variable)
                 </div>
             }
         </div>
@@ -244,4 +260,60 @@
         "System.Object" => "object",
         _ => "unknown"
     };
+
+    private RenderFragment RenderVariableEditor(GraphVariable variable)
+    {
+        var socketData = new SocketData(
+            Name: "Value",
+            TypeName: variable.TypeName,
+            IsInput: true,
+            IsExecution: false,
+            Value: variable.DefaultValue);
+
+        var socketVm = new SocketViewModel(socketData);
+
+        var nodeData = new NodeData(
+            Id: variable.Id,
+            Name: "Variable",
+            Callable: false,
+            ExecInit: false,
+            Inputs: new[] { socketData },
+            Outputs: Array.Empty<SocketData>());
+
+        var nodeVm = new NodeViewModel(nodeData);
+
+        var editor = EditorRegistry.GetEditor(socketData);
+        if (editor is null)
+        {
+            return builder => builder.AddContent(0, "No editor");
+        }
+
+        var context = new SocketEditorContext
+        {
+            Socket = socketVm,
+            Node = nodeVm,
+            SetValue = value =>
+            {
+                var updated = variable with { DefaultValue = SocketValue.FromObject(value) };
+                State.UpdateVariable(updated);
+            }
+        };
+
+        return editor.Render(context);
+    }
+
+    private void OnVariableTypeChanged(GraphVariable variable, string? typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName) || variable.TypeName == typeName)
+        {
+            return;
+        }
+
+        var updated = variable with
+        {
+            TypeName = typeName,
+            DefaultValue = GetDefaultValueForType(typeName)
+        };
+        State.UpdateVariable(updated);
+    }
 }
