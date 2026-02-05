@@ -27,6 +27,10 @@ param(
     [string]$PluginProject,
     
     [string]$RepositoryPath = "./plugin-repository",
+
+    [string]$PackageOutputPath = "./plugin-packages",
+
+    [bool]$CreateZip = $true,
     
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release"
@@ -105,6 +109,41 @@ Copy-Item -Path $ManifestPath -Destination $PluginRepoDir -Force
 $MarketplaceManifest = Join-Path $ProjectDir "plugin-marketplace.json"
 if (Test-Path $MarketplaceManifest) {
     Copy-Item -Path $MarketplaceManifest -Destination $PluginRepoDir -Force
+} else {
+    Write-Host "plugin-marketplace.json not found. Generating default metadata..." -ForegroundColor Yellow
+    $NowUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $Category = if ($Manifest.category) { $Manifest.category } else { "General" }
+    $Marketplace = [ordered]@{
+        author = "TODO"
+        description = "TODO: Short description for $PluginName."
+        longDescription = "# $PluginName`n`nTODO: Full description and usage."
+        category = $Category
+        tags = @("plugin")
+        homepageUrl = ""
+        repositoryUrl = ""
+        license = "MIT"
+        releaseNotes = "Initial release."
+        publishedAt = $NowUtc
+        lastUpdatedAt = $NowUtc
+    }
+
+    $MarketplaceRepoPath = Join-Path $PluginRepoDir "plugin-marketplace.json"
+    $Marketplace | ConvertTo-Json -Depth 6 | Out-File -FilePath $MarketplaceRepoPath -Encoding utf8
+}
+
+if ($CreateZip) {
+    $PackageOutputPath = [System.IO.Path]::GetFullPath($PackageOutputPath)
+    $PackageDir = Join-Path $PackageOutputPath $ProjectName
+    New-Item -ItemType Directory -Path $PackageDir -Force | Out-Null
+    $ZipName = "$ProjectName-$($Manifest.version).zip"
+    $ZipPath = Join-Path $PackageDir $ZipName
+
+    if (Test-Path $ZipPath) {
+        Remove-Item -Path $ZipPath -Force
+    }
+
+    Compress-Archive -Path (Join-Path $PluginRepoDir "*") -DestinationPath $ZipPath -Force
+    Write-Host "  Package: $ZipPath" -ForegroundColor Gray
 }
 
 Write-Host "`n✓ Published '$PluginName' (v$($Manifest.version)) to local repository" -ForegroundColor Green

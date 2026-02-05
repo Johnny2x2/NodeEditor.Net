@@ -1,0 +1,19 @@
+<textarea class="ne-editor-input ne-editor-textarea"
+          @oninput="OnInput"
+          @onpointerdown:stopPropagation
+          @onclick:stopPropagation
+          placeholder="@Placeholder">@CurrentValue</textarea>
+
+@code {
+    [Parameter, EditorRequired]
+    public SocketEditorContext Context { get; set; } = null!;
+
+    private string CurrentValue => Context.GetStringValue() ?? string.Empty;
+
+    private string? Placeholder => Context.Socket.Data.EditorHint?.Placeholder;
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        Context.SetValueTyped(e.Value?.ToString());
+    }
+}

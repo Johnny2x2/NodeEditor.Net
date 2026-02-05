@@ -14,6 +14,12 @@ public sealed class ImageEditorDefinition : INodeCustomEditor
             return false;
         }
 
+        var hint = socket.EditorHint?.Kind;
+        if (hint is not null && hint != SocketEditorKind.Image)
+        {
+            return false;
+        }
+
         var typeName = socket.Value?.TypeName ?? socket.TypeName;
         if (string.IsNullOrEmpty(typeName))
         {
@@ -29,8 +35,9 @@ public sealed class ImageEditorDefinition : INodeCustomEditor
             return false;
         }
 
-        // Only match specific socket names for image paths
-        return socket.Name.Equals("ImagePath", StringComparison.Ordinal);
+         // Only match specific socket names for image paths
+         return socket.Name.Equals("ImagePath", StringComparison.Ordinal)
+             || hint == SocketEditorKind.Image;
     }
 
     public RenderFragment Render(SocketEditorContext context)

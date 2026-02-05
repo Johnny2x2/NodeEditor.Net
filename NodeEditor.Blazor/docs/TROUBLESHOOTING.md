@@ -702,23 +702,27 @@ Pan around the canvas and verify nodes appear/disappear smoothly at viewport edg
 ```csharp
 public class ColorPickerEditor : INodeCustomEditor
 {
-    public Type EditorComponentType => typeof(ColorPickerComponent);
-    
-    public bool CanEdit(Type socketType, string socketTypeName)
+    public bool CanEdit(SocketData socket)
     {
-        return socketType == typeof(Color) || 
-               socketTypeName == "Color";
+        return socket.TypeName == typeof(Color).FullName
+               && socket.IsInput
+               && !socket.IsExecution;
     }
+
+    public RenderFragment Render(SocketEditorContext context)
+        => builder =>
+        {
+            builder.OpenComponent<ColorPickerComponent>(0);
+            builder.AddAttribute(1, nameof(ColorPickerComponent.Context), context);
+            builder.CloseComponent();
+        };
 }
 ```
 
 **Step 2:** Register editor in services:
 
 ```csharp
-builder.Services.AddNodeEditor(config =>
-{
-    config.RegisterCustomEditor<ColorPickerEditor>();
-});
+services.AddSingleton<INodeCustomEditor, ColorPickerEditor>();
 ```
 
 **Step 3:** Create editor component:

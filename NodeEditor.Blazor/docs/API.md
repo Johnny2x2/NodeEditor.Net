@@ -22,6 +22,9 @@ Complete API reference for NodeEditor.Blazor library.
 - [Models](#models)
   - [NodeData](#nodedata)
   - [SocketData](#socketdata)
+    - [SocketEditorHint](#socketeditorhint)
+    - [SocketEditorKind](#socketeditorkind)
+    - [SocketEditorAttribute](#socketeditorattribute)
   - [ConnectionData](#connectiondata)
   - [GraphDto](#graphdto)
   - [Point2D, Size2D, Rect2D](#geometry-primitives)
@@ -543,8 +546,75 @@ public sealed record class SocketData(
     string TypeName,
     bool IsInput,
     bool IsExecution,
-    SocketValue? Value = null
+    SocketValue? Value = null,
+    SocketEditorHint? EditorHint = null
 );
+```
+
+---
+
+### SocketEditorHint
+
+Optional editor metadata for a socket, provided via `[SocketEditor]` on node parameters.
+
+**Namespace:** `NodeEditor.Blazor.Models`
+
+```csharp
+public sealed record class SocketEditorHint(
+    SocketEditorKind Kind,
+    string? Options = null,
+    double? Min = null,
+    double? Max = null,
+    double? Step = null,
+    string? Placeholder = null,
+    string? Label = null);
+```
+
+---
+
+### SocketEditorKind
+
+Editor types supported by the standard UI layer.
+
+**Namespace:** `NodeEditor.Blazor.Models`
+
+```csharp
+public enum SocketEditorKind
+{
+    Text,
+    Number,
+    Bool,
+    Dropdown,
+    Button,
+    Image,
+    NumberUpDown,
+    TextArea,
+    Custom
+}
+```
+
+---
+
+### SocketEditorAttribute
+
+Attribute for selecting a standard editor on node input parameters.
+
+**Namespace:** `NodeEditor.Blazor.Services.Execution`
+
+```csharp
+[AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
+public sealed class SocketEditorAttribute : Attribute
+{
+    public SocketEditorAttribute(SocketEditorKind kind);
+
+    public SocketEditorKind Kind { get; }
+    public string? Options { get; init; }
+    public double Min { get; init; }
+    public double Max { get; init; }
+    public double Step { get; init; }
+    public string? Placeholder { get; init; }
+    public string? Label { get; init; }
+}
 ```
 
 ---
@@ -705,9 +775,6 @@ Interface for creating custom socket value editors.
 ```csharp
 public interface INodeCustomEditor
 {
-    string TypeName { get; }
-    int Priority { get; }
-    
     bool CanEdit(SocketData socket);
     RenderFragment Render(SocketEditorContext context);
 }

@@ -1,0 +1,59 @@
+@using System.Globalization
+@inject NodeEditor.Blazor.Services.SocketTypeResolver TypeResolver
+
+<button class="ne-editor-button"
+        @onclick="OnClick"
+        @onpointerdown:stopPropagation
+        @onclick:stopPropagation>
+    @Label
+</button>
+
+@code {
+    [Parameter, EditorRequired]
+    public SocketEditorContext Context { get; set; } = null!;
+
+    private string Label => Context.Socket.Data.EditorHint?.Label
+        ?? Context.Socket.Data.Name
+        ?? "Button";
+
+    private void OnClick()
+    {
+        var resolvedType = TypeResolver.Resolve(Context.Socket.Data.TypeName);
+        if (resolvedType == typeof(bool))
+        {
+            var current = Context.GetValue<bool>() ?? false;
+            Context.SetValueTyped(!current);
+            return;
+        }
+
+        if (resolvedType is not null && IsNumericType(resolvedType))
+        {
+            var converted = Convert.ChangeType(1, resolvedType, CultureInfo.InvariantCulture);
+            Context.SetValueTyped(converted);
+            return;
+        }
+
+        if (resolvedType == typeof(string))
+        {
+            Context.SetValueTyped("Clicked");
+            return;
+        }
+
+        Context.SetValueTyped(true);
+    }
+
+    private static bool IsNumericType(Type type)
+    {
+        return type == typeof(byte)
+               || type == typeof(sbyte)
+               || type == typeof(short)
+               || type == typeof(ushort)
+               || type == typeof(int)
+               || type == typeof(uint)
+               || type == typeof(long)
+               || type == typeof(ulong)
+               || type == typeof(float)
+               || type == typeof(double)
+               || type == typeof(decimal);
+    }
+}

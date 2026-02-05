@@ -1,0 +1,75 @@
+@using System.Globalization
+@inject NodeEditor.Blazor.Services.SocketTypeResolver TypeResolver
+
+<select class="ne-editor-input ne-editor-select"
+        value="@CurrentValue"
+        @onchange="OnChange"
+        @onpointerdown:stopPropagation
+        @onclick:stopPropagation>
+    @if (!string.IsNullOrWhiteSpace(Placeholder))
+    {
+        <option value="">@Placeholder</option>
+    }
+    @foreach (var option in Options)
+    {
+        <option value="@option">@option</option>
+    }
+</select>
+
+@code {
+    [Parameter, EditorRequired]
+    public SocketEditorContext Context { get; set; } = null!;
+
+    private IReadOnlyList<string>? _options;
+
+    private string CurrentValue => Context.Value?.ToString() ?? string.Empty;
+
+    private string? Placeholder => Context.Socket.Data.EditorHint?.Placeholder;
+
+    private IReadOnlyList<string> Options => _options ??= BuildOptions();
+
+    private IReadOnlyList<string> BuildOptions()
+    {
+        var hintOptions = Context.Socket.Data.EditorHint?.Options;
+        if (!string.IsNullOrWhiteSpace(hintOptions))
+        {
+            return hintOptions
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+
+        var resolvedType = TypeResolver.Resolve(Context.Socket.Data.TypeName);
+        if (resolvedType?.IsEnum == true)
+        {
+            return Enum.GetNames(resolvedType);
+        }
+
+        return Array.Empty<string>();
+    }
+
+    private void OnChange(ChangeEventArgs e)
+    {
+        var selected = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(selected))
+        {
+            Context.SetValueTyped<object?>(null);
+            return;
+        }
+
+        var resolvedType = TypeResolver.Resolve(Context.Socket.Data.TypeName);
+        if (resolvedType?.IsEnum == true)
+        {
+            var parsed = Enum.Parse(resolvedType, selected);
+            Context.SetValueTyped(parsed);
+            return;
+        }
+
+        if (resolvedType is not null && resolvedType != typeof(string))
+        {
+            var converted = Convert.ChangeType(selected, resolvedType, CultureInfo.InvariantCulture);
+            Context.SetValueTyped(converted);
+            return;
+        }
+
+        Context.SetValueTyped(selected);
+    }
+}

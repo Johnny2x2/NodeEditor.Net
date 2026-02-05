@@ -21,15 +21,7 @@
             {
                 @foreach (var category in _catalog.Categories)
                 {
-                    <div class="ne-context-menu-category">
-                        <div class="ne-context-menu-category-title">@category.Name</div>
-                        <div class="ne-context-menu-category-items">
-                            @foreach (var definition in category.Nodes)
-                            {
-                                <ContextMenuItem Definition="definition" OnSelect="OnSelectDefinition" />
-                            }
-                        </div>
-                    </div>
+                    @RenderCategory(category, 0)
                 }
             }
         </div>
@@ -146,4 +138,48 @@
             await OnClose.InvokeAsync();
         }
     }
+
+    private RenderFragment RenderCategory(NodeCategoryGroup category, int depth) => builder =>
+    {
+        var seq = 0;
+        var categoryClass = depth == 0
+            ? "ne-context-menu-category"
+            : "ne-context-menu-category ne-context-menu-category--nested";
+
+        builder.OpenElement(seq++, "div");
+        builder.AddAttribute(seq++, "class", categoryClass);
+        builder.AddAttribute(seq++, "style", $"--ne-category-depth: {depth};");
+
+        builder.OpenElement(seq++, "div");
+        builder.AddAttribute(seq++, "class", "ne-context-menu-category-title");
+        builder.AddContent(seq++, category.Name);
+        builder.CloseElement();
+
+        if (category.Nodes.Count > 0)
+        {
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", "ne-context-menu-category-items");
+
+            foreach (var definition in category.Nodes)
+            {
+                builder.OpenComponent<ContextMenuItem>(seq++);
+                builder.AddAttribute(seq++, nameof(ContextMenuItem.Definition), definition);
+                builder.AddAttribute(seq++, nameof(ContextMenuItem.OnSelect),
+                    EventCallback.Factory.Create<NodeDefinition>(this, OnSelectDefinition));
+                builder.CloseComponent();
+            }
+
+            builder.CloseElement();
+        }
+
+        if (category.Children.Count > 0)
+        {
+            foreach (var child in category.Children)
+            {
+                builder.AddContent(seq++, RenderCategory(child, depth + 1));
+            }
+        }
+
+        builder.CloseElement();
+    };
 }

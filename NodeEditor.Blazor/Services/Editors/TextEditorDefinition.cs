@@ -13,6 +13,12 @@ public sealed class TextEditorDefinition : INodeCustomEditor
             return false;
         }
 
+        var hint = socket.EditorHint?.Kind;
+        if (hint is not null && hint != SocketEditorKind.Text)
+        {
+            return false;
+        }
+
         var typeName = socket.TypeName ?? string.Empty;
         return typeName.Equals("string", StringComparison.OrdinalIgnoreCase)
                || typeName.Equals(typeof(string).FullName, StringComparison.OrdinalIgnoreCase)

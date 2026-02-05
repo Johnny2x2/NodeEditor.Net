@@ -1085,10 +1085,10 @@ Implement `INodeCustomEditor`:
 ```csharp
 public class DatePickerEditor : INodeCustomEditor
 {
-    public bool CanEdit(Type socketType) 
-        => socketType == typeof(DateTime);
+    public bool CanEdit(SocketData socket)
+        => socket.TypeName == typeof(DateTime).FullName && socket.IsInput && !socket.IsExecution;
     
-    public RenderFragment CreateEditor(SocketEditorContext context)
+    public RenderFragment Render(SocketEditorContext context)
     {
         // Return Blazor RenderFragment
     }

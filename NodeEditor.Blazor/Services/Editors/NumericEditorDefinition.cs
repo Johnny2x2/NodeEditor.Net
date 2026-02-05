@@ -44,6 +44,12 @@ public sealed class NumericEditorDefinition : INodeCustomEditor
             return false;
         }
 
+        var hint = socket.EditorHint?.Kind;
+        if (hint is not null && hint != SocketEditorKind.Number)
+        {
+            return false;
+        }
+
         var typeName = socket.TypeName ?? string.Empty;
         return NumericTypeNames.Contains(typeName);
     }

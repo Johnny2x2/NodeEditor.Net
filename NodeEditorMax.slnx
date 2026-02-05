@@ -3,5 +3,5 @@
   <Project Path="NodeEditor.Blazor/NodeEditor.Blazor.csproj" />
   <Project Path="NodeEditor.Blazor.Tests/NodeEditor.Blazor.Tests.csproj" />
   <Project Path="NodeEditor.Plugins.Sample/NodeEditor.Plugins.Sample.csproj" />
-  <Project Path="NodeEditor.Plugins.OpenCv2/NodeEditor.Plugins.OpenCv2.csproj" />
+  <Project Path="NodeEditor.Plugins.Template/NodeEditor.Plugins.Template.csproj" />
 </Solution>

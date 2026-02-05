@@ -8,8 +8,9 @@ Learn how to create custom nodes and custom socket editors for NodeEditor.Blazor
 - [Part 1: Creating Your First Custom Node](#part-1-creating-your-first-custom-node)
 - [Part 2: Working with Execution Flow](#part-2-working-with-execution-flow)
 - [Part 3: Advanced Node Features](#part-3-advanced-node-features)
-- [Part 4: Custom Socket Editors](#part-4-custom-socket-editors)
-- [Part 5: Creating a Plugin](#part-5-creating-a-plugin)
+- [Part 4: Standard Socket Editors (Attribute-Based)](#part-4-standard-socket-editors-attribute-based)
+- [Part 5: Custom Socket Editors](#part-5-custom-socket-editors)
+- [Part 6: Creating a Plugin](#part-6-creating-a-plugin)
 - [Best Practices](#best-practices)
 
 ---
@@ -273,9 +274,34 @@ public void Clamp(double Value, double Min = 0, double Max = 1, out double Resul
 
 ---
 
-## Part 4: Custom Socket Editors
+## Part 4: Standard Socket Editors (Attribute-Based)
 
-Create custom UI for editing socket values.
+Use `[SocketEditor]` to select a built-in editor for an input socket. This keeps UIs consistent and avoids custom component code.
+
+```csharp
+using NodeEditor.Blazor.Models;
+using NodeEditor.Blazor.Services.Execution;
+
+[Node("Image Loader", category: "Media")]
+public void LoadImage(
+    [SocketEditor(SocketEditorKind.Image, Label = "Image Path")] string ImagePath,
+    [SocketEditor(SocketEditorKind.Dropdown, Options = "PNG,JPEG,BMP")] string Format,
+    [SocketEditor(SocketEditorKind.NumberUpDown, Min = 0, Max = 100, Step = 1)] int Quality,
+    out ExecutionPath Exit)
+{
+    Exit = default;
+}
+```
+
+Notes:
+- Enum-typed inputs automatically render as dropdowns without `[SocketEditor]`.
+- If an input is connected, editors remain hidden (same as existing behavior).
+
+---
+
+## Part 5: Custom Socket Editors
+
+Create custom UI for editing socket values when built-in editors aren't enough.
 
 ### Step 1: Implement INodeCustomEditor
 
@@ -289,9 +315,6 @@ namespace MyApp.Editors;
 
 public sealed class ColorEditorDefinition : INodeCustomEditor
 {
-    public string TypeName => "Color";
-    public int Priority => 100;
-
     public bool CanEdit(SocketData socket)
     {
         return socket.TypeName == "Color" && socket.IsInput && !socket.IsExecution;
@@ -332,14 +355,11 @@ public void SetColor(string Color, out string Result)
 }
 ```
 
-### Example: Slider Editor
+### Example: Slider Editor (Custom)
 
 ```csharp
 public sealed class SliderEditorDefinition : INodeCustomEditor
 {
-    public string TypeName => "SliderValue";
-    public int Priority => 100;
-
     public bool CanEdit(SocketData socket)
     {
         return socket.TypeName == "double" && 
@@ -386,14 +406,11 @@ public sealed class SliderEditorDefinition : INodeCustomEditor
 }
 ```
 
-### Example: Dropdown Editor
+### Example: Dropdown Editor (Custom)
 
 ```csharp
 public sealed class EnumEditorDefinition : INodeCustomEditor
 {
-    public string TypeName => "Enum";
-    public int Priority => 100;
-
     public bool CanEdit(SocketData socket)
     {
         return socket.TypeName.StartsWith("Enum:") && socket.IsInput;
@@ -429,7 +446,7 @@ public sealed class EnumEditorDefinition : INodeCustomEditor
 
 ---
 
-## Part 5: Creating a Plugin
+## Part 6: Creating a Plugin
 
 Package your custom nodes as a reusable plugin.
 

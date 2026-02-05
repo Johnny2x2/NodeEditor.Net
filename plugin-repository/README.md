@@ -9,6 +9,8 @@ Open the app, click "Plugins", and install any plugins you want.
 
 ## For Plugin Developers
 
+See the SDK guide: [docs/PLUGIN_SDK.md](../docs/PLUGIN_SDK.md)
+
 To publish your plugin to this repository:
 
 ```powershell
@@ -19,6 +21,12 @@ Or publish all plugins in the solution:
 
 ```powershell
 ./publish-all-plugins.ps1
+```
+
+The publish script also generates default marketplace metadata (if missing) and creates a ZIP package under:
+
+```
+plugin-packages/<ProjectName>/<ProjectName>-<version>.zip
 ```
 
 ## Plugin Structure

@@ -65,6 +65,11 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<INodeContextRegistry, NodeContextRegistry>();
 
         // Register custom editors
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.DropdownEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.NumberUpDownEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.TextAreaEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.ButtonEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.ImageEditorDefinition>();
         services.AddSingleton<Editors.INodeCustomEditor, Editors.TextEditorDefinition>();
         services.AddSingleton<Editors.INodeCustomEditor, Editors.NumericEditorDefinition>();
         services.AddSingleton<Editors.INodeCustomEditor, Editors.BoolEditorDefinition>();
@@ -124,6 +129,11 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<Registry.NodeDiscoveryService>();
         services.AddSingleton<Registry.NodeRegistryService>();
 
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.DropdownEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.NumberUpDownEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.TextAreaEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.ButtonEditorDefinition>();
+        services.AddSingleton<Editors.INodeCustomEditor, Editors.ImageEditorDefinition>();
         services.AddSingleton<Editors.INodeCustomEditor, Editors.TextEditorDefinition>();
         services.AddSingleton<Editors.INodeCustomEditor, Editors.NumericEditorDefinition>();
         services.AddSingleton<Editors.INodeCustomEditor, Editors.BoolEditorDefinition>();

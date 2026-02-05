@@ -33,7 +33,6 @@
       - Tests load them dynamically from plugins folder
     -->
     <ProjectReference Include="..\NodeEditor.Plugins.Sample\NodeEditor.Plugins.Sample.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\NodeEditor.Plugins.OpenCv2\NodeEditor.Plugins.OpenCv2.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <!-- Copy Sample plugin with all dependencies for testing -->
@@ -44,16 +43,6 @@
       <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\plugin.json" />
     </ItemGroup>
     <Copy SourceFiles="@(_SamplePluginFiles)" DestinationFolder="$(OutDir)plugins\Sample" SkipUnchangedFiles="true" />
-  </Target>
-
-  <!-- Copy OpenCv2 plugin with all dependencies for testing -->
-  <Target Name="CopyOpenCv2PluginForTests" AfterTargets="Build">
-    <ItemGroup>
-      <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\bin\$(Configuration)\$(TargetFramework)\*.deps.json" />
-      <_OpenCv2PluginFiles Include="..\NodeEditor.Plugins.OpenCv2\plugin.json" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_OpenCv2PluginFiles)" DestinationFolder="$(OutDir)plugins\OpenCv2" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

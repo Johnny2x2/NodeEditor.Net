@@ -100,7 +100,8 @@ public sealed class NodeDiscoveryService
 
             var isOut = parameter.IsOut || isByRef;
             var socketName = string.IsNullOrWhiteSpace(parameter.Name) ? $"arg{i}" : parameter.Name;
-            var socket = CreateSocket(socketName, paramType, isInput: !isOut);
+            var editorHint = BuildEditorHint(parameter);
+            var socket = CreateSocket(socketName, paramType, isInput: !isOut, editorHint);
 
             if (isOut)
             {
@@ -133,17 +134,39 @@ public sealed class NodeDiscoveryService
                 id));
     }
 
-    private static SocketData CreateSocket(string name, Type type, bool isInput)
+    private static SocketData CreateSocket(string name, Type type, bool isInput, SocketEditorHint? editorHint = null)
     {
         var typeName = type.FullName ?? type.Name;
         var isExecution = type == typeof(ExecutionPath);
-        return new SocketData(name, typeName, isInput, isExecution);
+        return new SocketData(name, typeName, isInput, isExecution, EditorHint: editorHint);
     }
 
     private static SocketData CreateExecutionSocket(string name, bool isInput)
     {
         var typeName = typeof(ExecutionPath).FullName ?? nameof(ExecutionPath);
         return new SocketData(name, typeName, isInput, true);
+    }
+
+    private static SocketEditorHint? BuildEditorHint(ParameterInfo parameter)
+    {
+        var attribute = parameter.GetCustomAttribute<SocketEditorAttribute>();
+        if (attribute is null)
+        {
+            return null;
+        }
+
+        var min = double.IsNaN(attribute.Min) ? (double?)null : attribute.Min;
+        var max = double.IsNaN(attribute.Max) ? (double?)null : attribute.Max;
+        var step = double.IsNaN(attribute.Step) ? (double?)null : attribute.Step;
+
+        return new SocketEditorHint(
+            attribute.Kind,
+            attribute.Options,
+            min,
+            max,
+            step,
+            attribute.Placeholder,
+            attribute.Label);
     }
 
     private static void AddSocketIfMissing(List<SocketData> sockets, SocketData socket)

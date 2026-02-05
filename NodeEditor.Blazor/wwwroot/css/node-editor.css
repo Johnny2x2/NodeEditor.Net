@@ -455,6 +455,10 @@
     padding: 4px 0;
 }
 
+.ne-context-menu-category--nested {
+    padding-left: calc(var(--ne-category-depth, 0) * 12px);
+}
+
 .ne-context-menu-category-title {
     font-size: 11px;
     font-weight: 600;
@@ -520,6 +524,47 @@
     color: #e0e0f0;
     font-size: 11px;
     outline: none;
+}
+
+.ne-editor-select {
+    width: 128px;
+    cursor: pointer;
+}
+
+.ne-editor-textarea {
+    width: 160px;
+    min-height: 48px;
+    resize: vertical;
+}
+
+.ne-editor-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(45, 45, 61, 0.9);
+    color: #e0e0f0;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ne-editor-button:hover {
+    background: rgba(61, 61, 92, 0.95);
+    border-color: rgba(102, 153, 255, 0.6);
+}
+
+.ne-editor-numberupdown {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ne-editor-button--step {
+    padding: 2px 6px;
+    min-width: 22px;
 }
 
 .ne-editor-input:focus {

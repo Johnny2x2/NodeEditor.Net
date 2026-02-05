@@ -5,5 +5,6 @@ public sealed record class SocketData(
     string TypeName,
     bool IsInput,
     bool IsExecution,
-    SocketValue? Value = null
+    SocketValue? Value = null,
+    SocketEditorHint? EditorHint = null
 );
