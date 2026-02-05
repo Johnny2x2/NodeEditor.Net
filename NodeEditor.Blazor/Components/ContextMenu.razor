@@ -19,9 +19,14 @@
             }
             else
             {
-                @foreach (var category in _catalog.Categories)
+                @if (_categoryStack.Count > 0)
                 {
-                    @RenderCategory(category, 0)
+                    <button class="ne-context-menu-back" @onclick="NavigateUp">← Back</button>
+                }
+
+                @foreach (var category in CurrentCategories)
+                {
+                    @RenderCategory(category)
                 }
             }
         </div>
@@ -34,6 +39,7 @@
     private string _search = string.Empty;
     private bool _focusPending;
     private ContextMenuSearch? _searchRef;
+    private readonly List<NodeCategoryGroup> _categoryStack = new();
 
     [Parameter]
     public bool IsOpen { get; set; }
@@ -101,6 +107,7 @@
     private void RefreshCatalog()
     {
         _catalog = Registry.GetCatalog(_search);
+        _categoryStack.Clear();
     }
 
     private async Task OnSearchChanged(string value)
@@ -139,19 +146,34 @@
         }
     }
 
-    private RenderFragment RenderCategory(NodeCategoryGroup category, int depth) => builder =>
+    private IReadOnlyList<NodeCategoryGroup> CurrentCategories
+        => _categoryStack.Count == 0
+            ? _catalog.Categories
+            : _categoryStack[^1].Children;
+
+    private void NavigateInto(NodeCategoryGroup category)
+    {
+        _categoryStack.Add(category);
+    }
+
+    private void NavigateUp()
+    {
+        if (_categoryStack.Count > 0)
+        {
+            _categoryStack.RemoveAt(_categoryStack.Count - 1);
+        }
+    }
+
+    private RenderFragment RenderCategory(NodeCategoryGroup category) => builder =>
     {
         var seq = 0;
-        var categoryClass = depth == 0
-            ? "ne-context-menu-category"
-            : "ne-context-menu-category ne-context-menu-category--nested";
-
         builder.OpenElement(seq++, "div");
-        builder.AddAttribute(seq++, "class", categoryClass);
-        builder.AddAttribute(seq++, "style", $"--ne-category-depth: {depth};");
+        builder.AddAttribute(seq++, "class", "ne-context-menu-category");
 
-        builder.OpenElement(seq++, "div");
+        builder.OpenElement(seq++, "button");
+        builder.AddAttribute(seq++, "type", "button");
         builder.AddAttribute(seq++, "class", "ne-context-menu-category-title");
+        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => NavigateInto(category)));
         builder.AddContent(seq++, category.Name);
         builder.CloseElement();
 
@@ -170,14 +192,6 @@
             }
 
             builder.CloseElement();
-        }
-
-        if (category.Children.Count > 0)
-        {
-            foreach (var child in category.Children)
-            {
-                builder.AddContent(seq++, RenderCategory(child, depth + 1));
-            }
         }
 
         builder.CloseElement();
