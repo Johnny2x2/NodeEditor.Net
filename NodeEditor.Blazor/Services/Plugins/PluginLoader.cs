@@ -1,7 +1,9 @@
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NodeEditor.Blazor.Services.Execution;
+using NodeEditor.Blazor.Services.Editors;
 using NodeEditor.Blazor.Services.Registry;
 
 namespace NodeEditor.Blazor.Services.Plugins;
@@ -50,6 +52,11 @@ public sealed class PluginLoader
                 var pluginServices = _serviceRegistry.RegisterServices(plugin.Id, plugin.ConfigureServices);
 
                 plugin.Register(_registry);
+
+                if (_loadedPlugins.TryGetValue(plugin.Id, out var registeredEntry))
+                {
+                    registeredEntry.CustomEditors.AddRange(RegisterCustomEditorsFromAssembly(registeredEntry.Assembly));
+                }
 
                 if (plugin is INodeProvider provider)
                 {
@@ -193,6 +200,12 @@ public sealed class PluginLoader
                 _registry.RemoveDefinitions(entry.ProviderDefinitions);
             }
 
+            if (entry.CustomEditors.Count > 0)
+            {
+                var registry = _services.GetService<NodeEditorCustomEditorRegistry>();
+                registry?.RemoveEditors(entry.CustomEditors);
+            }
+
             _registry.RemoveDefinitionsFromAssembly(entry.Assembly);
 
             _serviceRegistry.RemoveServices(pluginId);
@@ -238,6 +251,12 @@ public sealed class PluginLoader
             if (entry.ProviderDefinitions.Count > 0)
             {
                 _registry.RemoveDefinitions(entry.ProviderDefinitions);
+            }
+
+            if (entry.CustomEditors.Count > 0)
+            {
+                var registry = _services.GetService<NodeEditorCustomEditorRegistry>();
+                registry?.RemoveEditors(entry.CustomEditors);
             }
 
             _registry.RemoveDefinitionsFromAssembly(entry.Assembly);
@@ -410,6 +429,48 @@ public sealed class PluginLoader
 
     private sealed record PluginCandidate(string AssemblyPath, PluginManifest? Manifest);
 
+    private List<INodeCustomEditor> RegisterCustomEditorsFromAssembly(Assembly assembly)
+    {
+        var registry = _services.GetService<NodeEditorCustomEditorRegistry>();
+        if (registry is null)
+        {
+            return new List<INodeCustomEditor>();
+        }
+
+        var editors = new List<INodeCustomEditor>();
+        foreach (var type in SafeGetTypes(assembly))
+        {
+            if (type is null || type.IsAbstract || type.IsInterface)
+            {
+                continue;
+            }
+
+            if (!typeof(INodeCustomEditor).IsAssignableFrom(type))
+            {
+                continue;
+            }
+
+            try
+            {
+                var editor = ActivatorUtilities.CreateInstance(_services, type) as INodeCustomEditor;
+                if (editor is null)
+                {
+                    continue;
+                }
+
+                registry.RegisterEditor(editor);
+                editors.Add(editor);
+                _logger.LogInformation("Registered custom editor '{EditorType}' from plugin assembly.", type.FullName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to create custom editor instance of type '{EditorType}'.", type.FullName);
+            }
+        }
+
+        return editors;
+    }
+
     private sealed class LoadedPlugin
     {
         public LoadedPlugin(INodePlugin plugin, PluginLoadContext loadContext, Assembly assembly, List<object> contextInstances)
@@ -425,6 +486,7 @@ public sealed class PluginLoader
         public Assembly Assembly { get; }
         public List<object> ContextInstances { get; }
         public List<NodeDefinition> ProviderDefinitions { get; } = new();
+        public List<INodeCustomEditor> CustomEditors { get; } = new();
     }
 
     private static IEnumerable<Type> SafeGetTypes(Assembly assembly)
