@@ -143,6 +143,41 @@
         _pendingVariableDrag = data;
     }
 
+    public void CreateVariableNode(string variableId, bool isSetNode)
+    {
+        var variable = State.FindVariable(variableId);
+        if (variable is null)
+        {
+            return;
+        }
+
+        var definitionId = isSetNode ? variable.SetDefinitionId : variable.GetDefinitionId;
+        var definition = _registry?.Definitions.FirstOrDefault(
+            d => d.Id.Equals(definitionId, StringComparison.Ordinal));
+
+        if (definition is null)
+        {
+            return;
+        }
+
+        var nodeData = definition.Factory();
+        var center = GetViewportCenterScreen();
+        var graphPosition = CoordinateConverter.ScreenToGraph(center);
+        var nodeViewModel = new NodeViewModel(nodeData)
+        {
+            Position = graphPosition
+        };
+
+        State.AddNode(nodeViewModel);
+    }
+
+    private Point2D GetViewportCenterScreen()
+    {
+        var width = State.Viewport.Width > 0 ? State.Viewport.Width : 800;
+        var height = State.Viewport.Height > 0 ? State.Viewport.Height : 600;
+        return new Point2D(width / 2, height / 2);
+    }
+
     private string ViewportTransformStyle =>
         $"transform: translate({_panOffset.X}px, {_panOffset.Y}px) scale({_zoom});";
 

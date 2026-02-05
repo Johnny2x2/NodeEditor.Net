@@ -339,6 +339,11 @@
     color: rgba(255, 255, 255, 0.8);
 }
 
+.ne-panel-drag-handle {
+    cursor: move;
+    user-select: none;
+}
+
 .ne-properties-title {
     font-size: 13px;
     font-weight: 600;
@@ -1750,6 +1755,35 @@
 .ne-variables-type-badge--unknown {
     background: rgba(255, 220, 100, 0.15);
     color: #ddcc66;
+}
+
+.ne-variables-node-btn {
+    background: rgba(100, 180, 255, 0.12);
+    border: 1px solid rgba(100, 180, 255, 0.25);
+    color: #7cb8ff;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 4px;
+    transition: background 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+}
+
+.ne-variables-node-btn:hover {
+    background: rgba(100, 180, 255, 0.25);
+    border-color: rgba(100, 180, 255, 0.45);
+}
+
+.ne-variables-node-btn--set {
+    background: rgba(120, 210, 140, 0.12);
+    border-color: rgba(120, 210, 140, 0.25);
+    color: #8bd39a;
+}
+
+.ne-variables-node-btn--set:hover {
+    background: rgba(120, 210, 140, 0.25);
+    border-color: rgba(120, 210, 140, 0.45);
 }
 
 .ne-variables-delete-btn {

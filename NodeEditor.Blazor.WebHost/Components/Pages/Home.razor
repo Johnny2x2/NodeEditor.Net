@@ -45,7 +45,9 @@
 <PluginManagerDialog @bind-IsOpen="_isPluginManagerOpen" OnClosed="OnPluginManagerClosed" />
 
 <NodePropertiesPanel State="EditorState" />
-<VariablesPanel State="EditorState" OnVariableDrag="OnVariableDragStarted" />
+<VariablesPanel State="EditorState"
+                OnVariableDrag="OnVariableDragStarted"
+                OnCreateVariableNode="OnVariableNodeRequested" />
 
 <div class="node-editor-container">
 	<NodeEditorCanvas @ref="_canvasRef" State="EditorState" />
@@ -84,6 +86,11 @@
 	private void OnVariableDragStarted(VariableDragData data)
 	{
 		_canvasRef?.SetPendingVariableDrag(data);
+	}
+
+	private void OnVariableNodeRequested(VariableNodeRequest request)
+	{
+		_canvasRef?.CreateVariableNode(request.VariableId, request.IsSetNode);
 	}
 
 	private void OnPluginManagerClosed()

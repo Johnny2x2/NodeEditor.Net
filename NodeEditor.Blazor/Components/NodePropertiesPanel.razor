@@ -1,10 +1,19 @@
+@using NodeEditor.Blazor.Models
 @using NodeEditor.Blazor.Services.Editors
 @using NodeEditor.Blazor.ViewModels
 @implements IDisposable
 @inject NodeEditorCustomEditorRegistry EditorRegistry
 
-<div class="ne-properties-panel">
-    <div class="ne-properties-header">Properties</div>
+<div class="ne-properties-panel"
+     style="@PanelStyle"
+     @onpointermove="OnPanelPointerMove"
+     @onpointerup="OnPanelPointerUp"
+     @onpointerleave="OnPanelPointerUp">
+    <div class="ne-properties-header ne-panel-drag-handle"
+         @onpointerdown="OnPanelPointerDown"
+         @onpointerdown:preventDefault>
+        Properties
+    </div>
 
     @if (_selectedNode is null)
     {
@@ -71,6 +80,14 @@
 
     private NodeViewModel? _selectedNode;
 
+    private bool _isDraggingPanel;
+    private bool _panelDragMoved;
+    private Point2D _panelDragStartScreen = Point2D.Zero;
+    private Point2D _panelDragStartOffset = Point2D.Zero;
+    private Point2D _panelDragOffset = Point2D.Zero;
+
+    private string PanelStyle => $"transform: translate({_panelDragOffset.X}px, {_panelDragOffset.Y}px);";
+
     protected override void OnInitialized()
     {
         SyncSelectedNode();
@@ -101,6 +118,32 @@
         _selectedNode = selectedId is null
             ? null
             : State.Nodes.FirstOrDefault(n => n.Data.Id == selectedId);
+    }
+
+    private void OnPanelPointerDown(PointerEventArgs e)
+    {
+        _isDraggingPanel = true;
+        _panelDragMoved = false;
+        _panelDragStartScreen = new Point2D(e.ClientX, e.ClientY);
+        _panelDragStartOffset = _panelDragOffset;
+    }
+
+    private void OnPanelPointerMove(PointerEventArgs e)
+    {
+        if (!_isDraggingPanel)
+        {
+            return;
+        }
+
+        var delta = new Point2D(e.ClientX - _panelDragStartScreen.X, e.ClientY - _panelDragStartScreen.Y);
+        _panelDragMoved = _panelDragMoved || Math.Abs(delta.X) > 2 || Math.Abs(delta.Y) > 2;
+        _panelDragOffset = new Point2D(_panelDragStartOffset.X + delta.X, _panelDragStartOffset.Y + delta.Y);
+        StateHasChanged();
+    }
+
+    private void OnPanelPointerUp(PointerEventArgs e)
+    {
+        _isDraggingPanel = false;
     }
 
     private RenderFragment RenderEditor(SocketViewModel socket)

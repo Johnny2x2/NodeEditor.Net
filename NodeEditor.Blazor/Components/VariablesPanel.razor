@@ -5,8 +5,15 @@
 
 @inject NodeEditorCustomEditorRegistry EditorRegistry
 
-<div class="ne-variables-panel @(_isCollapsed ? "ne-variables-panel--collapsed" : "")">
-    <div class="ne-variables-header" @onclick="ToggleCollapse">
+<div class="ne-variables-panel @(_isCollapsed ? "ne-variables-panel--collapsed" : "")"
+     style="@PanelStyle"
+     @onpointermove="OnPanelPointerMove"
+     @onpointerup="OnPanelPointerUp"
+     @onpointerleave="OnPanelPointerUp">
+    <div class="ne-variables-header ne-panel-drag-handle"
+         @onpointerdown="OnPanelPointerDown"
+         @onpointerdown:preventDefault
+         @onpointerup="OnHeaderPointerUp">
         <span class="ne-variables-header-icon">@(_isCollapsed ? "▶" : "▼")</span>
         Variables
         @if (!_isCollapsed)
@@ -81,6 +88,15 @@
                         @GetTypeFriendlyName(variable.TypeName)
                     </span>
 
+                    <button class="ne-variables-node-btn"
+                            @onclick="@(() => CreateVariableNode(variable, false))"
+                            @onclick:stopPropagation="true"
+                            title="Create Get node">G</button>
+                    <button class="ne-variables-node-btn ne-variables-node-btn--set"
+                            @onclick="@(() => CreateVariableNode(variable, true))"
+                            @onclick:stopPropagation="true"
+                            title="Create Set node">S</button>
+
                     <button class="ne-variables-delete-btn"
                             @onclick="@(() => DeleteVariable(variable.Id))"
                             @onclick:stopPropagation="true"
@@ -106,6 +122,9 @@
     [Parameter]
     public EventCallback<VariableDragData> OnVariableDrag { get; set; }
 
+    [Parameter]
+    public EventCallback<VariableNodeRequest> OnCreateVariableNode { get; set; }
+
     private bool _isCollapsed;
     private bool _isAddingNew;
     private string _newVariableName = "";
@@ -113,6 +132,14 @@
 
     private string? _editingVariableId;
     private string _editVariableName = "";
+
+    private bool _isDraggingPanel;
+    private bool _panelDragMoved;
+    private Point2D _panelDragStartScreen = Point2D.Zero;
+    private Point2D _panelDragStartOffset = Point2D.Zero;
+    private Point2D _panelDragOffset = Point2D.Zero;
+
+    private string PanelStyle => $"transform: translate({_panelDragOffset.X}px, {_panelDragOffset.Y}px);";
 
     protected override void OnInitialized()
     {
@@ -131,6 +158,40 @@
     private void OnStateChanged(object? sender, EventArgs e) => StateHasChanged();
 
     private void ToggleCollapse() => _isCollapsed = !_isCollapsed;
+
+    private void OnPanelPointerDown(PointerEventArgs e)
+    {
+        _isDraggingPanel = true;
+        _panelDragMoved = false;
+        _panelDragStartScreen = new Point2D(e.ClientX, e.ClientY);
+        _panelDragStartOffset = _panelDragOffset;
+    }
+
+    private void OnPanelPointerMove(PointerEventArgs e)
+    {
+        if (!_isDraggingPanel)
+        {
+            return;
+        }
+
+        var delta = new Point2D(e.ClientX - _panelDragStartScreen.X, e.ClientY - _panelDragStartScreen.Y);
+        _panelDragMoved = _panelDragMoved || Math.Abs(delta.X) > 2 || Math.Abs(delta.Y) > 2;
+        _panelDragOffset = new Point2D(_panelDragStartOffset.X + delta.X, _panelDragStartOffset.Y + delta.Y);
+        StateHasChanged();
+    }
+
+    private void OnPanelPointerUp(PointerEventArgs e)
+    {
+        _isDraggingPanel = false;
+    }
+
+    private void OnHeaderPointerUp(PointerEventArgs e)
+    {
+        if (!_panelDragMoved)
+        {
+            ToggleCollapse();
+        }
+    }
 
     // ===== Add Variable =====
 
@@ -227,6 +288,14 @@
         if (OnVariableDrag.HasDelegate)
         {
             await OnVariableDrag.InvokeAsync(new VariableDragData(variable.Id, variable.Name));
+        }
+    }
+
+    private async Task CreateVariableNode(GraphVariable variable, bool isSet)
+    {
+        if (OnCreateVariableNode.HasDelegate)
+        {
+            await OnCreateVariableNode.InvokeAsync(new VariableNodeRequest(variable.Id, isSet));
         }
     }
 

@@ -49,6 +49,11 @@ public sealed class ConnectionValidator
             return true;
         }
 
+        if (IsNumericCompatible(sourceTypeName, targetTypeName))
+        {
+            return true;
+        }
+
         var sourceType = _typeResolver.Resolve(sourceTypeName);
         var targetType = _typeResolver.Resolve(targetTypeName);
 
@@ -63,5 +68,32 @@ public sealed class ConnectionValidator
     private static bool IsObjectType(string typeName)
     {
         return string.Equals(typeName, "object", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static readonly IReadOnlyDictionary<string, int> NumericRank = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["System.Byte"] = 1,
+        ["System.Int16"] = 2,
+        ["System.Int32"] = 3,
+        ["System.Int64"] = 4,
+        ["System.Single"] = 5,
+        ["System.Double"] = 6,
+        ["System.Decimal"] = 7
+    };
+
+    private static bool IsNumericCompatible(string sourceTypeName, string targetTypeName)
+    {
+        if (!NumericRank.TryGetValue(sourceTypeName, out var sourceRank))
+        {
+            return false;
+        }
+
+        if (!NumericRank.TryGetValue(targetTypeName, out var targetRank))
+        {
+            return false;
+        }
+
+        // Allow widening numeric conversions only (e.g., int -> double)
+        return sourceRank <= targetRank;
     }
 }
