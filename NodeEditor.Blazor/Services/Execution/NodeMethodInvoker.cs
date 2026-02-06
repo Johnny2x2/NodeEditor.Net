@@ -8,11 +8,11 @@ namespace NodeEditor.Blazor.Services.Execution;
 public sealed class NodeMethodInvoker
 {
     private readonly object _context;
-    private readonly SocketTypeResolver _typeResolver;
+    private readonly ISocketTypeResolver _typeResolver;
     private readonly Dictionary<string, NodeMethodBinding> _methodMap;
     private readonly Dictionary<string, NodeMethodBinding> _definitionIdMap;
 
-    public NodeMethodInvoker(object context, SocketTypeResolver typeResolver)
+    public NodeMethodInvoker(object context, ISocketTypeResolver typeResolver)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _typeResolver = typeResolver ?? throw new ArgumentNullException(nameof(typeResolver));

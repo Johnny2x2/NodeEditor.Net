@@ -113,7 +113,7 @@
 
 @code {
     [Parameter, EditorRequired]
-    public NodeEditorState State { get; set; } = null!;
+    public INodeEditorState State { get; set; } = null!;
 
     /// <summary>
     /// Callback invoked when a variable drag starts, passing the variable ID and the drag event args.

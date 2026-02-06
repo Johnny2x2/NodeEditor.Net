@@ -1,20 +1,20 @@
 using System.Text.Json;
 using NodeEditor.Blazor.Models;
+using NodeEditor.Blazor.Services;
 using NodeEditor.Blazor.Services.Registry;
-using NodeEditor.Blazor.ViewModels;
 
 namespace NodeEditor.Blazor.Services.Serialization;
 
-public sealed class GraphSerializer
+public sealed class GraphSerializer : IGraphSerializer
 {
     public const int CurrentVersion = 1;
 
-    private readonly NodeRegistryService _registry;
+    private readonly INodeRegistryService _registry;
     private readonly ConnectionValidator _connectionValidator;
     private readonly GraphSchemaMigrator _migrator;
 
     public GraphSerializer(
-        NodeRegistryService registry,
+        INodeRegistryService registry,
         ConnectionValidator connectionValidator,
         GraphSchemaMigrator migrator)
     {
@@ -23,28 +23,48 @@ public sealed class GraphSerializer
         _migrator = migrator ?? throw new ArgumentNullException(nameof(migrator));
     }
 
-    public GraphDto Export(NodeEditorState state)
+    public GraphData ExportToGraphData(INodeEditorState state)
     {
         if (state is null)
         {
             throw new ArgumentNullException(nameof(state));
         }
 
-        return new GraphDto(
-            Version: CurrentVersion,
-            Nodes: state.Nodes.Select(ToDto).ToList(),
-            Connections: state.Connections.Select(ToDto).ToList(),
-            Viewport: new ViewportDto(
-                state.Viewport.X,
-                state.Viewport.Y,
-                state.Viewport.Width,
-                state.Viewport.Height,
-                state.Zoom),
-            SelectedNodeIds: state.SelectedNodeIds.ToList(),
-            Variables: state.Variables.Select(ToDto).ToList());
+        return state.ExportToGraphData();
     }
 
-    public GraphImportResult Import(NodeEditorState state, GraphDto dto)
+    public void Import(INodeEditorState state, GraphData graphData)
+    {
+        if (state is null)
+        {
+            throw new ArgumentNullException(nameof(state));
+        }
+
+        if (graphData is null)
+        {
+            throw new ArgumentNullException(nameof(graphData));
+        }
+
+        state.LoadFromGraphData(graphData);
+    }
+
+    public GraphDto Export(INodeEditorState state)
+    {
+        if (state is null)
+        {
+            throw new ArgumentNullException(nameof(state));
+        }
+
+        var graphData = state.ExportToGraphData();
+        return ToDto(
+            graphData,
+            state.Viewport,
+            state.Zoom,
+            state.SelectedNodeIds.ToList(),
+            CurrentVersion);
+    }
+
+    public GraphImportResult Import(INodeEditorState state, GraphDto dto)
     {
         if (state is null)
         {
@@ -67,38 +87,9 @@ public sealed class GraphSerializer
         }
 
         var warnings = new List<string>();
-        var nodes = dto.Nodes ?? new List<NodeDto>();
-        var connections = dto.Connections ?? new List<ConnectionDto>();
-        var selected = dto.SelectedNodeIds ?? new List<string>();
-        var variables = dto.Variables ?? new List<GraphVariableDto>();
+        var graphData = ToGraphData(dto, warnings);
 
-        state.Clear();
-
-        // Import variables first so that VariableNodeFactory can register definitions
-        // before nodes referencing them are created
-        foreach (var varDto in variables)
-        {
-            var variable = new GraphVariable(varDto.Id, varDto.Name, varDto.TypeName, varDto.DefaultValue);
-            state.AddVariable(variable);
-        }
-
-        var nodeMap = new Dictionary<string, NodeViewModel>(StringComparer.Ordinal);
-        foreach (var nodeDto in nodes)
-        {
-            var node = CreateNode(nodeDto, warnings);
-            nodeMap[node.Data.Id] = node;
-            state.AddNode(node);
-        }
-
-        foreach (var connectionDto in connections)
-        {
-            if (!TryCreateConnection(nodeMap, connectionDto, warnings, out var connection))
-            {
-                continue;
-            }
-
-            state.AddConnection(connection);
-        }
+        state.LoadFromGraphData(graphData);
 
         var viewport = dto.Viewport ?? new ViewportDto(
             state.Viewport.X,
@@ -114,9 +105,13 @@ public sealed class GraphSerializer
             viewport.Height);
         state.Zoom = viewport.Zoom;
 
+        var selected = dto.SelectedNodeIds ?? new List<string>();
         if (selected.Count > 0)
         {
-            var validSelected = selected.Where(nodeMap.ContainsKey).ToList();
+            var validSelected = selected
+                .Where(id => graphData.Nodes.Any(node => node.Data.Id == id))
+                .ToList();
+
             if (validSelected.Count != selected.Count)
             {
                 warnings.Add("Some selected nodes were missing during import.");
@@ -129,6 +124,40 @@ public sealed class GraphSerializer
         }
 
         return warnings.Count == 0 ? GraphImportResult.Empty : new GraphImportResult(warnings);
+    }
+
+    public string SerializeGraphData(GraphData graphData)
+    {
+        if (graphData is null)
+        {
+            throw new ArgumentNullException(nameof(graphData));
+        }
+
+        var dto = ToDto(
+            graphData,
+            new Rect2D(0, 0, 0, 0),
+            1.0,
+            new List<string>(),
+            graphData.SchemaVersion);
+
+        return Serialize(dto);
+    }
+
+    public GraphData DeserializeToGraphData(string json)
+    {
+        var dto = Deserialize(json);
+
+        if (dto.Version > CurrentVersion)
+        {
+            throw new NotSupportedException($"Unsupported schema version {dto.Version}.");
+        }
+
+        if (dto.Version < CurrentVersion)
+        {
+            dto = _migrator.MigrateToCurrent(dto);
+        }
+
+        return ToGraphData(dto, new List<string>());
     }
 
     public string Serialize(GraphDto dto)
@@ -157,7 +186,7 @@ public sealed class GraphSerializer
         return dto;
     }
 
-    private NodeViewModel CreateNode(NodeDto dto, List<string> warnings)
+    private GraphNodeData CreateGraphNodeData(NodeDto dto, List<string> warnings)
     {
         if (!string.IsNullOrWhiteSpace(dto.TypeId))
         {
@@ -181,18 +210,14 @@ public sealed class GraphSerializer
             outputs,
             dto.TypeId);
 
-        var node = new NodeViewModel(nodeData)
-        {
-            Position = new Point2D(dto.X, dto.Y),
-            Size = new Size2D(dto.Width, dto.Height),
-            IsSelected = false
-        };
-
-        return node;
+        return new GraphNodeData(
+            nodeData,
+            new Point2D(dto.X, dto.Y),
+            new Size2D(dto.Width, dto.Height));
     }
 
     private bool TryCreateConnection(
-        IReadOnlyDictionary<string, NodeViewModel> nodes,
+        IReadOnlyDictionary<string, GraphNodeData> nodes,
         ConnectionDto dto,
         List<string> warnings,
         out ConnectionData connection)
@@ -211,8 +236,7 @@ public sealed class GraphSerializer
             return false;
         }
 
-        var outputSocket = outputNode.Outputs
-            .Select(socket => socket.Data)
+        var outputSocket = outputNode.Data.Outputs
             .FirstOrDefault(socket => socket.Name.Equals(dto.OutputSocketName, StringComparison.Ordinal));
         if (outputSocket is null)
         {
@@ -220,8 +244,7 @@ public sealed class GraphSerializer
             return false;
         }
 
-        var inputSocket = inputNode.Inputs
-            .Select(socket => socket.Data)
+        var inputSocket = inputNode.Data.Inputs
             .FirstOrDefault(socket => socket.Name.Equals(dto.InputSocketName, StringComparison.Ordinal));
         if (inputSocket is null)
         {
@@ -244,10 +267,10 @@ public sealed class GraphSerializer
         return true;
     }
 
-    private static NodeDto ToDto(NodeViewModel node)
+    private static NodeDto ToDto(GraphNodeData node)
     {
-        var inputs = node.Inputs.Select(socket => socket.Data).ToList();
-        var outputs = node.Outputs.Select(socket => socket.Data).ToList();
+        var inputs = node.Data.Inputs.ToList();
+        var outputs = node.Data.Outputs.ToList();
 
         return new NodeDto(
             node.Data.Id,
@@ -280,5 +303,70 @@ public sealed class GraphSerializer
             variable.Name,
             variable.TypeName,
             variable.DefaultValue);
+    }
+
+    private static GraphVariable ToVariable(GraphVariableDto variable)
+    {
+        return new GraphVariable(
+            variable.Id,
+            variable.Name,
+            variable.TypeName,
+            variable.DefaultValue);
+    }
+
+    private GraphData ToGraphData(GraphDto dto, List<string> warnings)
+    {
+        var nodes = dto.Nodes ?? new List<NodeDto>();
+        var connections = dto.Connections ?? new List<ConnectionDto>();
+        var variables = dto.Variables ?? new List<GraphVariableDto>();
+
+        var graphNodes = new List<GraphNodeData>();
+        var nodeMap = new Dictionary<string, GraphNodeData>(StringComparer.Ordinal);
+        foreach (var nodeDto in nodes)
+        {
+            var node = CreateGraphNodeData(nodeDto, warnings);
+            nodeMap[node.Data.Id] = node;
+            graphNodes.Add(node);
+        }
+
+        var graphConnections = new List<ConnectionData>();
+        foreach (var connectionDto in connections)
+        {
+            if (!TryCreateConnection(nodeMap, connectionDto, warnings, out var connection))
+            {
+                continue;
+            }
+
+            graphConnections.Add(connection);
+        }
+
+        var graphVariables = variables.Select(ToVariable).ToList();
+
+        return new GraphData(
+            graphNodes,
+            graphConnections,
+            graphVariables,
+            CurrentVersion);
+    }
+
+    private static GraphDto ToDto(
+        GraphData graphData,
+        Rect2D viewport,
+        double zoom,
+        List<string> selectedNodeIds,
+        int version)
+    {
+        return new GraphDto(
+            Version: version,
+            Nodes: graphData.Nodes.Select(ToDto).ToList(),
+            Connections: graphData.Connections.Select(ToDto).ToList(),
+            Viewport: new ViewportDto(
+                viewport.X,
+                viewport.Y,
+                viewport.Width,
+                viewport.Height,
+                zoom),
+            SelectedNodeIds: selectedNodeIds,
+            Variables: graphData.Variables.Select(ToDto).ToList());
     }
 }

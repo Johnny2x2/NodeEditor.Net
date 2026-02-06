@@ -7,9 +7,9 @@ namespace NodeEditor.Blazor.Services;
 /// </summary>
 public sealed class ConnectionValidator
 {
-    private readonly SocketTypeResolver _typeResolver;
+    private readonly ISocketTypeResolver _typeResolver;
 
-    public ConnectionValidator(SocketTypeResolver typeResolver)
+    public ConnectionValidator(ISocketTypeResolver typeResolver)
     {
         _typeResolver = typeResolver;
     }

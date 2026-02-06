@@ -6,7 +6,7 @@
 @inject ConnectionValidator ConnectionValidator
 @inject TouchGestureHandler TouchGestures
 @inject ViewportCuller ViewportCuller
-@inject NodeRegistryService _registry
+@inject INodeRegistryService _registry
 
 <div class="ne-canvas"
      @ref="_canvasRef"
@@ -123,7 +123,7 @@
     private readonly Dictionary<string, Point2D> _socketPositionCache = new();
 
     [Parameter, EditorRequired]
-    public NodeEditorState State { get; set; } = null!;
+    public INodeEditorState State { get; set; } = null!;
 
     [Parameter]
     public double MinZoom { get; set; } = 0.1;

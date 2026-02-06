@@ -6,9 +6,9 @@ namespace NodeEditor.Blazor.Services.Editors;
 
 public sealed class DropdownEditorDefinition : INodeCustomEditor
 {
-    private readonly SocketTypeResolver _typeResolver;
+    private readonly ISocketTypeResolver _typeResolver;
 
-    public DropdownEditorDefinition(SocketTypeResolver typeResolver)
+    public DropdownEditorDefinition(ISocketTypeResolver typeResolver)
     {
         _typeResolver = typeResolver;
     }

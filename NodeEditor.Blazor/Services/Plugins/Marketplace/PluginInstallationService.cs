@@ -16,7 +16,7 @@ public sealed class PluginInstallationService : IPluginInstallationService
 
     private readonly PluginOptions _pluginOptions;
     private readonly MarketplaceOptions _marketplaceOptions;
-    private readonly PluginLoader _pluginLoader;
+    private readonly IPluginLoader _pluginLoader;
     private readonly ILogger<PluginInstallationService> _logger;
 
     public event EventHandler<PluginInstalledEventArgs>? PluginInstalled;
@@ -26,7 +26,7 @@ public sealed class PluginInstallationService : IPluginInstallationService
     public PluginInstallationService(
         IOptions<PluginOptions> pluginOptions,
         IOptions<MarketplaceOptions> marketplaceOptions,
-        PluginLoader pluginLoader,
+        IPluginLoader pluginLoader,
         ILogger<PluginInstallationService> logger)
     {
         _pluginOptions = pluginOptions.Value;

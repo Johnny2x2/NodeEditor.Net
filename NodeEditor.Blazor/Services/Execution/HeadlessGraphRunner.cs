@@ -1,0 +1,68 @@
+using NodeEditor.Blazor.Models;
+using NodeEditor.Blazor.Services.Serialization;
+
+namespace NodeEditor.Blazor.Services.Execution;
+
+/// <summary>
+/// Executes a GraphData directly without any UI state, ViewModels, or Blazor components.
+/// </summary>
+public sealed class HeadlessGraphRunner
+{
+    private readonly INodeExecutionService _executionService;
+    private readonly IGraphSerializer _serializer;
+
+    public HeadlessGraphRunner(
+        INodeExecutionService executionService,
+        IGraphSerializer serializer)
+    {
+        _executionService = executionService ?? throw new ArgumentNullException(nameof(executionService));
+        _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+    }
+
+    /// <summary>
+    /// Execute a graph from its pure model representation.
+    /// </summary>
+    public async Task<INodeExecutionContext> ExecuteAsync(
+        GraphData graphData,
+        INodeExecutionContext? context = null,
+        object? nodeContext = null,
+        NodeExecutionOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (graphData is null)
+        {
+            throw new ArgumentNullException(nameof(graphData));
+        }
+
+        var nodes = graphData.Nodes.Select(n => n.Data).ToList();
+        var connections = graphData.Connections.ToList();
+        var executionContext = context ?? new NodeExecutionContext();
+        var effectiveNodeContext = nodeContext ?? NodeContextFactory.CreateCompositeFromLoadedAssemblies();
+
+        VariableNodeExecutor.SeedVariables(executionContext, graphData.Variables);
+
+        await _executionService.ExecuteAsync(
+            nodes,
+            connections,
+            executionContext,
+            effectiveNodeContext,
+            options,
+            cancellationToken);
+
+        return executionContext;
+    }
+
+    /// <summary>
+    /// Convenience: load from JSON and execute.
+    /// </summary>
+    public Task<INodeExecutionContext> ExecuteFromJsonAsync(
+        string json,
+        INodeExecutionContext? context = null,
+        object? nodeContext = null,
+        NodeExecutionOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var graphData = _serializer.DeserializeToGraphData(json);
+        return ExecuteAsync(graphData, context, nodeContext, options, cancellationToken);
+    }
+}

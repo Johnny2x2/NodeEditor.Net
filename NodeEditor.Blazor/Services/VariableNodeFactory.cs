@@ -10,10 +10,10 @@ namespace NodeEditor.Blazor.Services;
 /// </summary>
 public sealed class VariableNodeFactory
 {
-    private readonly NodeRegistryService _registry;
-    private readonly NodeEditorState _state;
+    private readonly INodeRegistryService _registry;
+    private readonly INodeEditorState _state;
 
-    public VariableNodeFactory(NodeRegistryService registry, NodeEditorState state)
+    public VariableNodeFactory(INodeRegistryService registry, INodeEditorState state)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _state = state ?? throw new ArgumentNullException(nameof(state));

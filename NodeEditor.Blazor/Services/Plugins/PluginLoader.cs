@@ -8,9 +8,9 @@ using NodeEditor.Blazor.Services.Registry;
 
 namespace NodeEditor.Blazor.Services.Plugins;
 
-public sealed class PluginLoader
+public sealed class PluginLoader : IPluginLoader
 {
-    private readonly NodeRegistryService _registry;
+    private readonly INodeRegistryService _registry;
     private readonly ILogger<PluginLoader> _logger;
     private readonly PluginOptions _options;
     private readonly IServiceProvider _services;
@@ -19,7 +19,7 @@ public sealed class PluginLoader
     private readonly Dictionary<string, LoadedPlugin> _loadedPlugins = new(StringComparer.OrdinalIgnoreCase);
 
     public PluginLoader(
-        NodeRegistryService registry,
+        INodeRegistryService registry,
         IOptions<PluginOptions> options,
         ILogger<PluginLoader> logger,
         IServiceProvider services,

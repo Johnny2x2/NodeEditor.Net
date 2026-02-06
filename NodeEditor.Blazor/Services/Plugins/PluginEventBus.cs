@@ -6,10 +6,10 @@ namespace NodeEditor.Blazor.Services.Plugins;
 
 public sealed class PluginEventBus : IPluginEventBus, IDisposable
 {
-    private readonly NodeEditorState _state;
+    private readonly INodeEditorState _state;
     private readonly ConcurrentBag<IDisposable> _subscriptions = new();
 
-    public PluginEventBus(NodeEditorState state)
+    public PluginEventBus(INodeEditorState state)
     {
         _state = state;
         HookStateEvents();

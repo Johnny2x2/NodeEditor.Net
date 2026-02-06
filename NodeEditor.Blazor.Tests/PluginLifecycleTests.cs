@@ -105,7 +105,7 @@ public sealed class PluginLifecycleTests
 
         public bool UnloadCalled { get; private set; }
 
-        public void Register(NodeRegistryService registry)
+        public void Register(INodeRegistryService registry)
         {
             RegisterCalled = true;
         }

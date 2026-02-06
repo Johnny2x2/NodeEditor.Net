@@ -12,7 +12,7 @@ public sealed class TestAPlugin : INodePlugin
     public Version Version => new(1, 0, 0);
     public Version MinApiVersion => new(1, 0, 0);
 
-    public void Register(NodeRegistryService registry)
+    public void Register(INodeRegistryService registry)
     {
         registry.RegisterFromAssembly(typeof(TestAPlugin).Assembly);
     }

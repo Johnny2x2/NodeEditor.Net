@@ -1,6 +1,6 @@
 namespace NodeEditor.Blazor.Services;
 
-public sealed class SocketTypeResolver
+public sealed class SocketTypeResolver : ISocketTypeResolver
 {
     private readonly Dictionary<string, Type> _registry = new(StringComparer.Ordinal);
 

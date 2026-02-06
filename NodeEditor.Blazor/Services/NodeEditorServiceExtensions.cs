@@ -20,7 +20,7 @@ public static class NodeEditorServiceExtensions
     {
         services.AddOptions<Plugins.PluginOptions>();
         services.AddSingleton<Plugins.IPluginServiceRegistry, Plugins.PluginServiceRegistry>();
-        services.AddSingleton<Plugins.PluginLoader>();
+        services.AddSingleton<Plugins.IPluginLoader, Plugins.PluginLoader>();
         services.AddOptions<MarketplaceOptions>();
         services.AddSingleton<IPluginMarketplaceCache, FileBasedMarketplaceCache>();
         services.AddHttpClient<TokenBasedAuthProvider>();
@@ -33,7 +33,7 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<IPluginInstallationService, PluginInstallationService>();
 
         // Register state as scoped (one per user/circuit in Blazor Server, one per app in WASM)
-        services.AddScoped<NodeEditorState>();
+        services.AddScoped<INodeEditorState, NodeEditorState>();
         services.AddScoped<Plugins.IPluginEventBus, Plugins.PluginEventBus>();
         
         // Register coordinate converter as scoped (tied to state)
@@ -49,7 +49,7 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<ViewportCuller>();
         
         // Register socket type resolver as singleton (shared type registry)
-        services.AddSingleton<SocketTypeResolver>(provider =>
+        services.AddSingleton<ISocketTypeResolver>(provider =>
         {
             var resolver = new SocketTypeResolver();
             resolver.Register<ExecutionPath>();
@@ -59,7 +59,7 @@ public static class NodeEditorServiceExtensions
 
         // Register node registry services
         services.AddSingleton<Registry.NodeDiscoveryService>();
-        services.AddSingleton<Registry.NodeRegistryService>();
+        services.AddSingleton<Registry.INodeRegistryService, Registry.NodeRegistryService>();
 
         // Register node context registry for plugin contexts
         services.AddSingleton<INodeContextRegistry, NodeContextRegistry>();
@@ -79,11 +79,12 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<ExecutionPlanner>();
         services.AddSingleton<BackgroundExecutionQueue>();
         services.AddScoped<BackgroundExecutionWorker>();
-        services.AddScoped<NodeExecutionService>();
+        services.AddScoped<Execution.INodeExecutionService, Execution.NodeExecutionService>();
+        services.AddScoped<Execution.HeadlessGraphRunner>();
 
         // Register serialization services
         services.AddSingleton<GraphSchemaMigrator>();
-        services.AddScoped<GraphSerializer>();
+        services.AddScoped<Serialization.IGraphSerializer, Serialization.GraphSerializer>();
 
         // Register variable node factory (bridges graph variables to node definitions)
         services.AddScoped<VariableNodeFactory>();
@@ -100,11 +101,11 @@ public static class NodeEditorServiceExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddNodeEditor(
         this IServiceCollection services,
-        Func<IServiceProvider, NodeEditorState> stateFactory)
+        Func<IServiceProvider, INodeEditorState> stateFactory)
     {
         services.AddOptions<Plugins.PluginOptions>();
         services.AddSingleton<Plugins.IPluginServiceRegistry, Plugins.PluginServiceRegistry>();
-        services.AddSingleton<Plugins.PluginLoader>();
+        services.AddSingleton<Plugins.IPluginLoader, Plugins.PluginLoader>();
         services.AddOptions<MarketplaceOptions>();
         services.AddSingleton<IPluginMarketplaceCache, FileBasedMarketplaceCache>();
         services.AddHttpClient<TokenBasedAuthProvider>();
@@ -121,7 +122,7 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<CoordinateConverter>();
         services.AddScoped<ConnectionValidator>();
         services.AddScoped<ViewportCuller>();
-        services.AddSingleton<SocketTypeResolver>(provider =>
+        services.AddSingleton<ISocketTypeResolver>(provider =>
         {
             var resolver = new SocketTypeResolver();
             resolver.Register<ExecutionPath>();
@@ -130,7 +131,7 @@ public static class NodeEditorServiceExtensions
         });
 
         services.AddSingleton<Registry.NodeDiscoveryService>();
-        services.AddSingleton<Registry.NodeRegistryService>();
+        services.AddSingleton<Registry.INodeRegistryService, Registry.NodeRegistryService>();
 
         services.AddSingleton<Editors.INodeCustomEditor, Editors.DropdownEditorDefinition>();
         services.AddSingleton<Editors.INodeCustomEditor, Editors.NumberUpDownEditorDefinition>();
@@ -145,10 +146,11 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<ExecutionPlanner>();
         services.AddSingleton<BackgroundExecutionQueue>();
         services.AddScoped<BackgroundExecutionWorker>();
-        services.AddScoped<NodeExecutionService>();
+        services.AddScoped<Execution.INodeExecutionService, Execution.NodeExecutionService>();
+        services.AddScoped<Execution.HeadlessGraphRunner>();
 
         services.AddSingleton<GraphSchemaMigrator>();
-        services.AddScoped<GraphSerializer>();
+        services.AddScoped<Serialization.IGraphSerializer, Serialization.GraphSerializer>();
 
         // Register variable node factory (bridges graph variables to node definitions)
         services.AddScoped<VariableNodeFactory>();

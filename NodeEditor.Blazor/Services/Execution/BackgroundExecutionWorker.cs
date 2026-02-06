@@ -5,9 +5,9 @@ namespace NodeEditor.Blazor.Services.Execution;
 public sealed class BackgroundExecutionWorker
 {
     private readonly BackgroundExecutionQueue _queue;
-    private readonly NodeExecutionService _executor;
+    private readonly INodeExecutionService _executor;
 
-    public BackgroundExecutionWorker(BackgroundExecutionQueue queue, NodeExecutionService executor)
+    public BackgroundExecutionWorker(BackgroundExecutionQueue queue, INodeExecutionService executor)
     {
         _queue = queue;
         _executor = executor;

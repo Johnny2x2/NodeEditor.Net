@@ -38,7 +38,7 @@ namespace NodeEditor.Blazor.Services;
 /// }
 /// </code>
 /// </remarks>
-public sealed class NodeEditorState
+public class NodeEditorState : INodeEditorState
 {
     // Events for state changes
     
@@ -166,6 +166,60 @@ public sealed class NodeEditorState
                 node.Outputs.Select(socket => socket.Data).ToList(),
                 node.Data.DefinitionId))
             .ToList();
+    }
+
+    /// <summary>
+    /// Exports the current UI state to a pure graph model with layout data.
+    /// </summary>
+    public GraphData ExportToGraphData()
+    {
+        var nodes = Nodes.Select(vm => new GraphNodeData(
+            new NodeData(
+                vm.Data.Id,
+                vm.Data.Name,
+                vm.Data.Callable,
+                vm.Data.ExecInit,
+                vm.Inputs.Select(socket => socket.Data).ToList(),
+                vm.Outputs.Select(socket => socket.Data).ToList(),
+                vm.Data.DefinitionId),
+            vm.Position,
+            vm.Size)).ToList();
+
+        return new GraphData(nodes, Connections.ToList(), Variables.ToList());
+    }
+
+    /// <summary>
+    /// Loads a pure graph model into UI state (creates view models).
+    /// </summary>
+    public void LoadFromGraphData(GraphData graphData)
+    {
+        if (graphData is null)
+        {
+            throw new ArgumentNullException(nameof(graphData));
+        }
+
+        Clear();
+
+        foreach (var variable in graphData.Variables)
+        {
+            AddVariable(variable);
+        }
+
+        foreach (var graphNode in graphData.Nodes)
+        {
+            var vm = new NodeViewModel(graphNode.Data)
+            {
+                Position = graphNode.Position,
+                Size = graphNode.Size,
+                IsSelected = false
+            };
+            AddNode(vm);
+        }
+
+        foreach (var connection in graphData.Connections)
+        {
+            AddConnection(connection);
+        }
     }
 
     /// <summary>
@@ -332,10 +386,11 @@ public sealed class NodeEditorState
     /// Adds a node to the graph and raises the <see cref="NodeAdded"/> event.
     /// </summary>
     /// <param name="node">The node to add.</param>
-    public void AddNode(NodeViewModel node)
+    public NodeViewModel AddNode(NodeViewModel node)
     {
         Nodes.Add(node);
         NodeAdded?.Invoke(this, new NodeEventArgs(node));
+        return node;
     }
 
     /// <summary>

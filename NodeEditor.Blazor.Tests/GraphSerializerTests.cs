@@ -153,6 +153,51 @@ public sealed class GraphSerializerTests
         Assert.Empty(result.Warnings);
     }
 
+    [Fact]
+    public void SerializeGraphData_RoundTripsWithoutState()
+    {
+        var serializer = CreateSerializer();
+
+        var nodeInputs = new List<SocketData>
+        {
+            new("Input", typeof(int).FullName!, true, false, SocketValue.FromObject(3))
+        };
+        var nodeOutputs = new List<SocketData>
+        {
+            new("Output", typeof(int).FullName!, false, false, SocketValue.FromObject(7))
+        };
+
+        var graphData = new GraphData(
+            new List<GraphNodeData>
+            {
+                new(
+                    new NodeData(
+                        "node-1",
+                        "Add",
+                        false,
+                        false,
+                        nodeInputs,
+                        nodeOutputs,
+                        "Test.Context.Add(System.Int32)"),
+                    new Point2D(5, 15),
+                    new Size2D(110, 60))
+            },
+            new List<ConnectionData>(),
+            new List<GraphVariable>(),
+            GraphSerializer.CurrentVersion);
+
+        var json = serializer.SerializeGraphData(graphData);
+        var rehydrated = serializer.DeserializeToGraphData(json);
+
+        Assert.Single(rehydrated.Nodes);
+        var node = rehydrated.Nodes[0];
+        Assert.Equal("node-1", node.Data.Id);
+        Assert.Equal(new Point2D(5, 15), node.Position);
+        Assert.Equal(new Size2D(110, 60), node.Size);
+        Assert.Equal(3, node.Data.Inputs[0].Value?.ToObject<int>());
+        Assert.Equal(7, node.Data.Outputs[0].Value?.ToObject<int>());
+    }
+
     private static GraphSerializer CreateSerializer()
     {
         var registry = new NodeRegistryService(new NodeDiscoveryService());

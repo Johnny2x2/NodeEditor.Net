@@ -3,12 +3,12 @@ using NodeEditor.Blazor.Services;
 
 namespace NodeEditor.Blazor.Services.Execution;
 
-public sealed class NodeExecutionService
+public sealed class NodeExecutionService : INodeExecutionService
 {
     private readonly ExecutionPlanner _planner;
-    private readonly SocketTypeResolver _typeResolver;
+    private readonly ISocketTypeResolver _typeResolver;
 
-    public NodeExecutionService(ExecutionPlanner planner, SocketTypeResolver typeResolver)
+    public NodeExecutionService(ExecutionPlanner planner, ISocketTypeResolver typeResolver)
     {
         _planner = planner;
         _typeResolver = typeResolver;

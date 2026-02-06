@@ -11,7 +11,7 @@ public interface INodePlugin
     Version Version { get; }
     Version MinApiVersion { get; }
 
-    void Register(NodeRegistryService registry);
+    void Register(INodeRegistryService registry);
 
     void ConfigureServices(IServiceCollection services) { }
 

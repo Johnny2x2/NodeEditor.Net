@@ -94,7 +94,7 @@ public sealed class CoordinateConverter
     /// Updates both pan and zoom from state.
     /// Call this when the state changes to keep the converter synchronized.
     /// </summary>
-    public void SyncFromState(NodeEditorState state)
+    public void SyncFromState(INodeEditorState state)
     {
         _panOffset = new Point2D(state.Viewport.X, state.Viewport.Y);
         _zoom = state.Zoom;

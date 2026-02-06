@@ -3,7 +3,7 @@ using NodeEditor.Blazor.Services;
 
 namespace NodeEditor.Blazor.Services.Registry;
 
-public sealed class NodeRegistryService
+public class NodeRegistryService : INodeRegistryService
 {
     private readonly NodeDiscoveryService _discovery;
     private readonly List<NodeDefinition> _definitions = new();

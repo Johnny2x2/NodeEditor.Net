@@ -21,9 +21,9 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
 {
     private readonly string _testPluginsDir;
     private readonly ServiceProvider _serviceProvider;
-    private readonly PluginLoader _pluginLoader;
-    private readonly NodeRegistryService _registry;
-    private readonly NodeExecutionService _executionService;
+    private readonly IPluginLoader _pluginLoader;
+    private readonly INodeRegistryService _registry;
+    private readonly INodeExecutionService _executionService;
     private readonly INodeContextRegistry _contextRegistry;
     private IReadOnlyList<INodePlugin>? _loadedPlugins;
     private readonly ITestOutputHelper output;
@@ -37,13 +37,13 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<NodeDiscoveryService>();
-        services.AddSingleton<NodeRegistryService>();
+        services.AddSingleton<INodeRegistryService, NodeRegistryService>();
         services.AddSingleton<IPluginServiceRegistry, PluginServiceRegistry>();
         services.AddSingleton<INodeContextRegistry, NodeContextRegistry>();
-        services.AddSingleton<PluginLoader>();
+        services.AddSingleton<IPluginLoader, PluginLoader>();
         services.AddSingleton<ExecutionPlanner>();
-        services.AddSingleton<NodeExecutionService>();
-        services.AddSingleton<SocketTypeResolver>();
+        services.AddSingleton<INodeExecutionService, NodeExecutionService>();
+        services.AddSingleton<ISocketTypeResolver, SocketTypeResolver>();
         services.Configure<PluginOptions>(options =>
         {
             options.PluginDirectory = _testPluginsDir;
@@ -52,9 +52,9 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         });
 
         _serviceProvider = services.BuildServiceProvider();
-        _pluginLoader = _serviceProvider.GetRequiredService<PluginLoader>();
-        _registry = _serviceProvider.GetRequiredService<NodeRegistryService>();
-        _executionService = _serviceProvider.GetRequiredService<NodeExecutionService>();
+        _pluginLoader = _serviceProvider.GetRequiredService<IPluginLoader>();
+        _registry = _serviceProvider.GetRequiredService<INodeRegistryService>();
+        _executionService = _serviceProvider.GetRequiredService<INodeExecutionService>();
         _contextRegistry = _serviceProvider.GetRequiredService<INodeContextRegistry>();
     }
 

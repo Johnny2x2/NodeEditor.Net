@@ -76,7 +76,7 @@
 
 @code {
     [Parameter, EditorRequired]
-    public NodeEditorState State { get; set; } = null!;
+    public INodeEditorState State { get; set; } = null!;
 
     private NodeViewModel? _selectedNode;
 
