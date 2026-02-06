@@ -5,6 +5,7 @@ using NodeEditor.Blazor.Services.Execution;
 using NodeEditor.Blazor.Services.Plugins;
 using NodeEditor.Blazor.Services.Registry;
 using System.Diagnostics;
+using System.IO;
 using System.Reflection;
 using Xunit.Abstractions;
 
@@ -31,8 +32,8 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
     public DynamicPluginLoadingTests(ITestOutputHelper output)
     {
         this.output = output;
-        // Use the plugins folder that MSBuild copies to during test build
-        _testPluginsDir = Path.Combine(AppContext.BaseDirectory, "plugins");
+        // Prefer the packaged TestA plugin from the repo for dynamic loading tests
+        _testPluginsDir = PrepareTestPluginsDir();
 
         var services = new ServiceCollection();
         services.AddLogging();
@@ -69,6 +70,67 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         return Task.CompletedTask;
     }
 
+    private static string PrepareTestPluginsDir()
+    {
+        var repoRoot = FindRepoRoot();
+        if (repoRoot is null)
+        {
+            return Path.Combine(AppContext.BaseDirectory, "plugins");
+        }
+
+        var projectRoot = Path.Combine(repoRoot, "NodeEditor.Plugins.TestA");
+        var buildOutput = Path.Combine(projectRoot, "bin", "Debug", "net10.0");
+        var sourceDir = Directory.Exists(buildOutput)
+            ? buildOutput
+            : Path.Combine(repoRoot, "plugin-repository", "NodeEditor.Plugins.TestA");
+
+        if (!Directory.Exists(sourceDir))
+        {
+            return Path.Combine(AppContext.BaseDirectory, "plugins");
+        }
+
+        var targetRoot = Path.Combine(AppContext.BaseDirectory, "plugins-test", Guid.NewGuid().ToString("N"));
+        var targetDir = Path.Combine(targetRoot, "TestA");
+        Directory.CreateDirectory(targetDir);
+
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var fileName = Path.GetFileName(file);
+            if (fileName.Equals("NodeEditor.Blazor.dll", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var dest = Path.Combine(targetDir, fileName);
+            File.Copy(file, dest, overwrite: false);
+        }
+
+        var manifestPath = Path.Combine(projectRoot, "plugin.json");
+        if (File.Exists(manifestPath))
+        {
+            File.Copy(manifestPath, Path.Combine(targetDir, "plugin.json"), overwrite: true);
+        }
+
+        return targetRoot;
+    }
+
+    private static string? FindRepoRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var slnx = Path.Combine(current.FullName, "NodeEditorMax.slnx");
+            if (File.Exists(slnx))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        return null;
+    }
+
     private static NodeExecutionOptions DefaultOptions => new(
         ExecutionMode.Sequential, 
         AllowBackground: false, 
@@ -82,34 +144,32 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         // Verify at least one plugin is loaded
         Assert.NotEmpty(_loadedPlugins);
 
-        // Verify nodes are registered
+        // Verify TestA nodes are registered
         var catalog = _registry.GetCatalog();
-        Assert.Contains(catalog.All, n => n.Name == "Multiply");
-        Assert.Contains(catalog.All, n => n.Name == "Clamp");
-        Assert.Contains(catalog.All, n => n.Name == "Random Int");
-        Assert.Contains(catalog.All, n => n.Name == "Pulse");
+        Assert.Contains(catalog.All, n => n.Name == "Echo String");
+        Assert.Contains(catalog.All, n => n.Name == "Ping");
+        Assert.Contains(catalog.All, n => n.Name == "Load Image");
     }
 
     [Fact]
     public async Task DynamicLoad_TestPlugins_CanExecuteNodes()
     {
-        // Find the Multiply node definition
-        var multiplyDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Multiply");
-        Assert.NotNull(multiplyDef);
+        // Find the Echo String node definition
+        var echoDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Echo String");
+        Assert.NotNull(echoDef);
 
         // Create node instance using the Factory
-        var multiplyNode = multiplyDef.Factory();
-        multiplyNode = multiplyNode with
+        var echoNode = echoDef.Factory();
+        echoNode = echoNode with
         {
-            Inputs = multiplyNode.Inputs.Select(s => s.Name switch
+            Inputs = echoNode.Inputs.Select(s => s.Name switch
             {
-                "A" => s with { Value = SocketValue.FromObject(6.0) },
-                "B" => s with { Value = SocketValue.FromObject(7.0) },
+                "Input" => s with { Value = SocketValue.FromObject("Hello") },
                 _ => s
             }).ToArray()
         };
 
-        var nodes = new List<NodeData> { multiplyNode };
+        var nodes = new List<NodeData> { echoNode };
         var connections = new List<ConnectionData>();
 
         // Create context from currently loaded assemblies - must be done AFTER plugins are loaded
@@ -132,12 +192,12 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
             CancellationToken.None);
 
         // Check if the node was executed
-        Assert.True(executionContext.IsNodeExecuted(multiplyNode.Id), 
-            "Multiply node should have been executed");
+        Assert.True(executionContext.IsNodeExecuted(echoNode.Id), 
+            "Echo node should have been executed");
 
-        // Assert - Result should be 42
-        var result = executionContext.GetSocketValue(multiplyNode.Id, "Result");
-        Assert.Equal(42.0, result);
+        // Assert - Output should match input
+        var result = executionContext.GetSocketValue(echoNode.Id, "Output");
+        Assert.Equal("Hello", result);
     }
 
 

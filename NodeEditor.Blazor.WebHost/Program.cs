@@ -54,7 +54,7 @@ app.MapRazorComponents<App>()
 
 using (var scope = app.Services.CreateScope())
 {
-    var pluginLoader = scope.ServiceProvider.GetRequiredService<PluginLoader>();
+    var pluginLoader = scope.ServiceProvider.GetRequiredService<IPluginLoader>();
     await pluginLoader.LoadAndRegisterAsync();
 }
 

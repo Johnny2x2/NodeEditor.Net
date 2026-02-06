@@ -9,10 +9,10 @@
 @using NodeEditor.Blazor.ViewModels
 @using NodeEditor.Blazor.Services.Execution
 @using NodeEditor.Blazor.Services.Serialization
-@inject NodeEditorState EditorState
-@inject NodeExecutionService ExecutionService
-@inject NodeRegistryService Registry
-@inject GraphSerializer GraphSerializer
+@inject INodeEditorState EditorState
+@inject INodeExecutionService ExecutionService
+@inject INodeRegistryService Registry
+@inject IGraphSerializer GraphSerializer
 @inject VariableNodeFactory VariableNodeFactory
 @inject HttpClient Http
 

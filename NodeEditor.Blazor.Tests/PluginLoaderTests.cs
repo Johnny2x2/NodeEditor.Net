@@ -14,9 +14,9 @@ public sealed class PluginLoaderTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<NodeDiscoveryService>();
-        services.AddSingleton<NodeRegistryService>();
+        services.AddSingleton<INodeRegistryService, NodeRegistryService>();
         services.AddSingleton<IPluginServiceRegistry, PluginServiceRegistry>();
-        services.AddSingleton<PluginLoader>();
+        services.AddSingleton<IPluginLoader, PluginLoader>();
         services.Configure<PluginOptions>(options =>
         {
             options.PluginDirectory = Path.Combine(AppContext.BaseDirectory, "plugins");
@@ -24,7 +24,7 @@ public sealed class PluginLoaderTests
         });
 
         using var provider = services.BuildServiceProvider();
-        var loader = provider.GetRequiredService<PluginLoader>();
+        var loader = provider.GetRequiredService<IPluginLoader>();
         var plugins = await loader.LoadPluginsAsync();
 
         Assert.Empty(plugins);
