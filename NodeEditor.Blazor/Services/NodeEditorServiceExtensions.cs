@@ -37,16 +37,16 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<Plugins.IPluginEventBus, Plugins.PluginEventBus>();
         
         // Register coordinate converter as scoped (tied to state)
-        services.AddScoped<CoordinateConverter>();
+        services.AddScoped<ICoordinateConverter, CoordinateConverter>();
 
         // Register connection validator
-        services.AddScoped<ConnectionValidator>();
+        services.AddScoped<IConnectionValidator, ConnectionValidator>();
         
         // Register touch gesture handler as scoped
-        services.AddScoped<TouchGestureHandler>();
+        services.AddScoped<ITouchGestureHandler, TouchGestureHandler>();
 
         // Register viewport culling helper
-        services.AddScoped<ViewportCuller>();
+        services.AddScoped<IViewportCuller, ViewportCuller>();
         
         // Register socket type resolver as singleton (shared type registry)
         services.AddSingleton<ISocketTypeResolver>(provider =>
@@ -119,9 +119,10 @@ public static class NodeEditorServiceExtensions
 
         services.AddScoped(stateFactory);
         services.AddScoped<Plugins.IPluginEventBus, Plugins.PluginEventBus>();
-        services.AddScoped<CoordinateConverter>();
-        services.AddScoped<ConnectionValidator>();
-        services.AddScoped<ViewportCuller>();
+        services.AddScoped<ICoordinateConverter, CoordinateConverter>();
+        services.AddScoped<IConnectionValidator, ConnectionValidator>();
+        services.AddScoped<ITouchGestureHandler, TouchGestureHandler>();
+        services.AddScoped<IViewportCuller, ViewportCuller>();
         services.AddSingleton<ISocketTypeResolver>(provider =>
         {
             var resolver = new SocketTypeResolver();

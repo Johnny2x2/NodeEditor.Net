@@ -3,9 +3,14 @@ using NodeEditor.Blazor.Services.Registry;
 
 namespace NodeEditor.Blazor.Services.Execution;
 
-public static class NodeContextFactory
+public interface INodeContextFactory
 {
-    public static CompositeNodeContext CreateCompositeFromLoadedAssemblies()
+    CompositeNodeContext CreateCompositeFromLoadedAssemblies();
+}
+
+public sealed class NodeContextFactory : INodeContextFactory
+{
+    public CompositeNodeContext CreateCompositeFromLoadedAssemblies()
     {
         var contexts = new List<object>();
 

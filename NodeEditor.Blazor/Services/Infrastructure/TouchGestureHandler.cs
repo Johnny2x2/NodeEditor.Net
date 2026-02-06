@@ -6,7 +6,7 @@ namespace NodeEditor.Blazor.Services;
 /// Handles touch gesture recognition and processing for mobile/touch devices.
 /// Supports single-tap selection, two-finger pan, and pinch zoom gestures.
 /// </summary>
-public class TouchGestureHandler
+public class TouchGestureHandler : ITouchGestureHandler
 {
     private readonly Dictionary<long, TouchPoint> _activeTouches = new();
     private TouchGestureState _gestureState = TouchGestureState.None;

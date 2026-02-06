@@ -10,12 +10,12 @@ public sealed class GraphSerializer : IGraphSerializer
     public const int CurrentVersion = 1;
 
     private readonly INodeRegistryService _registry;
-    private readonly ConnectionValidator _connectionValidator;
+    private readonly IConnectionValidator _connectionValidator;
     private readonly GraphSchemaMigrator _migrator;
 
     public GraphSerializer(
         INodeRegistryService registry,
-        ConnectionValidator connectionValidator,
+        IConnectionValidator connectionValidator,
         GraphSchemaMigrator migrator)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));

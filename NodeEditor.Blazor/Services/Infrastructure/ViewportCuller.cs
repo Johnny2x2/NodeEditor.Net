@@ -7,11 +7,11 @@ namespace NodeEditor.Blazor.Services;
 /// <summary>
 /// Computes visible nodes and connections based on the current viewport.
 /// </summary>
-public sealed class ViewportCuller
+public sealed class ViewportCuller : IViewportCuller
 {
-    private readonly CoordinateConverter _coordinateConverter;
+    private readonly ICoordinateConverter _coordinateConverter;
 
-    public ViewportCuller(CoordinateConverter coordinateConverter)
+    public ViewportCuller(ICoordinateConverter coordinateConverter)
     {
         _coordinateConverter = coordinateConverter;
     }

@@ -42,6 +42,12 @@ public sealed class NodeContextRegistry : INodeContextRegistry
     private readonly List<object> _instances = new();
     private readonly List<Type> _types = new();
     private readonly object _lock = new();
+    private readonly INodeContextFactory _contextFactory;
+
+    public NodeContextRegistry(INodeContextFactory contextFactory)
+    {
+        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+    }
 
     public void Register(object context)
     {
@@ -109,7 +115,7 @@ public sealed class NodeContextRegistry : INodeContextRegistry
         var contexts = GetContexts().ToList();
         
         // Also include contexts from loaded assemblies for backward compatibility
-        var assemblyContexts = NodeContextFactory.CreateCompositeFromLoadedAssemblies();
+        var assemblyContexts = _contextFactory.CreateCompositeFromLoadedAssemblies();
         foreach (var ctx in assemblyContexts.Contexts)
         {
             if (!contexts.Any(c => c.GetType() == ctx.GetType()))

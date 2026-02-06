@@ -2,10 +2,10 @@
 @implements IDisposable
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
-@inject CoordinateConverter CoordinateConverter
-@inject ConnectionValidator ConnectionValidator
-@inject TouchGestureHandler TouchGestures
-@inject ViewportCuller ViewportCuller
+@inject ICoordinateConverter CoordinateConverter
+@inject IConnectionValidator ConnectionValidator
+@inject ITouchGestureHandler TouchGestures
+@inject IViewportCuller ViewportCuller
 @inject INodeRegistryService _registry
 
 <div class="ne-canvas"

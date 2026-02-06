@@ -5,7 +5,7 @@ namespace NodeEditor.Blazor.Services;
 /// <summary>
 /// Validates whether two sockets can be connected.
 /// </summary>
-public sealed class ConnectionValidator
+public sealed class ConnectionValidator : IConnectionValidator
 {
     private readonly ISocketTypeResolver _typeResolver;
 

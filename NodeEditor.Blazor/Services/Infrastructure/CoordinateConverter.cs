@@ -6,7 +6,7 @@ namespace NodeEditor.Blazor.Services;
 /// Provides coordinate conversion utilities between screen space and graph space.
 /// Essential for handling zoom, pan, and hit testing in the node editor.
 /// </summary>
-public sealed class CoordinateConverter
+public sealed class CoordinateConverter : ICoordinateConverter
 {
     private Point2D _panOffset = Point2D.Zero;
     private double _zoom = 1.0;
