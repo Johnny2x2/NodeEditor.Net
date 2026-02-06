@@ -1,8 +1,0 @@
-{
-  "id": "com.nodeeditormax.sample",
-  "name": "Sample Nodes",
-  "version": "1.0.0",
-  "minApiVersion": "1.0.0",
-  "entryAssembly": "NodeEditor.Plugins.Sample.dll",
-  "category": "Sample"
-}
