@@ -661,4 +661,3 @@ See LICENSE.txt in the repository root.
 - **NodeEditor** - Original WinForms-based node editor
 - **NodeEditorMax** - MAUI cross-platform implementation
 - **NodeEditor.Blazor.WebHost** - Example Blazor Server hosting application
-- **NodeEditor.Plugins.Sample** - Sample plugin implementation

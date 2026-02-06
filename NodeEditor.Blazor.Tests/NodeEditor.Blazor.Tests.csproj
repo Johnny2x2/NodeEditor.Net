@@ -32,17 +32,6 @@
       - But NOT linked at compile time
       - Tests load them dynamically from plugins folder
     -->
-    <ProjectReference Include="..\NodeEditor.Plugins.Sample\NodeEditor.Plugins.Sample.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
-
-  <!-- Copy Sample plugin with all dependencies for testing -->
-  <Target Name="CopySamplePluginForTests" AfterTargets="Build">
-    <ItemGroup>
-      <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\bin\$(Configuration)\$(TargetFramework)\*.deps.json" />
-      <_SamplePluginFiles Include="..\NodeEditor.Plugins.Sample\plugin.json" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_SamplePluginFiles)" DestinationFolder="$(OutDir)plugins\Sample" SkipUnchangedFiles="true" />
-  </Target>
 
 </Project>

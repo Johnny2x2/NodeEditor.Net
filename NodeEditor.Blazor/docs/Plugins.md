@@ -423,16 +423,16 @@ catch (Exception ex)
 }
 ```
 
-## Sample Plugin
+## Plugin Template
 
-See the included sample plugin for a complete example:
+See the included template plugin for a complete example:
 
-**Location:** `NodeEditor.Plugins.Sample/SamplePlugin.cs`
+**Location:** `NodeEditor.Plugins.Template/TemplatePlugin.cs`
 
 ```csharp
-public sealed class SamplePlugin : INodePlugin
+public sealed class TemplatePlugin : INodePlugin
 {
-    public string Name => "Sample Nodes";
+    public string Id => "com.nodeeditormax.template";
     public string Id => "com.nodeeditormax.sample";
     public Version Version => new(1, 0, 0);
     public Version MinApiVersion => new(1, 0, 0);
