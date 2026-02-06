@@ -50,36 +50,6 @@ public sealed class PluginLifecycleTests
         Assert.True(plugin.UnloadCalled, "Unload should be called");
     }
 
-    [Fact(Skip = "Lifecycle test with PluginLoadContext requires different approach - static state doesn't work across load contexts")]
-    public async Task PluginLoader_LoadsPluginFromDisk()
-    {
-        // This test is skipped because when plugins are loaded from disk via PluginLoadContext,
-        // they exist in a separate assembly load context with different type identity.
-        // Static fields in the test assembly cannot be shared with plugin instances loaded
-        // from disk. To properly test this scenario, we would need:
-        // 1. A communication mechanism (events, files, memory-mapped files)
-        // 2. Or load the plugin in the default context (but that defeats isolation)
-        // 3. Or verify behavior through side effects visible to the host
-        
-        var tempDir = Directory.CreateTempSubdirectory("nodeeditor-plugin-tests");
-        try
-        {
-            // Setup would go here but test is skipped
-            await Task.CompletedTask;
-        }
-        finally
-        {
-            try
-            {
-                tempDir.Delete(true);
-            }
-            catch
-            {
-                // ignore cleanup failures
-            }
-        }
-    }
-
     private sealed class TestLifecyclePlugin : INodePlugin
     {
         public const string PluginId = "com.nodeeditormax.test.lifecycle";

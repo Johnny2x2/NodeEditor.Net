@@ -5,9 +5,13 @@ namespace NodeEditor.Blazor.Services;
 
 public interface IViewportCuller
 {
-    IReadOnlyList<NodeViewModel> GetVisibleNodes(IEnumerable<NodeViewModel> nodes, Rect2D visibleRect);
+    IReadOnlyList<NodeViewModel> GetVisibleNodes(
+        IReadOnlyList<NodeViewModel> nodes,
+        Rect2D screenViewport,
+        IEnumerable<string>? alwaysIncludeNodeIds = null);
+
     IReadOnlyList<ConnectionData> GetVisibleConnections(
-        IEnumerable<ConnectionData> connections,
-        IEnumerable<NodeViewModel> nodes,
-        Rect2D visibleRect);
+        IReadOnlyList<ConnectionData> connections,
+        IReadOnlyCollection<NodeViewModel> visibleNodes,
+        IEnumerable<string>? alwaysIncludeNodeIds = null);
 }

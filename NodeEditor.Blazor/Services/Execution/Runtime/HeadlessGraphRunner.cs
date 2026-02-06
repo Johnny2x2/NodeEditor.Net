@@ -37,7 +37,7 @@ public sealed class HeadlessGraphRunner
         var nodes = graphData.Nodes.Select(n => n.Data).ToList();
         var connections = graphData.Connections.ToList();
         var executionContext = context ?? new NodeExecutionContext();
-        var effectiveNodeContext = nodeContext ?? NodeContextFactory.CreateCompositeFromLoadedAssemblies();
+        var effectiveNodeContext = nodeContext ?? new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
 
         VariableNodeExecutor.SeedVariables(executionContext, graphData.Variables);
 

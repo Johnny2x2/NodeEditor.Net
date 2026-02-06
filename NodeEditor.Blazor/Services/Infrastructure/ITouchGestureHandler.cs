@@ -2,8 +2,8 @@ namespace NodeEditor.Blazor.Services;
 
 public interface ITouchGestureHandler
 {
-    TouchGestureResult ProcessTouchStart(TouchPoint[] points);
-    TouchGestureResult ProcessTouchMove(TouchPoint[] points);
-    TouchGestureResult ProcessTouchEnd(TouchPoint[] points);
+    TouchGestureResult? OnTouchStart(IReadOnlyList<TouchPoint2D> touches);
+    TouchGestureResult? OnTouchMove(IReadOnlyList<TouchPoint2D> touches);
+    TouchGestureResult? OnTouchEnd(IReadOnlyList<TouchPoint2D> remainingTouches);
     void Reset();
 }

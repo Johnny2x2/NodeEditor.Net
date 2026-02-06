@@ -82,6 +82,40 @@ public sealed class CoordinateConverter : ICoordinateConverter
     }
 
     /// <summary>
+    /// Computes the visible graph-space rectangle given a screen viewport size.
+    /// </summary>
+    public Rect2D GetVisibleGraphRect(Size2D viewportSize)
+    {
+        var screenRect = new Rect2D(0, 0, viewportSize.Width, viewportSize.Height);
+        return ScreenToGraph(screenRect);
+    }
+
+    /// <summary>
+    /// Applies a screen-space pan delta to the current pan offset.
+    /// </summary>
+    public void ApplyPanDelta(Point2D delta)
+    {
+        _panOffset = new Point2D(_panOffset.X + delta.X, _panOffset.Y + delta.Y);
+    }
+
+    /// <summary>
+    /// Converts a graph rectangle to screen coordinates.
+    /// </summary>
+    public Rect2D GraphRectToScreenRect(Rect2D graphRect)
+    {
+        return GraphToScreen(graphRect);
+    }
+
+    /// <summary>
+    /// Resets the converter to the default pan and zoom.
+    /// </summary>
+    public void Reset()
+    {
+        _panOffset = Point2D.Zero;
+        _zoom = 1.0;
+    }
+
+    /// <summary>
     /// Converts a screen delta (movement) to graph delta.
     /// Use this for drag operations where only the difference matters.
     /// </summary>

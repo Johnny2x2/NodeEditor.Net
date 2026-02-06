@@ -630,7 +630,7 @@
         {
             switch (result.Type)
             {
-                case TouchGestureHandler.TouchGestureType.DragStart:
+                case TouchGestureType.DragStart:
                     // Check if touch is on a node for dragging
                     var graphPos = CoordinateConverter.ScreenToGraph(result.Position);
                     var nodeAtPosition = FindNodeAtPosition(graphPos);
@@ -670,7 +670,7 @@
         {
             switch (result.Type)
             {
-                case TouchGestureHandler.TouchGestureType.Pan:
+                case TouchGestureType.Pan:
                     if (result.Delta.HasValue)
                     {
                         _panOffset = new Point2D(
@@ -682,7 +682,7 @@
                     }
                     break;
 
-                case TouchGestureHandler.TouchGestureType.Zoom:
+                case TouchGestureType.Zoom:
                     if (result.ZoomDelta.HasValue && result.ZoomCenter.HasValue)
                     {
                         var newZoom = Math.Clamp(_touchZoomBase * result.ZoomDelta.Value, MinZoom, MaxZoom);
@@ -710,7 +710,7 @@
                     }
                     break;
 
-                case TouchGestureHandler.TouchGestureType.Drag:
+                case TouchGestureType.Drag:
                     if (_isDraggingNode && _draggingNode != null)
                     {
                         var currentPos = CoordinateConverter.ScreenToGraph(result.Position);
@@ -766,7 +766,7 @@
         {
             switch (result.Type)
             {
-                case TouchGestureHandler.TouchGestureType.Tap:
+                case TouchGestureType.Tap:
                     var graphPos = CoordinateConverter.ScreenToGraph(result.Position);
                     var nodeAtPosition = FindNodeAtPosition(graphPos);
                     
@@ -781,7 +781,7 @@
                     }
                     break;
 
-                case TouchGestureHandler.TouchGestureType.DragEnd:
+                case TouchGestureType.DragEnd:
                     _isDraggingNode = false;
                     _draggingNode = null;
                     _isPanning = false;

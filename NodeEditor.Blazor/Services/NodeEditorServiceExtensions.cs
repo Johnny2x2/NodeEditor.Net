@@ -61,6 +61,9 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<Registry.NodeDiscoveryService>();
         services.AddSingleton<Registry.INodeRegistryService, Registry.NodeRegistryService>();
 
+        // Register node context factory and registry
+        services.AddSingleton<INodeContextFactory, NodeContextFactory>();
+
         // Register node context registry for plugin contexts
         services.AddSingleton<INodeContextRegistry, NodeContextRegistry>();
 
@@ -133,6 +136,8 @@ public static class NodeEditorServiceExtensions
 
         services.AddSingleton<Registry.NodeDiscoveryService>();
         services.AddSingleton<Registry.INodeRegistryService, Registry.NodeRegistryService>();
+
+        services.AddSingleton<INodeContextFactory, NodeContextFactory>();
 
         services.AddSingleton<Editors.INodeCustomEditor, Editors.DropdownEditorDefinition>();
         services.AddSingleton<Editors.INodeCustomEditor, Editors.NumberUpDownEditorDefinition>();

@@ -71,7 +71,7 @@
 	protected override void OnInitialized()
 	{
 		Registry.RegisterFromAssembly(typeof(StandardNodeContext).Assembly);
-		_nodeContext = NodeContextFactory.CreateCompositeFromLoadedAssemblies();
+		_nodeContext = new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
 
 		// Ensure the VariableNodeFactory is initialized (subscribes to state events)
 		_ = VariableNodeFactory;
@@ -97,7 +97,7 @@
 	{
 		_isPluginManagerOpen = false;
 		// Refresh node context to pick up newly installed plugins
-		_nodeContext = NodeContextFactory.CreateCompositeFromLoadedAssemblies();
+		_nodeContext = new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
 	}
 
 	public void Dispose()
@@ -114,7 +114,7 @@
 			return;
 		}
 
-		_nodeContext ??= NodeContextFactory.CreateCompositeFromLoadedAssemblies();
+		_nodeContext ??= new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
 
 		_isExecuting = true;
 		_executionStatus = "Running";

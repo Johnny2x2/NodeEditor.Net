@@ -8,7 +8,7 @@ namespace NodeEditor.Blazor.Services;
 /// </summary>
 public class TouchGestureHandler : ITouchGestureHandler
 {
-    private readonly Dictionary<long, TouchPoint> _activeTouches = new();
+    private readonly Dictionary<long, TrackedTouchPoint> _activeTouches = new();
     private TouchGestureState _gestureState = TouchGestureState.None;
     private double _initialPinchDistance;
     private Point2D _initialPinchCenter = Point2D.Zero;
@@ -16,7 +16,7 @@ public class TouchGestureHandler : ITouchGestureHandler
     /// <summary>
     /// Represents a tracked touch point.
     /// </summary>
-    private record TouchPoint(long Identifier, Point2D Position, DateTime StartTime);
+    private record TrackedTouchPoint(long Identifier, Point2D Position, DateTime StartTime);
 
     /// <summary>
     /// Types of touch gestures that can be recognized.
@@ -30,31 +30,6 @@ public class TouchGestureHandler : ITouchGestureHandler
     }
 
     /// <summary>
-    /// The result of processing a touch gesture.
-    /// </summary>
-    public record TouchGestureResult(
-        TouchGestureType Type,
-        Point2D Position,
-        Point2D? Delta = null,
-        double? ZoomDelta = null,
-        Point2D? ZoomCenter = null
-    );
-
-    /// <summary>
-    /// Types of touch gestures.
-    /// </summary>
-    public enum TouchGestureType
-    {
-        None,
-        Tap,
-        Pan,
-        Zoom,
-        DragStart,
-        Drag,
-        DragEnd
-    }
-
-    /// <summary>
     /// Processes touch start events and determines gesture type.
     /// </summary>
     public TouchGestureResult? OnTouchStart(IReadOnlyList<TouchPoint2D> touches)
@@ -63,7 +38,7 @@ public class TouchGestureHandler : ITouchGestureHandler
         _activeTouches.Clear();
         foreach (var touch in touches)
         {
-            _activeTouches[touch.Identifier] = new TouchPoint(
+            _activeTouches[touch.Identifier] = new TrackedTouchPoint(
                 touch.Identifier,
                 new Point2D(touch.ClientX, touch.ClientY),
                 DateTime.UtcNow
@@ -171,7 +146,7 @@ public class TouchGestureHandler : ITouchGestureHandler
         _activeTouches.Clear();
         foreach (var touch in remainingTouches)
         {
-            _activeTouches[touch.Identifier] = new TouchPoint(
+            _activeTouches[touch.Identifier] = new TrackedTouchPoint(
                 touch.Identifier,
                 new Point2D(touch.ClientX, touch.ClientY),
                 DateTime.UtcNow
@@ -238,3 +213,28 @@ public class TouchGestureHandler : ITouchGestureHandler
 /// Represents a touch point from a touch event.
 /// </summary>
 public record TouchPoint2D(long Identifier, double ClientX, double ClientY);
+
+/// <summary>
+/// Types of touch gestures.
+/// </summary>
+public enum TouchGestureType
+{
+    None,
+    Tap,
+    Pan,
+    Zoom,
+    DragStart,
+    Drag,
+    DragEnd
+}
+
+/// <summary>
+/// The result of processing a touch gesture.
+/// </summary>
+public record TouchGestureResult(
+    TouchGestureType Type,
+    Point2D Position,
+    Point2D? Delta = null,
+    double? ZoomDelta = null,
+    Point2D? ZoomCenter = null
+);

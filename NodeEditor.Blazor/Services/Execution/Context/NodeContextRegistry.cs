@@ -44,9 +44,9 @@ public sealed class NodeContextRegistry : INodeContextRegistry
     private readonly object _lock = new();
     private readonly INodeContextFactory _contextFactory;
 
-    public NodeContextRegistry(INodeContextFactory contextFactory)
+    public NodeContextRegistry(INodeContextFactory? contextFactory = null)
     {
-        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+        _contextFactory = contextFactory ?? new NodeContextFactory();
     }
 
     public void Register(object context)
