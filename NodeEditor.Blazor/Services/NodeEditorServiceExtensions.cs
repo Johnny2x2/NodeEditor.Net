@@ -72,6 +72,9 @@ public static class NodeEditorServiceExtensions
         // Touch gesture handler
         services.AddScoped<ITouchGestureHandler, TouchGestureHandler>();
 
+        // Canvas interaction handler (coordinates pointer/touch/keyboard events)
+        services.AddScoped<ICanvasInteractionHandler, CanvasInteractionHandler>();
+
         // Viewport culler
         services.AddScoped<IViewportCuller, ViewportCuller>();
 

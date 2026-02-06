@@ -1,0 +1,29 @@
+@* Wraps the context menu, binding it to the interaction handler's state. *@
+<ContextMenu IsOpen="IsOpen"
+             Position="Position"
+             OnSelect="OnSelectCallback"
+             OnClose="OnCloseCallback" />
+
+@code {
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public Point2D Position { get; set; }
+
+    [Parameter]
+    public EventCallback<NodeDefinition> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private async Task OnSelectCallback(NodeDefinition definition)
+    {
+        await OnSelect.InvokeAsync(definition);
+    }
+
+    private async Task OnCloseCallback()
+    {
+        await OnClose.InvokeAsync();
+    }
+}

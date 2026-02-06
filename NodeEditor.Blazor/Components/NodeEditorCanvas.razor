@@ -3,8 +3,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 @inject ICoordinateConverter CoordinateConverter
-@inject IConnectionValidator ConnectionValidator
-@inject ITouchGestureHandler TouchGestures
+@inject ICanvasInteractionHandler Interaction
 @inject IViewportCuller ViewportCuller
 @inject INodeRegistryService _registry
 
@@ -27,24 +26,18 @@
      @ontouchend="OnTouchEnd"
      @ontouchcancel="OnTouchCancel"
      tabindex="0">
-    @if (_isSelecting)
-    {
-        <div class="ne-selection-rect" style="@SelectionRectStyle"></div>
-    }
-    <div class="ne-plugin-manager-launch">
-        <button class="ne-plugin-manager-launch-button"
-                @onclick="OpenPluginManager"
-                title="Plugin Manager">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z" />
-            </svg>
-        </button>
-    </div>
-    <ContextMenu IsOpen="_isContextMenuOpen"
-                 Position="_contextMenuScreenPosition"
-                 OnSelect="AddNodeFromDefinition"
-                 OnClose="CloseContextMenu" />
-    <PluginManagerDialog @bind-IsOpen="_isPluginManagerOpen" />
+
+    <SelectionRectangle IsVisible="Interaction.IsSelecting"
+                        Start="Interaction.SelectionStart"
+                        Current="Interaction.SelectionCurrent" />
+
+    <PluginManagerOverlay />
+
+    <CanvasContextMenu IsOpen="Interaction.IsContextMenuOpen"
+                       Position="Interaction.ContextMenuScreenPosition"
+                       OnSelect="AddNodeFromDefinition"
+                       OnClose="CloseContextMenu" />
+
     <div class="ne-viewport" style="@ViewportTransformStyle">
         @* Connection layer (SVG) - rendered below nodes *@
         <svg class="ne-connections" @ref="_svgRef">
@@ -56,13 +49,10 @@
                                 OnSelected="OnConnectionSelected"
                                 @key="@GetConnectionKey(connection)" />
             }
-            @if (_pendingConnection is not null)
-            {
-                <ConnectionPath Connection="_pendingConnection"
-                                Nodes="State.Nodes"
-                                IsPending="true"
-                                PendingEndPoint="_pendingConnectionEndGraph" />
-            }
+
+            <ConnectionDrawing Connection="Interaction.PendingConnection"
+                               EndPoint="Interaction.PendingConnectionEndGraph"
+                               Nodes="State.Nodes" />
         </svg>
 
         @* Node layer (HTML) - rendered above connections *@
@@ -86,35 +76,6 @@
     private ElementReference _canvasRef;
     private ElementReference _svgRef;
 
-    private bool _isPanning;
-    private Point2D _panStart;
-    private Point2D _panOffset = Point2D.Zero;
-    private double _zoom = 1.0;
-
-    private ConnectionData? _pendingConnection;
-    private Point2D? _pendingConnectionEndGraph;
-    private bool _isDraggingNode;
-    private Point2D _dragStart;
-    private NodeViewModel? _draggingNode;
-
-    private bool _isSelecting;
-    private bool _selectionAdditive;
-    private Point2D _selectionStartScreen;
-    private Point2D _selectionCurrentScreen;
-    private HashSet<string> _selectionBase = new();
-
-    private bool _isContextMenuOpen;
-    private Point2D _contextMenuScreenPosition = Point2D.Zero;
-    private Point2D _contextMenuGraphPosition = Point2D.Zero;
-
-    private bool _isPluginManagerOpen;
-
-    private bool _isTouchGesture;
-    private double _touchZoomBase = 1.0;
-
-    // Variable drag-and-drop state (set via VariablesPanel callback)
-    private VariableDragData? _pendingVariableDrag;
-
     private Point2D _canvasScreenOffset = Point2D.Zero;
 
     private IReadOnlyList<NodeViewModel> _visibleNodes = Array.Empty<NodeViewModel>();
@@ -134,75 +95,45 @@
     [Parameter]
     public double ZoomStep { get; set; } = 0.1;
 
+    private string ViewportTransformStyle =>
+        $"transform: translate({Interaction.PanOffset.X}px, {Interaction.PanOffset.Y}px) scale({Interaction.Zoom});";
+
+    // ────────────────────────── Public API (called by parent) ──────────────────────────
+
     /// <summary>
     /// Call this method from the parent when the VariablesPanel raises its OnVariableDrag callback
     /// to inform the canvas which variable is being dragged.
     /// </summary>
     public void SetPendingVariableDrag(VariableDragData? data)
     {
-        _pendingVariableDrag = data;
+        Interaction.PendingVariableDrag = data;
     }
 
     public void CreateVariableNode(string variableId, bool isSetNode)
     {
         var variable = State.FindVariable(variableId);
-        if (variable is null)
-        {
-            return;
-        }
+        if (variable is null) return;
 
         var definitionId = isSetNode ? variable.SetDefinitionId : variable.GetDefinitionId;
         var definition = _registry?.Definitions.FirstOrDefault(
             d => d.Id.Equals(definitionId, StringComparison.Ordinal));
-
-        if (definition is null)
-        {
-            return;
-        }
+        if (definition is null) return;
 
         var nodeData = definition.Factory();
         var center = GetViewportCenterScreen();
         var graphPosition = CoordinateConverter.ScreenToGraph(center);
-        var nodeViewModel = new NodeViewModel(nodeData)
-        {
-            Position = graphPosition
-        };
-
+        var nodeViewModel = new NodeViewModel(nodeData) { Position = graphPosition };
         State.AddNode(nodeViewModel);
     }
 
-    private Point2D GetViewportCenterScreen()
-    {
-        var width = State.Viewport.Width > 0 ? State.Viewport.Width : 800;
-        var height = State.Viewport.Height > 0 ? State.Viewport.Height : 600;
-        return new Point2D(width / 2, height / 2);
-    }
-
-    private string ViewportTransformStyle =>
-        $"transform: translate({_panOffset.X}px, {_panOffset.Y}px) scale({_zoom});";
-
-    private string SelectionRectStyle
-    {
-        get
-        {
-            var left = Math.Min(_selectionStartScreen.X, _selectionCurrentScreen.X);
-            var top = Math.Min(_selectionStartScreen.Y, _selectionCurrentScreen.Y);
-            var width = Math.Abs(_selectionCurrentScreen.X - _selectionStartScreen.X);
-            var height = Math.Abs(_selectionCurrentScreen.Y - _selectionStartScreen.Y);
-            return $"left: {left}px; top: {top}px; width: {width}px; height: {height}px;";
-        }
-    }
-
-    private void OpenPluginManager()
-    {
-        _isPluginManagerOpen = true;
-    }
+    // ────────────────────────── Lifecycle ──────────────────────────
 
     protected override void OnInitialized()
     {
         CoordinateConverter.SyncFromState(State);
+        Interaction.Attach(State, State.Zoom, new Point2D(State.Viewport.X, State.Viewport.Y));
+        Interaction.StateChanged += OnInteractionStateChanged;
 
-        // Subscribe to state events for reactive updates
         State.NodeAdded += OnStateChanged;
         State.NodeRemoved += OnStateChanged;
         State.ConnectionAdded += OnStateChanged;
@@ -217,21 +148,10 @@
         UpdateCulling();
     }
 
-    private async Task UpdateCanvasScreenOffsetAsync()
-    {
-        if (_canvasJsModule is null)
-        {
-            return;
-        }
-
-        _canvasScreenOffset = await _canvasJsModule.InvokeAsync<Point2D>("getCanvasScreenOffset", _canvasRef);
-    }
-
-    private Point2D ToCanvasPoint(Point2D clientPoint) =>
-        new(clientPoint.X - _canvasScreenOffset.X, clientPoint.Y - _canvasScreenOffset.Y);
-
     public void Dispose()
     {
+        Interaction.StateChanged -= OnInteractionStateChanged;
+
         State.NodeAdded -= OnStateChanged;
         State.NodeRemoved -= OnStateChanged;
         State.ConnectionAdded -= OnStateChanged;
@@ -244,15 +164,16 @@
         State.ViewportChanged -= OnViewportChanged;
     }
 
+    // ────────────────────────── State event handlers ──────────────────────────
+
     private void OnStateChanged(object? sender, EventArgs e)
     {
         UpdateCulling();
         StateHasChanged();
     }
-    
+
     private void OnZoomChanged(object? sender, ZoomChangedEventArgs e)
     {
-        _zoom = e.CurrentZoom;
         CoordinateConverter.SyncFromState(State);
         UpdateCulling();
         StateHasChanged();
@@ -260,580 +181,164 @@
 
     private void OnViewportChanged(object? sender, ViewportChangedEventArgs e)
     {
-        _panOffset = new Point2D(e.CurrentViewport.X, e.CurrentViewport.Y);
         CoordinateConverter.SyncFromState(State);
         UpdateCulling();
         StateHasChanged();
     }
 
+    private void OnInteractionStateChanged()
+    {
+        UpdateCulling();
+        StateHasChanged();
+    }
+
+    // ────────────────────────── Event forwarders ──────────────────────────
+
     private async Task OnPointerDown(PointerEventArgs e)
     {
         await _canvasRef.FocusAsync();
         await UpdateCanvasScreenOffsetAsync();
-
-        var canvasPoint = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
-
-        if (_isContextMenuOpen && e.Button == 0)
-        {
-            CloseContextMenu();
-        }
-
-        if (e.Button == 1) // Middle mouse button for panning
-        {
-            _isPanning = true;
-            _panStart = new Point2D(canvasPoint.X - _panOffset.X, canvasPoint.Y - _panOffset.Y);
-        }
-        else if (e.Button == 0) // Left click on empty canvas clears selection
-        {
-            BeginSelection(e, canvasPoint);
-        }
+        Interaction.HandlePointerDown(e, ToCanvasPoint(new Point2D(e.ClientX, e.ClientY)));
+        UpdateCulling();
     }
 
     private void OnPointerMove(PointerEventArgs e)
     {
-        var canvasPoint = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
-
-        if (_isPanning)
-        {
-            _panOffset = new Point2D(canvasPoint.X - _panStart.X, canvasPoint.Y - _panStart.Y);
-            State.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, State.Viewport.Width, State.Viewport.Height);
-            UpdateCulling();
-        }
-        else if (_isDraggingNode && _draggingNode is not null)
-        {
-            var screenDelta = new Point2D(canvasPoint.X - _dragStart.X, canvasPoint.Y - _dragStart.Y);
-            var graphDelta = CoordinateConverter.ScreenDeltaToGraph(screenDelta);
-
-            var selectedNodes = GetSelectedNodesForDrag();
-            foreach (var node in selectedNodes)
-            {
-                node.Position = new Point2D(
-                    node.Position.X + graphDelta.X,
-                    node.Position.Y + graphDelta.Y);
-            }
-
-            _dragStart = canvasPoint;
-            UpdateCulling();
-            StateHasChanged();
-        }
-        else if (_pendingConnection is not null)
-        {
-            _pendingConnectionEndGraph = CoordinateConverter.ScreenToGraph(canvasPoint);
-            StateHasChanged();
-        }
-        else if (_isSelecting)
-        {
-            _selectionCurrentScreen = canvasPoint;
-            UpdateSelectionFromRect();
-        }
+        Interaction.HandlePointerMove(e, ToCanvasPoint(new Point2D(e.ClientX, e.ClientY)));
+        UpdateCulling();
     }
 
     private void OnPointerUp(PointerEventArgs e)
     {
-        _isPanning = false;
-        _isDraggingNode = false;
-        _draggingNode = null;
-        _pendingConnection = null;
-        _pendingConnectionEndGraph = null;
-
-        if (_isSelecting)
-        {
-            _selectionCurrentScreen = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
-            UpdateSelectionFromRect(finalize: true);
-            _isSelecting = false;
-        }
+        Interaction.HandlePointerUp(e, ToCanvasPoint(new Point2D(e.ClientX, e.ClientY)));
     }
 
     private void OnWheel(WheelEventArgs e)
     {
-        var zoomDelta = e.DeltaY > 0 ? -ZoomStep : ZoomStep;
-        var newZoom = Math.Clamp(_zoom + zoomDelta, MinZoom, MaxZoom);
-        
-        if (Math.Abs(newZoom - _zoom) > double.Epsilon)
-        {
-            var focus = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
-            var newPan = CoordinateConverter.ComputeZoomCenteredPan(focus, _zoom, newZoom);
-            State.Zoom = newZoom;
-            State.Viewport = new Rect2D(newPan.X, newPan.Y, State.Viewport.Width, State.Viewport.Height);
-        }
+        var focus = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
+        Interaction.HandleWheel(e, focus, MinZoom, MaxZoom, ZoomStep);
     }
 
     private void OnContextMenu(MouseEventArgs e)
     {
-        _contextMenuScreenPosition = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
-        _contextMenuGraphPosition = CoordinateConverter.ScreenToGraph(_contextMenuScreenPosition);
-        _isContextMenuOpen = true;
+        Interaction.OpenContextMenu(ToCanvasPoint(new Point2D(e.ClientX, e.ClientY)));
         StateHasChanged();
-    }
-
-    private void OnSocketPointerDown(SocketPointerEventArgs e)
-    {
-        // Start creating a connection from this socket
-        if (!e.Socket.Data.IsInput)
-        {
-            _pendingConnection = new ConnectionData(
-                OutputNodeId: e.NodeId,
-                InputNodeId: string.Empty,
-                OutputSocketName: e.Socket.Data.Name,
-                InputSocketName: string.Empty,
-                IsExecution: e.Socket.Data.IsExecution);
-            var canvasPoint = ToCanvasPoint(e.Position);
-            _pendingConnectionEndGraph = CoordinateConverter.ScreenToGraph(canvasPoint);
-        }
-    }
-
-    private void OnSocketPointerUp(SocketPointerEventArgs e)
-    {
-        // Complete the connection if we have a pending one
-        if (_pendingConnection is not null && e.Socket.Data.IsInput)
-        {
-            var connection = _pendingConnection with
-            {
-                InputNodeId = e.NodeId,
-                InputSocketName = e.Socket.Data.Name
-            };
-            
-            // Validate connection is not to the same node
-            if (connection.OutputNodeId != connection.InputNodeId)
-            {
-                if (IsValidConnection(connection, e.Socket))
-                {
-                    State.AddConnection(connection);
-                }
-            }
-        }
-        _pendingConnection = null;
-        _pendingConnectionEndGraph = null;
-    }
-
-    private void OnNodeDragStart(NodePointerEventArgs e)
-    {
-        var node = State.Nodes.FirstOrDefault(n => n.Data.Id == e.NodeId);
-        if (node is null)
-        {
-            return;
-        }
-
-        _isSelecting = false;
-        _isDraggingNode = true;
-        _draggingNode = node;
-        _dragStart = ToCanvasPoint(e.Position);
-
-        if (!node.IsSelected)
-        {
-            State.SelectNode(node.Data.Id, clearExisting: true);
-        }
-    }
-
-    private void BeginSelection(PointerEventArgs e, Point2D canvasPoint)
-    {
-        _isSelecting = true;
-        _selectionStartScreen = canvasPoint;
-        _selectionCurrentScreen = _selectionStartScreen;
-        _selectionAdditive = e.CtrlKey || e.ShiftKey;
-        _selectionBase = _selectionAdditive ? State.SelectedNodeIds.ToHashSet() : new HashSet<string>();
-
-        State.ClearConnectionSelection();
-
-        if (!_selectionAdditive)
-        {
-            State.ClearSelection();
-        }
-    }
-
-    private void UpdateSelectionFromRect(bool finalize = false)
-    {
-        var selectionRectGraph = GetSelectionRectGraph();
-        var selected = State.Nodes
-            .Where(n => selectionRectGraph.Intersects(new Rect2D(n.Position.X, n.Position.Y, n.Size.Width, n.Size.Height)))
-            .Select(n => n.Data.Id)
-            .ToHashSet();
-
-        if (_selectionAdditive)
-        {
-            selected.UnionWith(_selectionBase);
-        }
-
-        State.SelectNodes(selected, clearExisting: true);
-
-        if (finalize)
-        {
-            _selectionBase = selected;
-        }
-    }
-
-    private Rect2D GetSelectionRectGraph()
-    {
-        var left = Math.Min(_selectionStartScreen.X, _selectionCurrentScreen.X);
-        var top = Math.Min(_selectionStartScreen.Y, _selectionCurrentScreen.Y);
-        var width = Math.Abs(_selectionCurrentScreen.X - _selectionStartScreen.X);
-        var height = Math.Abs(_selectionCurrentScreen.Y - _selectionStartScreen.Y);
-
-        var screenRect = new Rect2D(left, top, width, height);
-        return CoordinateConverter.ScreenToGraph(screenRect);
-    }
-
-    private IEnumerable<NodeViewModel> GetSelectedNodesForDrag()
-    {
-        if (_draggingNode is null)
-        {
-            return Array.Empty<NodeViewModel>();
-        }
-
-        if (_draggingNode.IsSelected)
-        {
-            return State.Nodes.Where(n => n.IsSelected);
-        }
-
-        return new[] { _draggingNode };
-    }
-
-    private bool IsValidConnection(ConnectionData connection, SocketViewModel targetSocket)
-    {
-        if (State.Connections.Any(c =>
-            c.InputNodeId == connection.InputNodeId &&
-            c.InputSocketName == connection.InputSocketName))
-        {
-            return false;
-        }
-
-        var sourceNode = State.Nodes.FirstOrDefault(n => n.Data.Id == connection.OutputNodeId);
-        var sourceSocket = sourceNode?.Outputs.FirstOrDefault(s => s.Data.Name == connection.OutputSocketName);
-
-        if (sourceSocket is null)
-        {
-            return false;
-        }
-
-        return ConnectionValidator.CanConnect(sourceSocket.Data, targetSocket.Data);
-    }
-
-    private void CancelInteraction()
-    {
-        _isPanning = false;
-        _isDraggingNode = false;
-        _draggingNode = null;
-        _pendingConnection = null;
-        _pendingConnectionEndGraph = null;
-        _isSelecting = false;
-        CloseContextMenu();
     }
 
     private void OnKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key is "Delete" or "Backspace")
-        {
-            if (State.SelectedConnection is not null)
-            {
-                State.RemoveConnection(State.SelectedConnection);
-            }
-            else
-            {
-                State.RemoveSelectedNodes();
-            }
-        }
-        else if (e.Key == "Escape")
-        {
-            CancelInteraction();
-        }
-        else if (e.CtrlKey && (e.Key == "a" || e.Key == "A"))
-        {
-            State.SelectAll();
-        }
-        else if (e.CtrlKey && (e.Key == "z" || e.Key == "Z"))
-        {
-            State.RequestUndo();
-        }
-        else if (e.CtrlKey && (e.Key == "y" || e.Key == "Y"))
-        {
-            State.RequestRedo();
-        }
+        Interaction.HandleKeyDown(e);
     }
 
-    private void AddNodeFromDefinition(NodeDefinition definition)
+    private void OnSocketPointerDown(SocketPointerEventArgs e)
     {
-        var nodeData = definition.Factory();
-        var nodeViewModel = new NodeViewModel(nodeData)
-        {
-            Position = _contextMenuGraphPosition
-        };
-
-        State.AddNode(nodeViewModel);
+        Interaction.HandleSocketPointerDown(e, ToCanvasPoint(e.Position));
     }
 
-    private void CloseContextMenu()
+    private void OnSocketPointerUp(SocketPointerEventArgs e)
     {
-        _isContextMenuOpen = false;
+        Interaction.HandleSocketPointerUp(e);
     }
 
-    // ===== Variable Drag & Drop =====
+    private void OnNodeDragStart(NodePointerEventArgs e)
+    {
+        Interaction.HandleNodeDragStart(e, ToCanvasPoint(e.Position));
+    }
 
     private void OnDragOver(DragEventArgs e)
     {
-        // Allow drop only if we have a pending variable drag
-        if (_pendingVariableDrag is not null)
-        {
-            e.DataTransfer.DropEffect = "copy";
-        }
+        Interaction.HandleDragOver(e);
     }
 
     private async Task OnDrop(DragEventArgs e)
     {
-        if (_pendingVariableDrag is null) return;
-
         await UpdateCanvasScreenOffsetAsync();
-
         var canvasPoint = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
-        var graphPosition = CoordinateConverter.ScreenToGraph(canvasPoint);
-
-        var variableId = _pendingVariableDrag.VariableId;
-        var variable = State.FindVariable(variableId);
-        _pendingVariableDrag = null;
-
-        if (variable is null) return;
-
-        // Hold Alt key to create a Set node, otherwise create a Get node
-        var isSetNode = e.AltKey;
-        var definitionId = isSetNode ? variable.SetDefinitionId : variable.GetDefinitionId;
-
-        // Find the matching definition from the registry
-        var definition = _registry?.Definitions.FirstOrDefault(
-            d => d.Id.Equals(definitionId, StringComparison.Ordinal));
-
-        if (definition is null) return;
-
-        var nodeData = definition.Factory();
-        var nodeViewModel = new NodeViewModel(nodeData)
-        {
-            Position = graphPosition
-        };
-
-        State.AddNode(nodeViewModel);
+        Interaction.HandleDrop(e, canvasPoint, _registry);
     }
-
-    // ===== Touch Event Handlers =====
 
     private void OnTouchStart(TouchEventArgs e)
     {
         _ = UpdateCanvasScreenOffsetAsync();
-        _isTouchGesture = true;
-        
         var touches = e.ChangedTouches.Select(t =>
         {
-            var canvasPoint = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
-            return new TouchPoint2D(t.Identifier, canvasPoint.X, canvasPoint.Y);
+            var pt = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
+            return new TouchPoint2D(t.Identifier, pt.X, pt.Y);
         }).ToList();
-        
-        var result = TouchGestures.OnTouchStart(touches);
-        
-        if (result != null)
-        {
-            switch (result.Type)
-            {
-                case TouchGestureType.DragStart:
-                    // Check if touch is on a node for dragging
-                    var graphPos = CoordinateConverter.ScreenToGraph(result.Position);
-                    var nodeAtPosition = FindNodeAtPosition(graphPos);
-                    
-                    if (nodeAtPosition != null)
-                    {
-                        _isDraggingNode = true;
-                        _draggingNode = nodeAtPosition;
-                        _dragStart = graphPos;
-                    }
-                    else
-                    {
-                        // Start pan with single touch
-                        _isPanning = true;
-                        _panStart = result.Position;
-                    }
-                    break;
-            }
-        }
-
+        Interaction.HandleTouchStart(touches);
+        UpdateCulling();
         StateHasChanged();
     }
 
     private void OnTouchMove(TouchEventArgs e)
     {
-        if (!_isTouchGesture) return;
-
         var touches = e.Touches.Select(t =>
         {
-            var canvasPoint = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
-            return new TouchPoint2D(t.Identifier, canvasPoint.X, canvasPoint.Y);
+            var pt = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
+            return new TouchPoint2D(t.Identifier, pt.X, pt.Y);
         }).ToList();
-        
-        var result = TouchGestures.OnTouchMove(touches);
-        
-        if (result != null)
-        {
-            switch (result.Type)
-            {
-                case TouchGestureType.Pan:
-                    if (result.Delta.HasValue)
-                    {
-                        _panOffset = new Point2D(
-                            _panOffset.X + result.Delta.Value.X,
-                            _panOffset.Y + result.Delta.Value.Y
-                        );
-                        CoordinateConverter.PanOffset = _panOffset;
-                        State.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, State.Viewport.Width, State.Viewport.Height);
-                    }
-                    break;
-
-                case TouchGestureType.Zoom:
-                    if (result.ZoomDelta.HasValue && result.ZoomCenter.HasValue)
-                    {
-                        var newZoom = Math.Clamp(_touchZoomBase * result.ZoomDelta.Value, MinZoom, MaxZoom);
-                        
-                        // Zoom towards the pinch center
-                        var screenCenter = result.ZoomCenter.Value;
-                        var graphBefore = CoordinateConverter.ScreenToGraph(screenCenter);
-                        
-                        _zoom = newZoom;
-                        CoordinateConverter.Zoom = _zoom;
-                        
-                        var graphAfter = CoordinateConverter.ScreenToGraph(screenCenter);
-                        var correction = new Point2D(
-                            (graphAfter.X - graphBefore.X) * _zoom,
-                            (graphAfter.Y - graphBefore.Y) * _zoom
-                        );
-                        
-                        _panOffset = new Point2D(
-                            _panOffset.X + correction.X,
-                            _panOffset.Y + correction.Y
-                        );
-                        CoordinateConverter.PanOffset = _panOffset;
-                        State.Zoom = _zoom;
-                        State.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, State.Viewport.Width, State.Viewport.Height);
-                    }
-                    break;
-
-                case TouchGestureType.Drag:
-                    if (_isDraggingNode && _draggingNode != null)
-                    {
-                        var currentPos = CoordinateConverter.ScreenToGraph(result.Position);
-                        var delta = new Point2D(
-                            currentPos.X - _dragStart.X,
-                            currentPos.Y - _dragStart.Y
-                        );
-                        
-                        _draggingNode.Position = new Point2D(
-                            _draggingNode.Position.X + delta.X,
-                            _draggingNode.Position.Y + delta.Y
-                        );
-                        
-                        _dragStart = currentPos;
-                    }
-                    else if (_isPanning)
-                    {
-                        var delta = new Point2D(
-                            result.Position.X - _panStart.X,
-                            result.Position.Y - _panStart.Y
-                        );
-                        
-                        _panOffset = new Point2D(
-                            _panOffset.X + delta.X,
-                            _panOffset.Y + delta.Y
-                        );
-                        CoordinateConverter.PanOffset = _panOffset;
-                        
-                        _panStart = result.Position;
-                        State.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, State.Viewport.Width, State.Viewport.Height);
-                    }
-                    break;
-            }
-        }
-
+        Interaction.HandleTouchMove(touches, MinZoom, MaxZoom);
         UpdateCulling();
         StateHasChanged();
     }
 
     private void OnTouchEnd(TouchEventArgs e)
     {
-        if (!_isTouchGesture) return;
-
-        var remainingTouches = e.Touches.Select(t =>
+        var remaining = e.Touches.Select(t =>
         {
-            var canvasPoint = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
-            return new TouchPoint2D(t.Identifier, canvasPoint.X, canvasPoint.Y);
+            var pt = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
+            return new TouchPoint2D(t.Identifier, pt.X, pt.Y);
         }).ToList();
-        
-        var result = TouchGestures.OnTouchEnd(remainingTouches);
-        
-        if (result != null)
-        {
-            switch (result.Type)
-            {
-                case TouchGestureType.Tap:
-                    var graphPos = CoordinateConverter.ScreenToGraph(result.Position);
-                    var nodeAtPosition = FindNodeAtPosition(graphPos);
-                    
-                    if (nodeAtPosition != null)
-                    {
-                        State.SelectNode(nodeAtPosition.Data.Id);
-                    }
-                    else
-                    {
-                        State.ClearConnectionSelection();
-                        State.ClearSelection();
-                    }
-                    break;
-
-                case TouchGestureType.DragEnd:
-                    _isDraggingNode = false;
-                    _draggingNode = null;
-                    _isPanning = false;
-                    _touchZoomBase = _zoom;
-                    break;
-            }
-        }
-
-        if (remainingTouches.Count == 0)
-        {
-            _isTouchGesture = false;
-            TouchGestures.Reset();
-        }
-
+        Interaction.HandleTouchEnd(remaining);
         StateHasChanged();
     }
 
     private void OnTouchCancel(TouchEventArgs e)
     {
-        _isTouchGesture = false;
-        _isDraggingNode = false;
-        _draggingNode = null;
-        _isPanning = false;
-        TouchGestures.Reset();
+        Interaction.HandleTouchCancel();
         StateHasChanged();
     }
 
-    private NodeViewModel? FindNodeAtPosition(Point2D graphPosition)
+    // ────────────────────────── Context menu callbacks ──────────────────────────
+
+    private void AddNodeFromDefinition(NodeDefinition definition)
     {
-        // Check nodes in reverse order (top-most first)
-        for (int i = State.Nodes.Count - 1; i >= 0; i--)
+        var nodeData = definition.Factory();
+        var nodeViewModel = new NodeViewModel(nodeData)
         {
-            var node = State.Nodes[i];
-            var nodeRect = new Rect2D(
-                node.Position.X,
-                node.Position.Y,
-                node.Size.Width,
-                node.Size.Height
-            );
-
-            if (nodeRect.Contains(graphPosition))
-            {
-                return node;
-            }
-        }
-
-        return null;
+            Position = Interaction.ContextMenuGraphPosition
+        };
+        State.AddNode(nodeViewModel);
     }
+
+    private void CloseContextMenu()
+    {
+        Interaction.CloseContextMenu();
+    }
+
+    // ────────────────────────── Connection selection ──────────────────────────
 
     private void OnConnectionSelected(ConnectionData connection)
     {
         State.SelectConnection(connection);
+    }
+
+    // ────────────────────────── Helpers ──────────────────────────
+
+    private async Task UpdateCanvasScreenOffsetAsync()
+    {
+        if (_canvasJsModule is null) return;
+        _canvasScreenOffset = await _canvasJsModule.InvokeAsync<Point2D>("getCanvasScreenOffset", _canvasRef);
+    }
+
+    private Point2D ToCanvasPoint(Point2D clientPoint) =>
+        new(clientPoint.X - _canvasScreenOffset.X, clientPoint.Y - _canvasScreenOffset.Y);
+
+    private Point2D GetViewportCenterScreen()
+    {
+        var width = State.Viewport.Width > 0 ? State.Viewport.Width : 800;
+        var height = State.Viewport.Height > 0 ? State.Viewport.Height : 600;
+        return new Point2D(width / 2, height / 2);
     }
 
     private static string GetConnectionKey(ConnectionData c) =>
@@ -854,8 +359,10 @@
             -cullPadding,
             State.Viewport.Width + cullPadding * 2,
             State.Viewport.Height + cullPadding * 2);
-        var alwaysInclude = _isDraggingNode && _draggingNode is not null
-            ? new[] { _draggingNode.Data.Id }
+
+        var handler = Interaction as CanvasInteractionHandler;
+        var alwaysInclude = Interaction.IsDraggingNode && handler?.DraggingNode is not null
+            ? new[] { handler.DraggingNode.Data.Id }
             : Array.Empty<string>();
 
         _visibleNodes = ViewportCuller.GetVisibleNodes(State.Nodes, screenViewport, alwaysInclude);
