@@ -5,6 +5,8 @@ namespace NodeEditor.Blazor.Tests;
 
 public sealed class NodeAdapterTests
 {
+    private readonly INodeAdapter _adapter = new NodeAdapter();
+
     [Fact]
     public void FromSnapshot_MapsSocketsAndValues()
     {
@@ -30,7 +32,7 @@ public sealed class NodeAdapterTests
             new[] { input },
             new[] { output });
 
-        var node = NodeAdapter.FromSnapshot(snapshot);
+        var node = _adapter.FromSnapshot(snapshot);
 
         Assert.Equal("node-1", node.Id);
         Assert.Single(node.Inputs);

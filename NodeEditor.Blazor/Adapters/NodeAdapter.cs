@@ -3,9 +3,13 @@ using NodeEditor.Blazor.Models;
 
 namespace NodeEditor.Blazor.Adapters;
 
-public static class NodeAdapter
+/// <summary>
+/// Converts legacy node snapshot formats to the current <see cref="NodeData"/> model.
+/// </summary>
+public sealed class NodeAdapter : INodeAdapter
 {
-    public static NodeData FromSnapshot(LegacyNodeSnapshot snapshot)
+    /// <inheritdoc />
+    public NodeData FromSnapshot(LegacyNodeSnapshot snapshot)
     {
         var inputs = snapshot.Inputs
             .Select(socket => new SocketData(
