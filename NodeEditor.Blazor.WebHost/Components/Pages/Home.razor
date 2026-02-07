@@ -9,11 +9,14 @@
 @using NodeEditor.Blazor.Services.Registry
 @using NodeEditor.Blazor.ViewModels
 @using NodeEditor.Blazor.Services.Execution
+@using NodeEditor.Blazor.Services.Logging
 @using NodeEditor.Blazor.Services.Serialization
 @inject INodeEditorState EditorState
 @inject INodeExecutionService ExecutionService
 @inject INodeRegistryService Registry
 @inject IGraphSerializer GraphSerializer
+@inject INodeEditorLogger NodeLogger
+@inject ILogChannelRegistry ChannelRegistry
 @inject VariableNodeFactory VariableNodeFactory
 @inject EventNodeFactory EventNodeFactory
 @inject ISocketTypeResolver SocketTypeResolver
@@ -54,6 +57,11 @@
 	<span class="toolbar-separator"></span>
 	<button @onclick="ExportGraphToFileAsync" disabled="@_isExecuting"
 			title="Export graph to a .json file">Export</button>
+	<button @onclick="OpenPluginManager"
+			title="Plugin Manager">Plugins</button>
+	<button @onclick="ToggleTerminal"
+			class="@(_isTerminalVisible ? "toolbar-btn--active" : "")"
+			title="Toggle Output Terminal">Terminal</button>
 	<label class="load-file-btn" title="Import graph from a .json file">
 		Import
 		<InputFile OnChange="ImportGraphFromFileAsync" accept=".json" style="display:none" />
@@ -74,15 +82,22 @@
 <EventsPanel State="EditorState"
              OnCreateEventNode="OnEventNodeRequested" />
 
-<div class="node-editor-container">
+<OutputTerminalPanel @ref="_terminalRef"
+                     Logger="NodeLogger"
+                     ChannelRegistry="ChannelRegistry"
+                     @bind-IsVisible="_isTerminalVisible" />
+
+<div class="node-editor-container" style="@(_isTerminalVisible ? "height: calc(100% - 48px - 220px);" : "")">
 	<NodeEditorCanvas @ref="_canvasRef" State="EditorState" />
 </div>
 
 @code {
 	private NodeEditorCanvas? _canvasRef;
+	private OutputTerminalPanel? _terminalRef;
 	private CancellationTokenSource? _executionCts;
 	private bool _isExecuting;
 	private bool _isPaused;
+	private bool _isTerminalVisible;
 	private string _executionStatus = "Idle";
 	private CompositeNodeContext? _nodeContext;
 	private string? _loadStatus;
@@ -124,6 +139,11 @@
 		_savedGraphNames = names?.ToList() ?? new List<string>();
 	}
 
+	private void OpenPluginManager()
+	{
+		_isPluginManagerOpen = true;
+	}
+
 	protected override void OnInitialized()
 	{
 		Registry.RegisterFromAssembly(typeof(StandardNodeContext).Assembly);
@@ -136,11 +156,12 @@
 		ExecutionService.NodeCompleted += OnNodeCompleted;
 		ExecutionService.NodeFailed += OnNodeFailed;
 		ExecutionService.Gate.StateChanged += OnGateStateChanged;
+		ExecutionService.FeedbackReceived += OnFeedbackReceived;
+		ExecutionService.ExecutionFailed += OnExecutionFailed;
+		ExecutionService.ExecutionCanceled += OnExecutionCanceled;
 
 		AddDefaultStartNode();
 	}
-
-	private void OpenPluginManager() => _isPluginManagerOpen = true;
 
 	private void OnVariableDragStarted(VariableDragData data)
 	{
@@ -170,6 +191,9 @@
 		ExecutionService.NodeCompleted -= OnNodeCompleted;
 		ExecutionService.NodeFailed -= OnNodeFailed;
 		ExecutionService.Gate.StateChanged -= OnGateStateChanged;
+		ExecutionService.FeedbackReceived -= OnFeedbackReceived;
+		ExecutionService.ExecutionFailed -= OnExecutionFailed;
+		ExecutionService.ExecutionCanceled -= OnExecutionCanceled;
 	}
 
 	public async ValueTask DisposeAsync()
@@ -198,6 +222,10 @@
 		_isExecuting = true;
 		_executionStatus = "Running";
 		EditorState.ResetNodeExecutionState();
+
+		// Notify terminal to clear ClearOnRun channels
+		_terminalRef?.NotifyExecutionStarting();
+		NodeLogger.LogExecution("Execution started.");
 
 		_executionCts?.Dispose();
 		_executionCts = new CancellationTokenSource();
@@ -243,6 +271,7 @@
 
 	private void OnNodeStarted(object? sender, NodeExecutionEventArgs e)
 	{
+		NodeLogger.LogExecution($"Node started: {e.Node.Name}", e.Node.Id, e.Node.Name);
 		_ = InvokeAsync(() =>
 		{
 			EditorState.SetNodeExecuting(e.Node.Id, true);
@@ -252,6 +281,7 @@
 
 	private void OnNodeCompleted(object? sender, NodeExecutionEventArgs e)
 	{
+		NodeLogger.LogExecution($"Node completed: {e.Node.Name}", e.Node.Id, e.Node.Name);
 		_ = InvokeAsync(() =>
 		{
 			EditorState.SetNodeExecuting(e.Node.Id, false);
@@ -260,6 +290,8 @@
 
 	private void OnNodeFailed(object? sender, NodeExecutionFailedEventArgs e)
 	{
+		NodeLogger.Log(LogChannels.Execution, LogLevel.Error,
+			$"Node failed: {e.Node.Name} — {e.Exception.Message}", e.Node.Id, e.Node.Name);
 		_ = InvokeAsync(() =>
 		{
 			EditorState.SetNodeExecuting(e.Node.Id, false);
@@ -362,6 +394,28 @@
 		});
 	}
 
+	private void ToggleTerminal()
+	{
+		_isTerminalVisible = !_isTerminalVisible;
+	}
+
+	private void OnFeedbackReceived(object? sender, FeedbackMessageEventArgs e)
+	{
+		var level = e.Type == ExecutionFeedbackType.DebugPrint ? LogLevel.Debug : LogLevel.Info;
+		var channel = e.Type == ExecutionFeedbackType.DebugPrint ? LogChannels.Debug : LogChannels.Execution;
+		NodeLogger.Log(channel, level, e.Message, e.Node.Id, e.Node.Name);
+	}
+
+	private void OnExecutionFailed(object? sender, Exception e)
+	{
+		NodeLogger.Log(LogChannels.Execution, LogLevel.Error, $"Execution failed: {e.Message}");
+	}
+
+	private void OnExecutionCanceled(object? sender, EventArgs e)
+	{
+		NodeLogger.Log(LogChannels.Execution, LogLevel.Warning, "Execution canceled.");
+	}
+
 	private void CreateNewGraph()
 	{
 		EditorState.Clear();
@@ -369,6 +423,7 @@
 		AddDefaultStartNode();
 		_executionStatus = "Idle";
 		_loadStatus = "New graph.";
+		NodeLogger.LogApplication("New graph created.");
 	}
 
 	private void AddDefaultStartNode()

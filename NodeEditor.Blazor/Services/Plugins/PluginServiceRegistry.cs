@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using NodeEditor.Blazor.Services.Logging;
 
 namespace NodeEditor.Blazor.Services.Plugins;
 
@@ -7,7 +8,7 @@ public sealed class PluginServiceRegistry : IPluginServiceRegistry, IDisposable
     private readonly Dictionary<string, ServiceProvider> _providers = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _lock = new();
 
-    public IServiceProvider RegisterServices(string pluginId, Action<IServiceCollection> configureServices)
+    public IServiceProvider RegisterServices(string pluginId, Action<IServiceCollection> configureServices, INodeEditorLogger? logger = null)
     {
         if (string.IsNullOrWhiteSpace(pluginId))
         {
@@ -28,6 +29,13 @@ public sealed class PluginServiceRegistry : IPluginServiceRegistry, IDisposable
             }
 
             var services = new ServiceCollection();
+
+            // Pre-seed host services so plugins can resolve them
+            if (logger is not null)
+            {
+                services.AddSingleton(logger);
+            }
+
             configureServices(services);
             var provider = services.BuildServiceProvider();
             _providers[pluginId] = provider;

@@ -13,6 +13,11 @@ public interface INodeExecutionService
     event EventHandler<ExecutionLayerEventArgs>? LayerCompleted;
 
     /// <summary>
+    /// Raised when a node emits a feedback message (e.g. from Debug Print nodes).
+    /// </summary>
+    event EventHandler<FeedbackMessageEventArgs>? FeedbackReceived;
+
+    /// <summary>
     /// Gets the execution gate for step/pause control.
     /// </summary>
     ExecutionGate Gate { get; }

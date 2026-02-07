@@ -2230,3 +2230,218 @@
     color: #ff6666;
     background: rgba(255, 100, 100, 0.12);
 }
+
+/* ============================================
+   Output Terminal Panel
+   ============================================ */
+.ne-output-terminal {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 220px;
+    background: rgba(22, 22, 34, 0.97);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.45);
+    color: #e0e0f0;
+    z-index: 10000;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+}
+
+.ne-output-terminal--collapsed {
+    height: auto;
+}
+
+.ne-output-terminal-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(30, 30, 46, 0.98);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+    min-height: 32px;
+}
+
+.ne-output-terminal-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.7);
+    flex-shrink: 0;
+}
+
+.ne-output-terminal-channel-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    color: #e0e0f0;
+    padding: 3px 8px;
+    font-size: 11px;
+    outline: none;
+    cursor: pointer;
+    min-width: 120px;
+}
+
+.ne-output-terminal-channel-select:focus {
+    border-color: rgba(100, 180, 255, 0.4);
+}
+
+.ne-output-terminal-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ne-output-terminal-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    user-select: none;
+}
+
+.ne-output-terminal-toggle-label input[type="checkbox"] {
+    width: 12px;
+    height: 12px;
+    cursor: pointer;
+    accent-color: #7cb8ff;
+}
+
+.ne-output-terminal-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.ne-output-terminal-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ne-output-terminal-btn--close:hover {
+    background: rgba(255, 80, 80, 0.15);
+    color: #ff6666;
+    border-color: rgba(255, 80, 80, 0.3);
+}
+
+.ne-output-terminal-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-anchor: auto;
+}
+
+.ne-output-terminal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ne-output-terminal-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+}
+
+.ne-output-terminal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ne-output-terminal-empty {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 11px;
+    padding: 16px 0;
+    text-align: center;
+    font-style: italic;
+}
+
+.ne-output-terminal-entry {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 1px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.ne-output-terminal-entry:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.ne-output-terminal-timestamp {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 10px;
+    flex-shrink: 0;
+    min-width: 72px;
+}
+
+.ne-output-terminal-level {
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    min-width: 28px;
+    text-align: center;
+}
+
+.ne-output-terminal-node {
+    color: rgba(100, 180, 255, 0.7);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.ne-output-terminal-message {
+    color: #d0d8f0;
+    word-break: break-word;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Level-specific coloring */
+.ne-output-terminal-entry--debug .ne-output-terminal-level {
+    color: #66d9ef;
+}
+
+.ne-output-terminal-entry--debug .ne-output-terminal-message {
+    color: #88d8e8;
+}
+
+.ne-output-terminal-entry--info .ne-output-terminal-level {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.ne-output-terminal-entry--info .ne-output-terminal-message {
+    color: #d0d8f0;
+}
+
+.ne-output-terminal-entry--warning .ne-output-terminal-level {
+    color: #ffcc44;
+}
+
+.ne-output-terminal-entry--warning .ne-output-terminal-message {
+    color: #e8d088;
+}
+
+.ne-output-terminal-entry--error .ne-output-terminal-level {
+    color: #ff6666;
+}
+
+.ne-output-terminal-entry--error .ne-output-terminal-message {
+    color: #e88888;
+}
+
+.ne-output-terminal-entry--error {
+    background: rgba(255, 60, 60, 0.04);
+}

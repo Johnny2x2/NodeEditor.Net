@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NodeEditor.Blazor.Services.Execution;
 using NodeEditor.Blazor.Services.Editors;
+using NodeEditor.Blazor.Services.Logging;
 using NodeEditor.Blazor.Services.Registry;
 
 namespace NodeEditor.Blazor.Services.Plugins;
@@ -16,6 +17,7 @@ public sealed class PluginLoader : IPluginLoader
     private readonly IServiceProvider _services;
     private readonly IPluginServiceRegistry _serviceRegistry;
     private readonly INodeContextRegistry? _contextRegistry;
+    private readonly ILogChannelRegistry? _channelRegistry;
     private readonly Dictionary<string, LoadedPlugin> _loadedPlugins = new(StringComparer.OrdinalIgnoreCase);
 
     public PluginLoader(
@@ -24,7 +26,8 @@ public sealed class PluginLoader : IPluginLoader
         ILogger<PluginLoader> logger,
         IServiceProvider services,
         IPluginServiceRegistry serviceRegistry,
-        INodeContextRegistry? contextRegistry = null)
+        INodeContextRegistry? contextRegistry = null,
+        ILogChannelRegistry? channelRegistry = null)
     {
         _registry = registry;
         _logger = logger;
@@ -32,6 +35,7 @@ public sealed class PluginLoader : IPluginLoader
         _services = services;
         _serviceRegistry = serviceRegistry;
         _contextRegistry = contextRegistry;
+        _channelRegistry = channelRegistry;
     }
 
     public async Task<IReadOnlyList<INodePlugin>> LoadAndRegisterAsync(
@@ -49,9 +53,23 @@ public sealed class PluginLoader : IPluginLoader
                 await plugin.OnLoadAsync(token).ConfigureAwait(false);
 
                 // Register plugin services and get the plugin's service provider
-                var pluginServices = _serviceRegistry.RegisterServices(plugin.Id, plugin.ConfigureServices);
+                var hostLogger = _services.GetService<INodeEditorLogger>();
+                var pluginServices = _serviceRegistry.RegisterServices(plugin.Id, plugin.ConfigureServices, hostLogger);
 
                 plugin.Register(_registry);
+
+                // Let plugin register custom log channels if it implements ILogChannelAware
+                if (plugin is ILogChannelAware logAware && _channelRegistry is not null)
+                {
+                    try
+                    {
+                        logAware.RegisterChannels(_channelRegistry);
+                    }
+                    catch (Exception channelEx)
+                    {
+                        _logger.LogWarning(channelEx, "Plugin '{PluginId}' failed during channel registration.", plugin.Id);
+                    }
+                }
 
                 if (_loadedPlugins.TryGetValue(plugin.Id, out var registeredEntry))
                 {
@@ -210,6 +228,9 @@ public sealed class PluginLoader : IPluginLoader
 
             _serviceRegistry.RemoveServices(pluginId);
 
+            // Remove log channels registered by this plugin
+            _channelRegistry?.RemoveChannelsByPlugin(pluginId);
+
             try
             {
                 entry.LoadContext.Unload();
@@ -262,6 +283,9 @@ public sealed class PluginLoader : IPluginLoader
             _registry.RemoveDefinitionsFromAssembly(entry.Assembly);
 
             _serviceRegistry.RemoveServices(pluginId);
+
+            // Remove log channels registered by this plugin
+            _channelRegistry?.RemoveChannelsByPlugin(pluginId);
 
             try
             {

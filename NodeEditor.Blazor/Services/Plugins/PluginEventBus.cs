@@ -1,18 +1,22 @@
 using System.Collections.Concurrent;
 using System.Threading;
 using NodeEditor.Blazor.Services;
+using NodeEditor.Blazor.Services.Logging;
 
 namespace NodeEditor.Blazor.Services.Plugins;
 
 public sealed class PluginEventBus : IPluginEventBus, IDisposable
 {
     private readonly INodeEditorState _state;
+    private readonly INodeEditorLogger? _logger;
     private readonly ConcurrentBag<IDisposable> _subscriptions = new();
 
-    public PluginEventBus(INodeEditorState state)
+    public PluginEventBus(INodeEditorState state, INodeEditorLogger? logger = null)
     {
         _state = state;
+        _logger = logger;
         HookStateEvents();
+        HookLoggerEvents();
     }
 
     public IDisposable SubscribeNodeAdded(Action<NodeEventArgs> handler) => AddHandler(_nodeAddedHandlers, handler);
@@ -35,6 +39,8 @@ public sealed class PluginEventBus : IPluginEventBus, IDisposable
 
     public IDisposable SubscribeNodeExecutionStateChanged(Action<NodeEventArgs> handler) => AddHandler(_nodeExecutionStateChangedHandlers, handler);
 
+    public IDisposable SubscribeLogMessage(Action<LogEntry> handler) => AddHandler(_logMessageHandlers, handler);
+
     public void PublishNodeAdded(NodeEventArgs args) => Publish(_nodeAddedHandlers, args);
 
     public void PublishNodeRemoved(NodeEventArgs args) => Publish(_nodeRemovedHandlers, args);
@@ -55,9 +61,12 @@ public sealed class PluginEventBus : IPluginEventBus, IDisposable
 
     public void PublishNodeExecutionStateChanged(NodeEventArgs args) => Publish(_nodeExecutionStateChangedHandlers, args);
 
+    public void PublishLogMessage(LogEntry entry) => Publish(_logMessageHandlers, entry);
+
     public void Dispose()
     {
         UnhookStateEvents();
+        UnhookLoggerEvents();
         foreach (var subscription in _subscriptions)
         {
             subscription.Dispose();
@@ -74,6 +83,7 @@ public sealed class PluginEventBus : IPluginEventBus, IDisposable
     private readonly HandlerCollection<ZoomChangedEventArgs> _zoomChangedHandlers = new();
     private readonly HandlerCollection _socketValuesChangedHandlers = new();
     private readonly HandlerCollection<NodeEventArgs> _nodeExecutionStateChangedHandlers = new();
+    private readonly HandlerCollection<LogEntry> _logMessageHandlers = new();
 
     private void HookStateEvents()
     {
@@ -98,6 +108,21 @@ public sealed class PluginEventBus : IPluginEventBus, IDisposable
         _state.ZoomChanged += _zoomChangedHandler;
         _state.SocketValuesChanged += _socketValuesChangedHandler;
         _state.NodeExecutionStateChanged += _nodeExecutionStateChangedHandler;
+    }
+
+    private Action<LogEntry>? _logEntryHandler;
+
+    private void HookLoggerEvents()
+    {
+        if (_logger is null) return;
+        _logEntryHandler = entry => PublishLogMessage(entry);
+        _logger.OnLogEntry += _logEntryHandler;
+    }
+
+    private void UnhookLoggerEvents()
+    {
+        if (_logger is null || _logEntryHandler is null) return;
+        _logger.OnLogEntry -= _logEntryHandler;
     }
 
     private void UnhookStateEvents()

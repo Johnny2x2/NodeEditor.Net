@@ -10,5 +10,6 @@ public enum ExecutionFeedbackType
     Continue,
     Wait,
     True,
-    False
+    False,
+    DebugPrint
 }

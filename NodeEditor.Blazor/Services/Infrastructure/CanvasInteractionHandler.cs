@@ -326,7 +326,7 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
 
         _overlayDragOverlays = _state.Overlays
             .Where(o => o.Id != overlay.Id)
-            .Where(o => overlayRect.Intersects(new Rect2D(o.Position.X, o.Position.Y, o.Size.Width, o.Size.Height)))
+            .Where(o => IsOverlayContained(overlayRect, o))
             .ToList();
     }
 
@@ -708,6 +708,15 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
 
         var screenRect = new Rect2D(left, top, width, height);
         return _coordinateConverter.ScreenToGraph(screenRect);
+    }
+
+    private static bool IsOverlayContained(Rect2D container, OverlayViewModel overlay)
+    {
+        var rect = new Rect2D(overlay.Position.X, overlay.Position.Y, overlay.Size.Width, overlay.Size.Height);
+        return container.Contains(rect.Location)
+               && container.Contains(new Point2D(rect.X + rect.Width, rect.Y))
+               && container.Contains(new Point2D(rect.X, rect.Y + rect.Height))
+               && container.Contains(new Point2D(rect.X + rect.Width, rect.Y + rect.Height));
     }
 
     private IEnumerable<NodeViewModel> GetSelectedNodesForDrag()

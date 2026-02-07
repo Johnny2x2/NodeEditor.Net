@@ -1,4 +1,5 @@
 using NodeEditor.Blazor.Services;
+using NodeEditor.Blazor.Services.Logging;
 
 namespace NodeEditor.Blazor.Services.Plugins;
 
@@ -14,6 +15,7 @@ public interface IPluginEventBus
     IDisposable SubscribeZoomChanged(Action<ZoomChangedEventArgs> handler);
     IDisposable SubscribeSocketValuesChanged(Action handler);
     IDisposable SubscribeNodeExecutionStateChanged(Action<NodeEventArgs> handler);
+    IDisposable SubscribeLogMessage(Action<LogEntry> handler);
 
     void PublishNodeAdded(NodeEventArgs args);
     void PublishNodeRemoved(NodeEventArgs args);
@@ -25,4 +27,5 @@ public interface IPluginEventBus
     void PublishZoomChanged(ZoomChangedEventArgs args);
     void PublishSocketValuesChanged();
     void PublishNodeExecutionStateChanged(NodeEventArgs args);
+    void PublishLogMessage(LogEntry entry);
 }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NodeEditor.Blazor.Adapters;
 using NodeEditor.Blazor.Models;
 using NodeEditor.Blazor.Services.Execution;
+using NodeEditor.Blazor.Services.Logging;
 using NodeEditor.Blazor.Services.Serialization;
 using NodeEditor.Blazor.Services.Plugins.Marketplace;
 
@@ -43,6 +44,10 @@ public static class NodeEditorServiceExtensions
     /// </summary>
     private static IServiceCollection AddNodeEditorCore(this IServiceCollection services)
     {
+        // Logging infrastructure (singleton — shared across Blazor circuits)
+        services.AddSingleton<ILogChannelRegistry, LogChannelRegistry>();
+        services.AddSingleton<INodeEditorLogger, NodeEditorLogger>();
+
         // Plugin infrastructure
         services.AddOptions<Plugins.PluginOptions>();
         services.AddSingleton<Plugins.IPluginServiceRegistry, Plugins.PluginServiceRegistry>();

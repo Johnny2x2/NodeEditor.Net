@@ -22,6 +22,7 @@ public sealed class NodeExecutionService : INodeExecutionService
     public event EventHandler? ExecutionCanceled;
     public event EventHandler<ExecutionLayerEventArgs>? LayerStarted;
     public event EventHandler<ExecutionLayerEventArgs>? LayerCompleted;
+    public event EventHandler<FeedbackMessageEventArgs>? FeedbackReceived;
 
     public ExecutionGate Gate { get; } = new();
 
@@ -50,6 +51,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         void FeedbackHandler(string message, NodeData node, ExecutionFeedbackType type, object? tag, bool breakFlag)
         {
             if (breakFlag) breakExecution = true;
+            FeedbackReceived?.Invoke(this, new FeedbackMessageEventArgs(message, node, type, tag));
         }
 
         if (feedbackContext is not null)
@@ -94,6 +96,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         void FeedbackHandler(string message, NodeData node, ExecutionFeedbackType type, object? tag, bool breakFlag)
         {
             if (breakFlag) breakExecution = true;
+            FeedbackReceived?.Invoke(this, new FeedbackMessageEventArgs(message, node, type, tag));
         }
 
         if (feedbackContext is not null)
