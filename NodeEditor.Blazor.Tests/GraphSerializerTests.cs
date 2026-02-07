@@ -62,6 +62,9 @@ public sealed class GraphSerializerTests
         state.AddNode(node2);
         state.AddConnection(new ConnectionData("node-1", "node-2", "Output", "Input", false));
 
+        var graphEvent = GraphEvent.Create("OnStart");
+        state.AddEvent(graphEvent);
+
         state.Viewport = new Rect2D(0, 0, 640, 480);
         state.Zoom = 1.25;
         state.SelectNode("node-1");
@@ -80,6 +83,8 @@ public sealed class GraphSerializerTests
         Assert.Equal(new Rect2D(0, 0, 640, 480), importedState.Viewport);
         Assert.Equal(1.25, importedState.Zoom);
         Assert.Single(importedState.SelectedNodeIds);
+        Assert.Single(importedState.Events);
+        Assert.Equal(graphEvent.Name, importedState.Events[0].Name);
 
         var importedNode1 = importedState.Nodes.Single(n => n.Data.Id == "node-1");
         Assert.Equal(new Point2D(10, 20), importedNode1.Position);
@@ -184,7 +189,7 @@ public sealed class GraphSerializerTests
             },
             new List<ConnectionData>(),
             new List<GraphVariable>(),
-            GraphSerializer.CurrentVersion);
+            SchemaVersion: GraphSerializer.CurrentVersion);
 
         var json = serializer.SerializeGraphData(graphData);
         var rehydrated = serializer.DeserializeToGraphData(json);

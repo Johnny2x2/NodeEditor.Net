@@ -126,6 +126,23 @@
         State.AddNode(nodeViewModel);
     }
 
+    public void CreateEventNode(string eventId, bool isTrigger)
+    {
+        var graphEvent = State.FindEvent(eventId);
+        if (graphEvent is null) return;
+
+        var definitionId = isTrigger ? graphEvent.TriggerDefinitionId : graphEvent.ListenerDefinitionId;
+        var definition = _registry?.Definitions.FirstOrDefault(
+            d => d.Id.Equals(definitionId, StringComparison.Ordinal));
+        if (definition is null) return;
+
+        var nodeData = definition.Factory();
+        var center = GetViewportCenterScreen();
+        var graphPosition = CoordinateConverter.ScreenToGraph(center);
+        var nodeViewModel = new NodeViewModel(nodeData) { Position = graphPosition };
+        State.AddNode(nodeViewModel);
+    }
+
     // ────────────────────────── Lifecycle ──────────────────────────
 
     protected override void OnInitialized()

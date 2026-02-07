@@ -120,6 +120,21 @@ public class NodeEditorState : INodeEditorState
     public event EventHandler<GraphVariableChangedEventArgs>? VariableChanged;
 
     /// <summary>
+    /// Raised when a graph event is added.
+    /// </summary>
+    public event EventHandler<GraphEventEventArgs>? EventAdded;
+
+    /// <summary>
+    /// Raised when a graph event is removed.
+    /// </summary>
+    public event EventHandler<GraphEventEventArgs>? EventRemoved;
+
+    /// <summary>
+    /// Raised when a graph event is updated (renamed).
+    /// </summary>
+    public event EventHandler<GraphEventChangedEventArgs>? EventChanged;
+
+    /// <summary>
     /// Gets the collection of all nodes in the editor.
     /// Note: Use AddNode() and RemoveNode() methods instead of modifying this collection directly
     /// to ensure events are raised properly.
@@ -139,6 +154,13 @@ public class NodeEditorState : INodeEditorState
     /// modifying this collection directly to ensure events are raised properly.
     /// </summary>
     public ObservableCollection<GraphVariable> Variables { get; } = new();
+
+    /// <summary>
+    /// Gets the collection of all graph events.
+    /// Note: Use AddEvent(), RemoveEvent(), and UpdateEvent() methods instead of
+    /// modifying this collection directly to ensure events are raised properly.
+    /// </summary>
+    public ObservableCollection<GraphEvent> Events { get; } = new();
 
     /// <summary>
     /// Gets the set of IDs for currently selected nodes.
@@ -185,7 +207,7 @@ public class NodeEditorState : INodeEditorState
             vm.Position,
             vm.Size)).ToList();
 
-        return new GraphData(nodes, Connections.ToList(), Variables.ToList());
+        return new GraphData(nodes, Connections.ToList(), Variables.ToList(), Events.ToList());
     }
 
     /// <summary>
@@ -203,6 +225,14 @@ public class NodeEditorState : INodeEditorState
         foreach (var variable in graphData.Variables)
         {
             AddVariable(variable);
+        }
+
+        if (graphData.Events is not null)
+        {
+            foreach (var graphEvent in graphData.Events)
+            {
+                AddEvent(graphEvent);
+            }
         }
 
         foreach (var graphNode in graphData.Nodes)
@@ -794,6 +824,107 @@ public class NodeEditorState : INodeEditorState
         return Variables.FirstOrDefault(v => v.Id == variableId);
     }
 
+    // ===== Graph Events =====
+
+    /// <summary>
+    /// Adds a graph event.
+    /// </summary>
+    public void AddEvent(GraphEvent graphEvent)
+    {
+        if (graphEvent is null) throw new ArgumentNullException(nameof(graphEvent));
+        Events.Add(graphEvent);
+        EventAdded?.Invoke(this, new GraphEventEventArgs(graphEvent));
+    }
+
+    /// <summary>
+    /// Removes a graph event by its ID. Also removes any listener/trigger nodes referencing it.
+    /// </summary>
+    public void RemoveEvent(string eventId)
+    {
+        var graphEvent = Events.FirstOrDefault(e => e.Id == eventId);
+        if (graphEvent is null) return;
+
+        // Remove any nodes that reference this event
+        var listenerDefId = graphEvent.ListenerDefinitionId;
+        var triggerDefId = graphEvent.TriggerDefinitionId;
+        var nodesToRemove = Nodes
+            .Where(n => n.Data.DefinitionId == listenerDefId || n.Data.DefinitionId == triggerDefId)
+            .Select(n => n.Data.Id)
+            .ToList();
+        foreach (var nodeId in nodesToRemove)
+        {
+            RemoveNode(nodeId);
+        }
+
+        Events.Remove(graphEvent);
+        EventRemoved?.Invoke(this, new GraphEventEventArgs(graphEvent));
+    }
+
+    /// <summary>
+    /// Updates an existing graph event (rename).
+    /// Existing listener/trigger nodes are updated to reflect the new name.
+    /// </summary>
+    public void UpdateEvent(GraphEvent updated)
+    {
+        if (updated is null) throw new ArgumentNullException(nameof(updated));
+
+        var index = -1;
+        for (var i = 0; i < Events.Count; i++)
+        {
+            if (Events[i].Id == updated.Id)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0) return;
+
+        var previous = Events[index];
+        Events[index] = updated;
+
+        // Update node names if renamed
+        if (previous.Name != updated.Name)
+        {
+            var listenerDefId = updated.ListenerDefinitionId;
+            var triggerDefId = updated.TriggerDefinitionId;
+            var nodesToRebuild = Nodes
+                .Where(n => n.Data.DefinitionId == listenerDefId || n.Data.DefinitionId == triggerDefId)
+                .ToList();
+
+            foreach (var oldNode in nodesToRebuild)
+            {
+                var isListener = oldNode.Data.DefinitionId == listenerDefId;
+                var newName = isListener
+                    ? "Custom Event: " + updated.Name
+                    : "Trigger Event: " + updated.Name;
+                var newData = oldNode.Data with { Name = newName };
+                var newNode = new NodeViewModel(newData)
+                {
+                    Position = oldNode.Position,
+                    Size = oldNode.Size,
+                    IsSelected = oldNode.IsSelected
+                };
+
+                var idx = Nodes.IndexOf(oldNode);
+                if (idx >= 0)
+                {
+                    Nodes[idx] = newNode;
+                }
+            }
+        }
+
+        EventChanged?.Invoke(this, new GraphEventChangedEventArgs(previous, updated));
+    }
+
+    /// <summary>
+    /// Finds a graph event by its ID.
+    /// </summary>
+    public GraphEvent? FindEvent(string eventId)
+    {
+        return Events.FirstOrDefault(e => e.Id == eventId);
+    }
+
     /// <summary>
     /// Clears all nodes, connections, selections, and resets viewport/zoom.
     /// </summary>
@@ -808,6 +939,7 @@ public class NodeEditorState : INodeEditorState
         ClearSelectionInternal();
         ClearConnectionSelection();
         Variables.Clear();
+        Events.Clear();
         Viewport = new Rect2D(0, 0, 0, 0);
         Zoom = 1.0;
     }

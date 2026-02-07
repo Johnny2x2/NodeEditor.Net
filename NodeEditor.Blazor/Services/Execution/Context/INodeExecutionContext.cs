@@ -28,4 +28,10 @@ public interface INodeExecutionContext
     void ClearExecutedForNodes(IEnumerable<string> nodeIds);
 
     INodeExecutionContext CreateChild(string scopeName, bool inheritVariables = true);
+
+    /// <summary>
+    /// Gets the event bus for the current execution run.
+    /// Used by Custom Event and Trigger Event nodes.
+    /// </summary>
+    ExecutionEventBus EventBus { get; }
 }

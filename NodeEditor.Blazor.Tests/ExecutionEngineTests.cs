@@ -62,6 +62,53 @@ public sealed class ExecutionEngineTests
     }
 
     [Fact]
+    public async Task EventTrigger_ExecutesListenerDownstream()
+    {
+        var graphEvent = GraphEvent.Create("OnFire");
+
+        var listener = new NodeData(
+            Id: "listener",
+            Name: "Custom Event: OnFire",
+            Callable: true,
+            ExecInit: true,
+            Inputs: Array.Empty<SocketData>(),
+            Outputs: new[] { new SocketData("Exit", typeof(ExecutionPath).FullName!, false, true) },
+            DefinitionId: graphEvent.ListenerDefinitionId);
+
+        var trigger = new NodeData(
+            Id: "trigger",
+            Name: "Trigger Event: OnFire",
+            Callable: true,
+            ExecInit: false,
+            Inputs: new[] { new SocketData("Enter", typeof(ExecutionPath).FullName!, true, true) },
+            Outputs: new[] { new SocketData("Exit", typeof(ExecutionPath).FullName!, false, true) },
+            DefinitionId: graphEvent.TriggerDefinitionId);
+
+        var nodes = new List<NodeData>
+        {
+            TestNodes.Start("start"),
+            trigger,
+            listener,
+            TestNodes.Marker("after")
+        };
+
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "trigger", "Enter"),
+            TestConnections.Exec("listener", "Exit", "after", "Enter")
+        };
+
+        var context = new NodeExecutionContext();
+        var service = TestNodes.CreateExecutor();
+
+        await service.ExecuteAsync(nodes, connections, context, new TestNodeContext(), NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("trigger"));
+        Assert.True(context.IsNodeExecuted("listener"));
+        Assert.True(context.IsNodeExecuted("after"));
+    }
+
+    [Fact]
     public async Task ParallelExecution_RunsIndependentNodesConcurrently()
     {
         var nodes = new List<NodeData>

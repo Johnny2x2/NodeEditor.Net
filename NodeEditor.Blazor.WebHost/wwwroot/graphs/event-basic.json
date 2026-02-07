@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "events": [
+    { "id": "event-onstart", "name": "OnStart" }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "typeId": null,
+      "name": "Start",
+      "callable": true,
+      "execInit": true,
+      "x": 60,
+      "y": 80,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "trigger-onstart",
+      "typeId": "event.trigger.event-onstart",
+      "name": "Trigger Event: OnStart",
+      "callable": true,
+      "execInit": false,
+      "x": 300,
+      "y": 80,
+      "width": 220,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "marker-trigger",
+      "typeId": null,
+      "name": "Marker",
+      "callable": true,
+      "execInit": false,
+      "x": 560,
+      "y": 80,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "listener-onstart",
+      "typeId": "event.listener.event-onstart",
+      "name": "Custom Event: OnStart",
+      "callable": true,
+      "execInit": true,
+      "x": 300,
+      "y": 220,
+      "width": 240,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "delay-listener",
+      "typeId": null,
+      "name": "Delay",
+      "callable": true,
+      "execInit": false,
+      "x": 580,
+      "y": 220,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        },
+        {
+          "name": "DelayMs",
+          "typeName": "System.Int32",
+          "isInput": true,
+          "isExecution": false,
+          "value": { "typeName": "System.Int32", "json": 250 }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "marker-listener",
+      "typeId": null,
+      "name": "Marker",
+      "callable": true,
+      "execInit": false,
+      "x": 820,
+      "y": 220,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    }
+  ],
+  "connections": [
+    { "outputNodeId": "start", "outputSocketName": "Exit", "inputNodeId": "trigger-onstart", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "trigger-onstart", "outputSocketName": "Exit", "inputNodeId": "marker-trigger", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "listener-onstart", "outputSocketName": "Exit", "inputNodeId": "delay-listener", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "delay-listener", "outputSocketName": "Exit", "inputNodeId": "marker-listener", "inputSocketName": "Enter", "isExecution": true }
+  ],
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "width": 1400,
+    "height": 800,
+    "zoom": 1
+  },
+  "selectedNodeIds": []
+}

@@ -8,6 +8,7 @@ public sealed record class GraphData(
     IReadOnlyList<GraphNodeData> Nodes,
     IReadOnlyList<ConnectionData> Connections,
     IReadOnlyList<GraphVariable> Variables,
+    IReadOnlyList<GraphEvent>? Events = null,
     int SchemaVersion = 1);
 
 /// <summary>

@@ -264,4 +264,53 @@ public sealed class StateEventTests
 
         Assert.False(eventRaised);
     }
+
+    [Fact]
+    public void AddEvent_RaisesEventAdded()
+    {
+        var state = new NodeEditorState();
+        var graphEvent = GraphEvent.Create("OnStart");
+
+        GraphEventEventArgs? raisedArgs = null;
+        state.EventAdded += (sender, args) => raisedArgs = args;
+
+        state.AddEvent(graphEvent);
+
+        Assert.NotNull(raisedArgs);
+        Assert.Equal(graphEvent, raisedArgs.Event);
+    }
+
+    [Fact]
+    public void UpdateEvent_RaisesEventChanged()
+    {
+        var state = new NodeEditorState();
+        var graphEvent = GraphEvent.Create("OnStart");
+        state.AddEvent(graphEvent);
+
+        GraphEventChangedEventArgs? raisedArgs = null;
+        state.EventChanged += (sender, args) => raisedArgs = args;
+
+        var updated = graphEvent with { Name = "OnBegin" };
+        state.UpdateEvent(updated);
+
+        Assert.NotNull(raisedArgs);
+        Assert.Equal(graphEvent, raisedArgs.PreviousEvent);
+        Assert.Equal(updated, raisedArgs.CurrentEvent);
+    }
+
+    [Fact]
+    public void RemoveEvent_RaisesEventRemoved()
+    {
+        var state = new NodeEditorState();
+        var graphEvent = GraphEvent.Create("OnStop");
+        state.AddEvent(graphEvent);
+
+        GraphEventEventArgs? raisedArgs = null;
+        state.EventRemoved += (sender, args) => raisedArgs = args;
+
+        state.RemoveEvent(graphEvent.Id);
+
+        Assert.NotNull(raisedArgs);
+        Assert.Equal(graphEvent, raisedArgs.Event);
+    }
 }

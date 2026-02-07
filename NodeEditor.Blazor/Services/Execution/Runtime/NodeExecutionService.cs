@@ -43,6 +43,10 @@ public sealed class NodeExecutionService : INodeExecutionService
         var feedbackContext = nodeContext as INodeMethodContext;
         var breakExecution = false;
 
+        // Register Custom Event (listener) node handlers on the event bus.
+        // When a Trigger Event node fires, the listener's downstream path executes.
+        RegisterEventListeners(nodes, connections, nodeMap, context, invoker, feedbackContext, effectiveOptions, token);
+
         void FeedbackHandler(string message, NodeData node, ExecutionFeedbackType type, object? tag, bool breakFlag)
         {
             if (breakFlag) breakExecution = true;
@@ -441,6 +445,21 @@ public sealed class NodeExecutionService : INodeExecutionService
                 return;
             }
 
+            if (EventNodeExecutor.IsEventNode(node))
+            {
+                if (EventNodeExecutor.IsTriggerNode(node))
+                {
+                    await EventNodeExecutor.ExecuteTriggerAsync(node, context, token).ConfigureAwait(false);
+                }
+                else
+                {
+                    // Listener nodes are handled by the event bus; just mark executed
+                    EventNodeExecutor.ExecuteListener(node, context);
+                }
+                NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
+                return;
+            }
+
             var binding = invoker.Resolve(node);
             if (binding is null)
             {
@@ -519,5 +538,55 @@ public sealed class NodeExecutionService : INodeExecutionService
         }
 
         await ResolveNodeAsync(node).ConfigureAwait(false);
+    }
+
+    // ────────────────────────── Event listener registration ──────────────────────────
+
+    /// <summary>
+    /// Scans the graph for Custom Event (listener) nodes and registers handlers on the event bus.
+    /// When a Trigger Event fires, the corresponding listener handlers execute the listener's
+    /// downstream execution path.
+    /// </summary>
+    private void RegisterEventListeners(
+        IReadOnlyList<NodeData> nodes,
+        IReadOnlyList<ConnectionData> connections,
+        IReadOnlyDictionary<string, NodeData> nodeMap,
+        INodeExecutionContext context,
+        NodeMethodInvoker invoker,
+        INodeMethodContext? feedbackContext,
+        NodeExecutionOptions options,
+        CancellationToken token)
+    {
+        var listenerNodes = nodes.Where(EventNodeExecutor.IsListenerNode).ToList();
+        if (listenerNodes.Count == 0) return;
+
+        foreach (var listener in listenerNodes)
+        {
+            var eventId = EventNodeExecutor.GetEventId(listener);
+            if (eventId is null) continue;
+
+            // Capture for closure
+            var capturedListener = listener;
+
+            context.EventBus.Subscribe(eventId, async () =>
+            {
+                // Signal the listener's Exit path
+                EventNodeExecutor.ExecuteListener(capturedListener, context);
+
+                // Find the downstream nodes connected to Exit and execute them
+                var exitConnections = connections
+                    .Where(c => c.OutputNodeId == capturedListener.Id && c.OutputSocketName == "Exit" && c.IsExecution)
+                    .ToList();
+
+                foreach (var exitConn in exitConnections)
+                {
+                    if (nodeMap.TryGetValue(exitConn.InputNodeId, out var downstreamNode))
+                    {
+                        await ExecuteNodeAsync(downstreamNode, connections, nodeMap, context, invoker, feedbackContext, token)
+                            .ConfigureAwait(false);
+                    }
+                }
+            });
+        }
     }
 }

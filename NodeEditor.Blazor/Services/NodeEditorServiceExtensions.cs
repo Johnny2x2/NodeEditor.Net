@@ -123,6 +123,9 @@ public static class NodeEditorServiceExtensions
         // Variable node factory (bridges graph variables to node definitions)
         services.AddScoped<VariableNodeFactory>();
 
+        // Event node factory (bridges graph events to node definitions)
+        services.AddScoped<EventNodeFactory>();
+
         return services;
     }
 }

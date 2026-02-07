@@ -116,3 +116,31 @@ public sealed class GraphVariableChangedEventArgs : EventArgs
     public GraphVariable PreviousVariable { get; }
     public GraphVariable CurrentVariable { get; }
 }
+
+/// <summary>
+/// Event args for graph event changes.
+/// </summary>
+public sealed class GraphEventEventArgs : EventArgs
+{
+    public GraphEventEventArgs(GraphEvent @event)
+    {
+        Event = @event;
+    }
+
+    public GraphEvent Event { get; }
+}
+
+/// <summary>
+/// Event args for graph event updates (rename).
+/// </summary>
+public sealed class GraphEventChangedEventArgs : EventArgs
+{
+    public GraphEventChangedEventArgs(GraphEvent previousEvent, GraphEvent currentEvent)
+    {
+        PreviousEvent = previousEvent;
+        CurrentEvent = currentEvent;
+    }
+
+    public GraphEvent PreviousEvent { get; }
+    public GraphEvent CurrentEvent { get; }
+}

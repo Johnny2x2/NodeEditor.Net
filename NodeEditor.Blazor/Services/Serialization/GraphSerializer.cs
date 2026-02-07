@@ -331,11 +331,22 @@ public sealed class GraphSerializer : IGraphSerializer
             variable.DefaultValue);
     }
 
+    private static GraphEventDto ToDto(GraphEvent graphEvent)
+    {
+        return new GraphEventDto(graphEvent.Id, graphEvent.Name);
+    }
+
+    private static GraphEvent ToEvent(GraphEventDto dto)
+    {
+        return new GraphEvent(dto.Id, dto.Name);
+    }
+
     private GraphData ToGraphData(GraphDto dto, List<string> warnings)
     {
         var nodes = dto.Nodes ?? new List<NodeDto>();
         var connections = dto.Connections ?? new List<ConnectionDto>();
         var variables = dto.Variables ?? new List<GraphVariableDto>();
+        var events = dto.Events ?? new List<GraphEventDto>();
 
         var graphNodes = new List<GraphNodeData>();
         var nodeMap = new Dictionary<string, GraphNodeData>(StringComparer.Ordinal);
@@ -358,11 +369,13 @@ public sealed class GraphSerializer : IGraphSerializer
         }
 
         var graphVariables = variables.Select(ToVariable).ToList();
+        var graphEvents = events.Select(ToEvent).ToList();
 
         return new GraphData(
             graphNodes,
             graphConnections,
             graphVariables,
+            graphEvents,
             CurrentVersion);
     }
 
@@ -384,7 +397,8 @@ public sealed class GraphSerializer : IGraphSerializer
                 viewport.Height,
                 zoom),
             SelectedNodeIds: selectedNodeIds,
-            Variables: graphData.Variables.Select(ToDto).ToList());
+            Variables: graphData.Variables.Select(ToDto).ToList(),
+            Events: graphData.Events?.Select(ToDto).ToList());
     }
 
     private List<PluginDependencyDto> BuildRequiredPlugins(GraphData graphData)

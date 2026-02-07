@@ -15,6 +15,7 @@
 @inject INodeRegistryService Registry
 @inject IGraphSerializer GraphSerializer
 @inject VariableNodeFactory VariableNodeFactory
+@inject EventNodeFactory EventNodeFactory
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 
@@ -76,6 +77,8 @@
 <VariablesPanel State="EditorState"
                 OnVariableDrag="OnVariableDragStarted"
                 OnCreateVariableNode="OnVariableNodeRequested" />
+<EventsPanel State="EditorState"
+             OnCreateEventNode="OnEventNodeRequested" />
 
 <div class="node-editor-container">
 	<NodeEditorCanvas @ref="_canvasRef" State="EditorState" />
@@ -96,7 +99,9 @@
 	private readonly List<GraphPreset> _presets = new()
 	{
 		new GraphPreset("Loop + Lists + Strings", "graphs/loop-list-string.json"),
-		new GraphPreset("Parallel Execution", "graphs/parallel.json")
+		new GraphPreset("Parallel Execution", "graphs/parallel.json"),
+		new GraphPreset("Events: Basic Trigger", "graphs/event-basic.json"),
+		new GraphPreset("Events: Multiple Listeners", "graphs/event-multi.json")
 	};
 
 	private bool IsLocalGraphSelected => _selectedPreset.StartsWith("local:", StringComparison.Ordinal);
@@ -151,6 +156,11 @@
 	private void OnVariableNodeRequested(VariableNodeRequest request)
 	{
 		_canvasRef?.CreateVariableNode(request.VariableId, request.IsSetNode);
+	}
+
+	private void OnEventNodeRequested(EventNodeRequest request)
+	{
+		_canvasRef?.CreateEventNode(request.EventId, request.IsTrigger);
 	}
 
 	private void OnPluginManagerClosed()

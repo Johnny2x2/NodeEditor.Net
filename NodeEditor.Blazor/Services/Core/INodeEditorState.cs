@@ -26,11 +26,15 @@ public interface INodeEditorState
     event EventHandler<GraphVariableEventArgs>? VariableAdded;
     event EventHandler<GraphVariableEventArgs>? VariableRemoved;
     event EventHandler<GraphVariableChangedEventArgs>? VariableChanged;
+    event EventHandler<GraphEventEventArgs>? EventAdded;
+    event EventHandler<GraphEventEventArgs>? EventRemoved;
+    event EventHandler<GraphEventChangedEventArgs>? EventChanged;
 
     // Collections
     ObservableCollection<NodeViewModel> Nodes { get; }
     ObservableCollection<ConnectionData> Connections { get; }
     ObservableCollection<GraphVariable> Variables { get; }
+    ObservableCollection<GraphEvent> Events { get; }
     HashSet<string> SelectedNodeIds { get; }
     ConnectionData? SelectedConnection { get; }
 
@@ -75,6 +79,12 @@ public interface INodeEditorState
     void RemoveVariable(string variableId);
     void UpdateVariable(GraphVariable updated);
     GraphVariable? FindVariable(string variableId);
+
+    // Events
+    void AddEvent(GraphEvent graphEvent);
+    void RemoveEvent(string eventId);
+    void UpdateEvent(GraphEvent updated);
+    GraphEvent? FindEvent(string eventId);
 
     // Graph management
     GraphData ExportToGraphData();

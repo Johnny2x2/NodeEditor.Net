@@ -11,24 +11,29 @@ public sealed class NodeExecutionContext : INodeExecutionContext
     private readonly Stack<int> _generationStack = new();
     private int _currentGeneration;
 
+    public ExecutionEventBus EventBus { get; }
+
     public NodeExecutionContext()
     {
         _socketValues = new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
         _executedNodes = new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
         _variables = new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
         _loopState = new ConcurrentDictionary<string, object>(StringComparer.Ordinal);
+        EventBus = new ExecutionEventBus();
     }
 
     private NodeExecutionContext(
         ConcurrentDictionary<string, object?> socketValues,
         ConcurrentDictionary<string, bool> executedNodes,
         ConcurrentDictionary<string, object?> variables,
-        ConcurrentDictionary<string, object> loopState)
+        ConcurrentDictionary<string, object> loopState,
+        ExecutionEventBus eventBus)
     {
         _socketValues = socketValues;
         _executedNodes = executedNodes;
         _variables = variables;
         _loopState = loopState;
+        EventBus = eventBus;
     }
 
     public bool TryGetSocketValue(string nodeId, string socketName, out object? value)
@@ -127,7 +132,7 @@ public sealed class NodeExecutionContext : INodeExecutionContext
             : new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
         var loopState = new ConcurrentDictionary<string, object>(StringComparer.Ordinal);
 
-        return new NodeExecutionContext(socketValues, executedNodes, variables, loopState);
+        return new NodeExecutionContext(socketValues, executedNodes, variables, loopState, EventBus);
     }
 
     private static string BuildSocketKey(string nodeId, string socketName)
