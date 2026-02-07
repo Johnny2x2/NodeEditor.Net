@@ -26,6 +26,9 @@
     <!-- Core library -->
     <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
 
+    <!-- MCP tools library -->
+    <ProjectReference Include="..\NodeEditor.Mcp\NodeEditor.Mcp.csproj" />
+
     <!-- 
       Plugin projects - ReferenceOutputAssembly=false means:
       - They are built (as dependencies)
