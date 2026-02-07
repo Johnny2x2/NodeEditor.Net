@@ -277,6 +277,45 @@ public sealed class PluginLoader : IPluginLoader
         return;
     }
 
+    public (string PluginId, string PluginName, string? Version)? GetPluginForDefinition(string definitionId)
+    {
+        if (string.IsNullOrWhiteSpace(definitionId))
+        {
+            return null;
+        }
+
+        foreach (var (pluginId, entry) in _loadedPlugins)
+        {
+            // Check provider definitions registered via INodeProvider
+            if (entry.ProviderDefinitions.Any(d => d.Id.Equals(definitionId, StringComparison.Ordinal)))
+            {
+                return (pluginId, entry.Plugin.Name, entry.Plugin.Version.ToString());
+            }
+
+            // Check definitions registered from the plugin assembly via Register()
+            var assemblyDefs = _registry.Definitions.Where(d =>
+                d.Id.Equals(definitionId, StringComparison.Ordinal));
+            foreach (var def in assemblyDefs)
+            {
+                // If the definition's factory type comes from this plugin's assembly
+                var factoryTarget = def.Factory.Target;
+                if (factoryTarget is not null && factoryTarget.GetType().Assembly == entry.Assembly)
+                {
+                    return (pluginId, entry.Plugin.Name, entry.Plugin.Version.ToString());
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public IReadOnlyList<(string PluginId, string PluginName, string? Version)> GetLoadedPlugins()
+    {
+        return _loadedPlugins.Values
+            .Select(e => (e.Plugin.Id, e.Plugin.Name, (string?)e.Plugin.Version.ToString()))
+            .ToList();
+    }
+
     private string ResolvePluginDirectory(string? pluginDirectory)
     {
         if (!string.IsNullOrWhiteSpace(pluginDirectory))

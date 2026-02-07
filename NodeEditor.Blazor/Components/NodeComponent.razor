@@ -44,6 +44,7 @@
                 <SocketComponent Socket="output"
                                  NodeId="@Node.Data.Id"
                                  Node="Node"
+                                 IsConnected="IsOutputConnected(output)"
                                  OnPointerDown="@OnSocketPointerDown"
                                  OnPointerUp="@OnSocketPointerUp"
                                  @key="@($"out-{output.Data.Name}")" />
@@ -119,6 +120,13 @@
         return Connections.Any(c =>
             c.InputNodeId == Node.Data.Id &&
             c.InputSocketName == socket.Data.Name);
+    }
+
+    private bool IsOutputConnected(SocketViewModel socket)
+    {
+        return Connections.Any(c =>
+            c.OutputNodeId == Node.Data.Id &&
+            c.OutputSocketName == socket.Data.Name);
     }
 
     private NodeImage? GetPreviewImage()

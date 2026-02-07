@@ -1,5 +1,6 @@
 ﻿@page "/"
 @implements IDisposable
+@implements IAsyncDisposable
 @rendermode InteractiveServer
 @using NodeEditor.Blazor.Components
 @using NodeEditor.Blazor.Components.Marketplace
@@ -15,6 +16,7 @@
 @inject IGraphSerializer GraphSerializer
 @inject VariableNodeFactory VariableNodeFactory
 @inject HttpClient Http
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Node Editor</PageTitle>
 
@@ -22,13 +24,35 @@
 	<button @onclick="StartExecutionAsync" disabled="@_isExecuting">Start</button>
 	<button @onclick="StopExecution" disabled="@(!_isExecuting)">Stop</button>
 	<button @onclick="CreateNewGraph" disabled="@_isExecuting">New</button>
+	<button @onclick="SaveGraphLocalAsync" disabled="@_isExecuting"
+			title="Save graph to browser storage">Save</button>
 	<select @bind="_selectedPreset" disabled="@_isExecuting">
-		@foreach (var preset in _presets)
+		@if (_savedGraphNames.Count > 0)
 		{
-			<option value="@preset.Path">@preset.Name</option>
+			<optgroup label="Saved Graphs">
+				@foreach (var name in _savedGraphNames)
+				{
+					<option value="@($"local:{name}")">@name</option>
+				}
+			</optgroup>
 		}
+		<optgroup label="Presets">
+			@foreach (var preset in _presets)
+			{
+				<option value="@preset.Path">@preset.Name</option>
+			}
+		</optgroup>
 	</select>
 	<button @onclick="LoadSelectedPresetAsync" disabled="@_isExecuting">Load</button>
+	<button @onclick="DeleteSelectedSavedGraphAsync" disabled="@(_isExecuting || !IsLocalGraphSelected)"
+			title="Delete the selected saved graph">Delete</button>
+	<span class="toolbar-separator"></span>
+	<button @onclick="ExportGraphToFileAsync" disabled="@_isExecuting"
+			title="Export graph to a .json file">Export</button>
+	<label class="load-file-btn" title="Import graph from a .json file">
+		Import
+		<InputFile OnChange="ImportGraphFromFileAsync" accept=".json" style="display:none" />
+	</label>
 	<button class="plugins-btn" @onclick="OpenPluginManager">
 		<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
 			<path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/>
@@ -62,11 +86,39 @@
 	private string? _loadStatus;
 	private bool _isPluginManagerOpen;
 	private string _selectedPreset = "graphs/loop-list-string.json";
+	private IJSObjectReference? _jsModule;
+	private List<string> _savedGraphNames = new();
 	private readonly List<GraphPreset> _presets = new()
 	{
 		new GraphPreset("Loop + Lists + Strings", "graphs/loop-list-string.json"),
 		new GraphPreset("Parallel Split/Join", "graphs/parallel.json")
 	};
+
+	private bool IsLocalGraphSelected => _selectedPreset.StartsWith("local:", StringComparison.Ordinal);
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			await EnsureJsModuleAsync();
+			await RefreshSavedGraphNamesAsync();
+			StateHasChanged();
+		}
+	}
+
+	private async Task EnsureJsModuleAsync()
+	{
+		_jsModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+			"import",
+			"./_content/NodeEditor.Blazor/nodeEditorCanvas.js");
+	}
+
+	private async Task RefreshSavedGraphNamesAsync()
+	{
+		if (_jsModule is null) return;
+		var names = await _jsModule.InvokeAsync<string[]>("listSavedGraphNames");
+		_savedGraphNames = names?.ToList() ?? new List<string>();
+	}
 
 	protected override void OnInitialized()
 	{
@@ -79,6 +131,8 @@
 		ExecutionService.NodeStarted += OnNodeStarted;
 		ExecutionService.NodeCompleted += OnNodeCompleted;
 		ExecutionService.NodeFailed += OnNodeFailed;
+
+		AddDefaultStartNode();
 	}
 
 	private void OpenPluginManager() => _isPluginManagerOpen = true;
@@ -105,6 +159,20 @@
 		ExecutionService.NodeStarted -= OnNodeStarted;
 		ExecutionService.NodeCompleted -= OnNodeCompleted;
 		ExecutionService.NodeFailed -= OnNodeFailed;
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		Dispose();
+		if (_jsModule is not null)
+		{
+			try
+			{
+				await _jsModule.DisposeAsync();
+			}
+			catch (JSDisconnectedException) { }
+			catch (TaskCanceledException) { }
+		}
 	}
 
 	private async Task StartExecutionAsync()
@@ -200,8 +268,44 @@
 	{
 		EditorState.Clear();
 		EditorState.ResetNodeExecutionState();
+		AddDefaultStartNode();
 		_executionStatus = "Idle";
 		_loadStatus = "New graph.";
+	}
+
+	private void AddDefaultStartNode()
+	{
+		// Try to find a registered Start definition from the registry
+		var startDef = Registry.Definitions.FirstOrDefault(d =>
+			d.Name.Equals("Start", StringComparison.OrdinalIgnoreCase)
+			&& d.Category.Equals("Flow", StringComparison.OrdinalIgnoreCase));
+
+		NodeViewModel startNode;
+		if (startDef is not null)
+		{
+			var nodeData = startDef.Factory();
+			startNode = new NodeViewModel(nodeData)
+			{
+				Position = new Point2D(100, 200)
+			};
+		}
+		else
+		{
+			// Fallback: create a Start node manually
+			var execType = typeof(ExecutionPath).FullName ?? "ExecutionPath";
+			startNode = new NodeViewModel(new NodeData(
+				Id: Guid.NewGuid().ToString(),
+				Name: "Start",
+				Callable: true,
+				ExecInit: true,
+				Inputs: Array.Empty<SocketData>(),
+				Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+			{
+				Position = new Point2D(100, 200)
+			};
+		}
+
+		EditorState.AddNode(startNode);
 	}
 
 	private async Task LoadSelectedPresetAsync()
@@ -209,7 +313,26 @@
 		try
 		{
 			_loadStatus = "Loading graph...";
-			var json = await Http.GetStringAsync(_selectedPreset);
+			string json;
+
+			if (_selectedPreset.StartsWith("local:", StringComparison.Ordinal))
+			{
+				// Load from browser localStorage
+				var name = _selectedPreset.Substring("local:".Length);
+				await EnsureJsModuleAsync();
+				json = await _jsModule!.InvokeAsync<string>("loadGraphFromLocal", name);
+				if (string.IsNullOrEmpty(json))
+				{
+					_loadStatus = $"Saved graph '{name}' not found.";
+					return;
+				}
+			}
+			else
+			{
+				// Load from wwwroot preset
+				json = await Http.GetStringAsync(_selectedPreset);
+			}
+
 			var dto = GraphSerializer.Deserialize(json);
 			var result = GraphSerializer.Import(EditorState, dto);
 			_loadStatus = result.Warnings.Count > 0
@@ -219,6 +342,141 @@
 		catch (Exception ex)
 		{
 			_loadStatus = $"Load failed: {ex.Message}";
+		}
+		finally
+		{
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task SaveGraphLocalAsync()
+	{
+		try
+		{
+			await EnsureJsModuleAsync();
+
+			// Prompt the user for a name
+			var defaultName = $"Graph {DateTime.Now:yyyy-MM-dd HH:mm}";
+			var name = await _jsModule!.InvokeAsync<string?>("promptForName", "Enter a name for this graph:", defaultName);
+			if (string.IsNullOrWhiteSpace(name))
+			{
+				_loadStatus = "Save cancelled.";
+				return;
+			}
+
+			_loadStatus = "Saving graph...";
+			StateHasChanged();
+
+			var dto = GraphSerializer.Export(EditorState);
+			var json = GraphSerializer.Serialize(dto);
+
+			await _jsModule!.InvokeVoidAsync("saveGraphToLocal", name, json);
+			await RefreshSavedGraphNamesAsync();
+
+			// Auto-select the newly saved graph
+			_selectedPreset = $"local:{name}";
+
+			var pluginCount = dto.RequiredPlugins?.Count ?? 0;
+			_loadStatus = pluginCount > 0
+				? $"Graph saved as '{name}' ({pluginCount} plugin dep(s) recorded)."
+				: $"Graph saved as '{name}'.";
+		}
+		catch (Exception ex)
+		{
+			_loadStatus = $"Save failed: {ex.Message}";
+		}
+		finally
+		{
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task DeleteSelectedSavedGraphAsync()
+	{
+		if (!IsLocalGraphSelected) return;
+
+		var name = _selectedPreset.Substring("local:".Length);
+		try
+		{
+			await EnsureJsModuleAsync();
+			await _jsModule!.InvokeVoidAsync("deleteGraphFromLocal", name);
+			await RefreshSavedGraphNamesAsync();
+
+			// Reset selection to the first preset
+			_selectedPreset = _savedGraphNames.Count > 0
+				? $"local:{_savedGraphNames[0]}"
+				: _presets.First().Path;
+
+			_loadStatus = $"Deleted saved graph '{name}'.";
+		}
+		catch (Exception ex)
+		{
+			_loadStatus = $"Delete failed: {ex.Message}";
+		}
+		finally
+		{
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task ExportGraphToFileAsync()
+	{
+		try
+		{
+			_loadStatus = "Exporting graph...";
+			var dto = GraphSerializer.Export(EditorState);
+			var json = GraphSerializer.Serialize(dto);
+			var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+			var base64 = Convert.ToBase64String(bytes);
+
+			await EnsureJsModuleAsync();
+
+			var fileName = $"node-graph-{DateTime.Now:yyyy-MM-dd-HHmmss}.json";
+			await _jsModule!.InvokeVoidAsync("downloadFile", fileName, "application/json", base64);
+
+			var pluginCount = dto.RequiredPlugins?.Count ?? 0;
+			_loadStatus = pluginCount > 0
+				? $"Graph exported ({pluginCount} plugin dep(s) recorded)."
+				: "Graph exported.";
+		}
+		catch (Exception ex)
+		{
+			_loadStatus = $"Export failed: {ex.Message}";
+		}
+		finally
+		{
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task ImportGraphFromFileAsync(InputFileChangeEventArgs e)
+	{
+		try
+		{
+			_loadStatus = "Importing graph from file...";
+			StateHasChanged();
+
+			var file = e.File;
+			if (file is null)
+			{
+				_loadStatus = "No file selected.";
+				return;
+			}
+
+			const long maxSize = 10 * 1024 * 1024; // 10 MB
+			using var stream = file.OpenReadStream(maxSize);
+			using var reader = new System.IO.StreamReader(stream);
+			var json = await reader.ReadToEndAsync();
+
+			var dto = GraphSerializer.Deserialize(json);
+			var result = GraphSerializer.Import(EditorState, dto);
+			_loadStatus = result.Warnings.Count > 0
+				? string.Join(" ", result.Warnings)
+				: $"Graph imported from '{file.Name}'.";
+		}
+		catch (Exception ex)
+		{
+			_loadStatus = $"Import failed: {ex.Message}";
 		}
 		finally
 		{

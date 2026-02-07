@@ -6,7 +6,8 @@ public sealed record class GraphDto(
     List<ConnectionDto> Connections,
     ViewportDto Viewport,
     List<string> SelectedNodeIds,
-    List<GraphVariableDto>? Variables = null);
+    List<GraphVariableDto>? Variables = null,
+    List<PluginDependencyDto>? RequiredPlugins = null);
 
 public sealed record class NodeDto(
     string Id,
@@ -40,3 +41,8 @@ public sealed record class GraphVariableDto(
     string Name,
     string TypeName,
     SocketValue? DefaultValue = null);
+
+public sealed record class PluginDependencyDto(
+    string PluginId,
+    string PluginName,
+    string? Version = null);

@@ -15,6 +15,7 @@ namespace NodeEditor.Blazor.Services.Serialization;
 [JsonSerializable(typeof(SocketEditorKind))]
 [JsonSerializable(typeof(SocketValue))]
 [JsonSerializable(typeof(GraphVariableDto))]
+[JsonSerializable(typeof(PluginDependencyDto))]
 public partial class GraphSerializerContext : JsonSerializerContext
 {
 }

@@ -32,6 +32,32 @@ html, body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.load-file-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 12px;
+    margin: 0;
+    cursor: pointer;
+    font-size: 14px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.load-file-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.15);
+    margin: 0 4px;
+}
+
 a, .btn-link {
     color: #006bb7;
 }

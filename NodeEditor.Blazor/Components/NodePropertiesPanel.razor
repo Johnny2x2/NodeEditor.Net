@@ -57,13 +57,15 @@
         <div class="ne-properties-section">
             <div class="ne-properties-subtitle">Outputs</div>
 
-            @if (_selectedNode.Outputs.Count == 0)
+            @{ var outputSockets = _selectedNode.Outputs.Where(o => !o.Data.IsExecution).ToList(); }
+
+            @if (outputSockets.Count == 0)
             {
                 <div class="ne-properties-empty">No outputs.</div>
             }
             else
             {
-                @foreach (var output in _selectedNode.Outputs)
+                @foreach (var output in outputSockets)
                 {
                     <div class="ne-properties-row">
                         <div class="ne-properties-label">@output.Data.Name</div>

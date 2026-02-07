@@ -19,7 +19,12 @@
         Variables
         @if (!_isCollapsed)
         {
-            <button class="ne-variables-add-btn" @onclick="OpenAddForm" @onclick:stopPropagation="true" title="Add Variable">+</button>
+            <button class="ne-variables-add-btn"
+                    @onclick="OpenAddForm"
+                    @onclick:stopPropagation="true"
+                    @onmousedown:stopPropagation="true"
+                    @onmouseup:stopPropagation="true"
+                    title="Add Variable">+</button>
         }
     </div>
 
