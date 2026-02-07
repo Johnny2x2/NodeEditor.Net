@@ -38,19 +38,25 @@ builder.Services
 
 var host = builder.Build();
 
-// Create a long-lived scope for scoped services and initialize ability providers
+// Create a long-lived scope for scoped services and initialize ability providers.
+// Services registered as scoped (NodeEditorState, GraphSerializer, ExecutionService, etc.)
+// are resolved from the scope, while singletons (PluginLoader, Logger, Registry) are resolved
+// from the root provider to avoid captive dependency issues.
 var scope = host.Services.CreateScope();
 var sp = scope.ServiceProvider;
 
 var abilityRegistry = host.Services.GetRequiredService<AbilityRegistry>();
 
+// Scoped services — must come from scope
 var state = sp.GetRequiredService<INodeEditorState>();
-var nodeRegistry = host.Services.GetRequiredService<INodeRegistryService>();
 var serializer = sp.GetRequiredService<IGraphSerializer>();
 var executionService = sp.GetRequiredService<INodeExecutionService>();
 var headlessRunner = sp.GetRequiredService<HeadlessGraphRunner>();
-var pluginLoader = host.Services.GetRequiredService<IPluginLoader>();
 var installService = sp.GetRequiredService<IPluginInstallationService>();
+
+// Singleton services — resolved from root
+var nodeRegistry = host.Services.GetRequiredService<INodeRegistryService>();
+var pluginLoader = host.Services.GetRequiredService<IPluginLoader>();
 var logger = host.Services.GetRequiredService<INodeEditorLogger>();
 
 abilityRegistry.Register(new NodeAbilityProvider(state, nodeRegistry));

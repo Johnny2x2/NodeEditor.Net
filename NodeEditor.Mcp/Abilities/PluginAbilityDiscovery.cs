@@ -1,5 +1,8 @@
+using System.Reflection;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using NodeEditor.Blazor.Services.Plugins;
+using NodeEditor.Blazor.Services.Registry;
 
 namespace NodeEditor.Mcp.Abilities;
 
@@ -51,9 +54,7 @@ public sealed class PluginAbilityDiscovery
 
             try
             {
-                // Get plugin assembly via the definition mapping
-                var definitions = _services.GetService(typeof(NodeEditor.Blazor.Services.Registry.INodeRegistryService))
-                    as NodeEditor.Blazor.Services.Registry.INodeRegistryService;
+                var definitions = _services.GetService<INodeRegistryService>();
                 if (definitions is null) continue;
 
                 definitions.EnsureInitialized();
@@ -82,9 +83,14 @@ public sealed class PluginAbilityDiscovery
 
                 _registeredPlugins.Add(pluginId);
             }
-            catch
+            catch (TypeLoadException)
             {
-                // Plugin doesn't have ability contributors — that's fine
+                // Plugin doesn't have ability contributors — that's expected
+                _registeredPlugins.Add(pluginId);
+            }
+            catch (ReflectionTypeLoadException)
+            {
+                // Plugin assembly has types that can't be loaded — skip it
                 _registeredPlugins.Add(pluginId);
             }
         }
