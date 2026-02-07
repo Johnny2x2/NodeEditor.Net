@@ -187,6 +187,11 @@ public sealed class NodeExecutionService : INodeExecutionService
                     await ExecuteBranchAsync(branch, connections, nodeMap, context, invoker, feedbackContext, options, shouldBreak, token)
                         .ConfigureAwait(false);
                     break;
+
+                case ParallelSteps parallel:
+                    await ExecuteParallelStepsAsync(parallel, connections, nodeMap, context, invoker, feedbackContext, options, shouldBreak, token)
+                        .ConfigureAwait(false);
+                    break;
             }
         }
     }
@@ -306,6 +311,35 @@ public sealed class NodeExecutionService : INodeExecutionService
                 $"Loop '{loop.Header.Name}' exceeded maximum iteration limit ({MaxLoopIterations}). " +
                 "This may indicate an infinite loop.");
         }
+    }
+
+    private async Task ExecuteParallelStepsAsync(
+        ParallelSteps parallel,
+        IReadOnlyList<ConnectionData> connections,
+        IReadOnlyDictionary<string, NodeData> nodeMap,
+        INodeExecutionContext context,
+        NodeMethodInvoker invoker,
+        INodeMethodContext? feedbackContext,
+        NodeExecutionOptions options,
+        Func<bool> shouldBreak,
+        CancellationToken token)
+    {
+        if (parallel.Steps.Count == 0) return;
+
+        if (parallel.Steps.Count == 1 || options.MaxDegreeOfParallelism <= 1)
+        {
+            // Fall back to sequential if only one step or parallelism disabled
+            await ExecuteStepsAsync(parallel.Steps, connections, nodeMap, context, invoker, feedbackContext, options, shouldBreak, token)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        var tasks = parallel.Steps.Select(step =>
+            ExecuteStepsAsync(
+                new[] { step }, connections, nodeMap, context, invoker, feedbackContext,
+                options, shouldBreak, token));
+
+        await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     private async Task ExecuteBranchAsync(

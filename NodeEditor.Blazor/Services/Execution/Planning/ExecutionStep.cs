@@ -35,6 +35,12 @@ public sealed record BranchStep(
     IReadOnlyList<(string SocketName, IReadOnlyList<IExecutionStep> Steps)> Branches) : IExecutionStep;
 
 /// <summary>
+/// A group of independent steps that can execute concurrently.
+/// Used when multiple loops or branches at the same level have no dependencies between them.
+/// </summary>
+public sealed record ParallelSteps(IReadOnlyList<IExecutionStep> Steps) : IExecutionStep;
+
+/// <summary>
 /// A hierarchical execution plan composed of steps.
 /// </summary>
 public sealed record HierarchicalPlan(IReadOnlyList<IExecutionStep> Steps);

@@ -242,6 +242,51 @@ public sealed class ExecutionEngineTests
     }
 
     [Fact]
+    public async Task Loop_TwoIndependentLoops_RunConcurrently()
+    {
+        // Two independent loops with no dependency between them should execute concurrently.
+        // Start → LoopA (0..1) → bodyA → endA
+        // Start → LoopB (0..1) → bodyB → endB
+        var nodes = new List<NodeData>
+        {
+            TestNodes.Start("start"),
+            TestNodes.ForLoopStep("loopA", start: 0, end: 1, step: 1),
+            TestNodes.Marker("bodyA"),
+            TestNodes.Marker("endA"),
+            TestNodes.ForLoopStep("loopB", start: 0, end: 1, step: 1),
+            TestNodes.Marker("bodyB"),
+            TestNodes.Marker("endB")
+        };
+
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "loopA", "Enter"),
+            TestConnections.Exec("start", "Exit", "loopB", "Enter"),
+            TestConnections.Exec("loopA", "LoopPath", "bodyA", "Enter"),
+            TestConnections.Exec("loopA", "Exit", "endA", "Enter"),
+            TestConnections.Exec("loopB", "LoopPath", "bodyB", "Enter"),
+            TestConnections.Exec("loopB", "Exit", "endB", "Enter")
+        };
+
+        var context = new NodeExecutionContext();
+        var service = TestNodes.CreateExecutor();
+        var testContext = new TestNodeContext();
+
+        var options = new NodeExecutionOptions(ExecutionMode.Parallel, AllowBackground: false, MaxDegreeOfParallelism: 4);
+        await service.ExecuteAsync(nodes, connections, context, testContext, options, CancellationToken.None);
+
+        // Both loops should complete and reach their exit targets
+        Assert.True(context.IsNodeExecuted("endA"), "endA should have been executed");
+        Assert.True(context.IsNodeExecuted("endB"), "endB should have been executed");
+
+        // Verify the plan contains a ParallelSteps grouping
+        var planner = new ExecutionPlanner();
+        var plan = planner.BuildHierarchicalPlan(nodes, connections);
+        var hasParallelSteps = plan.Steps.Any(s => s is ParallelSteps ps && ps.Steps.Count >= 2);
+        Assert.True(hasParallelSteps, "Two independent loops should be grouped into ParallelSteps");
+    }
+
+    [Fact]
     public async Task StepMode_GatePausesAndResumes()
     {
         var nodes = new List<NodeData>

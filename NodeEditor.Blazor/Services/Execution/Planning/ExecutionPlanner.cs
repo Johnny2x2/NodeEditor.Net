@@ -365,6 +365,8 @@ public sealed class ExecutionPlanner
                 .Where(h => headerPredecessors[h].All(p => processed.Contains(p)))
                 .ToList();
 
+            var concurrentLoopSteps = new List<IExecutionStep>();
+
             foreach (var headerId in readyLoops)
             {
                 pendingLoops.Remove(headerId);
@@ -392,7 +394,7 @@ public sealed class ExecutionPlanner
                     bodySteps,
                     bodyNodes);
 
-                steps.Add(loopStep);
+                concurrentLoopSteps.Add(loopStep);
                 processed.Add(headerId);
 
                 // After the loop, its exit targets may now be ready
@@ -407,6 +409,12 @@ public sealed class ExecutionPlanner
                     }
                 }
             }
+
+            // If multiple independent loops are ready at the same time, run them concurrently
+            if (concurrentLoopSteps.Count == 1)
+                steps.Add(concurrentLoopSteps[0]);
+            else if (concurrentLoopSteps.Count > 1)
+                steps.Add(new ParallelSteps(concurrentLoopSteps));
 
             // Safety: if we have no ready nodes and no ready loops, break to avoid infinite loop
             if (ready.Count == 0 && readyLoops.Count == 0)
@@ -525,6 +533,9 @@ public sealed class ExecutionPlanner
                     layers.Add(new ExecutionLayer(new[] { branch.ConditionNode }));
                     foreach (var (_, branchSteps) in branch.Branches)
                         FlattenSteps(branchSteps, layers);
+                    break;
+                case ParallelSteps parallel:
+                    FlattenSteps(parallel.Steps, layers);
                     break;
             }
         }
