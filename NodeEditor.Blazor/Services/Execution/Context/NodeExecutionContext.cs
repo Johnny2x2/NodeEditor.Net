@@ -7,22 +7,28 @@ public sealed class NodeExecutionContext : INodeExecutionContext
     private readonly ConcurrentDictionary<string, object?> _socketValues;
     private readonly ConcurrentDictionary<string, bool> _executedNodes;
     private readonly ConcurrentDictionary<string, object?> _variables;
+    private readonly ConcurrentDictionary<string, object> _loopState;
+    private readonly Stack<int> _generationStack = new();
+    private int _currentGeneration;
 
     public NodeExecutionContext()
     {
         _socketValues = new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
         _executedNodes = new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
         _variables = new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
+        _loopState = new ConcurrentDictionary<string, object>(StringComparer.Ordinal);
     }
 
     private NodeExecutionContext(
         ConcurrentDictionary<string, object?> socketValues,
         ConcurrentDictionary<string, bool> executedNodes,
-        ConcurrentDictionary<string, object?> variables)
+        ConcurrentDictionary<string, object?> variables,
+        ConcurrentDictionary<string, object> loopState)
     {
         _socketValues = socketValues;
         _executedNodes = executedNodes;
         _variables = variables;
+        _loopState = loopState;
     }
 
     public bool TryGetSocketValue(string nodeId, string socketName, out object? value)
@@ -51,6 +57,11 @@ public sealed class NodeExecutionContext : INodeExecutionContext
         _executedNodes[nodeId] = true;
     }
 
+    public void ClearNodeExecuted(string nodeId)
+    {
+        _executedNodes.TryRemove(nodeId, out _);
+    }
+
     public object? GetVariable(string key)
     {
         _variables.TryGetValue(key, out var value);
@@ -62,6 +73,51 @@ public sealed class NodeExecutionContext : INodeExecutionContext
         _variables[key] = value;
     }
 
+    // ── Loop state management ──
+
+    public bool TryGetLoopState<T>(string key, out T value)
+    {
+        if (_loopState.TryGetValue(key, out var stored) && stored is T typed)
+        {
+            value = typed;
+            return true;
+        }
+        value = default!;
+        return false;
+    }
+
+    public void SetLoopState(string key, object value)
+    {
+        _loopState[key] = value;
+    }
+
+    public void ClearLoopState(string key)
+    {
+        _loopState.TryRemove(key, out _);
+    }
+
+    // ── Iteration generation (for loop body scoping) ──
+
+    public int CurrentGeneration => _currentGeneration;
+
+    public void PushGeneration()
+    {
+        _generationStack.Push(_currentGeneration);
+        _currentGeneration++;
+    }
+
+    public void PopGeneration()
+    {
+        if (_generationStack.Count > 0)
+            _currentGeneration = _generationStack.Pop();
+    }
+
+    public void ClearExecutedForNodes(IEnumerable<string> nodeIds)
+    {
+        foreach (var id in nodeIds)
+            _executedNodes.TryRemove(id, out _);
+    }
+
     public INodeExecutionContext CreateChild(string scopeName, bool inheritVariables = true)
     {
         var socketValues = new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
@@ -69,8 +125,9 @@ public sealed class NodeExecutionContext : INodeExecutionContext
         var variables = inheritVariables
             ? new ConcurrentDictionary<string, object?>(_variables, StringComparer.Ordinal)
             : new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
+        var loopState = new ConcurrentDictionary<string, object>(StringComparer.Ordinal);
 
-        return new NodeExecutionContext(socketValues, executedNodes, variables);
+        return new NodeExecutionContext(socketValues, executedNodes, variables, loopState);
     }
 
     private static string BuildSocketKey(string nodeId, string socketName)

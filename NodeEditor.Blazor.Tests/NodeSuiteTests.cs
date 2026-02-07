@@ -100,8 +100,7 @@ public sealed class NodeSuiteTests
         var connections = new List<ConnectionData>
         {
             TestConnections.Exec("start", "Exit", "loop", "Enter"),
-            TestConnections.Exec("loop", "LoopPath", "loop", "Enter"),
-            TestConnections.Exec("loop", "ExitPath", "end", "Enter")
+            TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
         var context = new NodeExecutionContext();
@@ -184,7 +183,7 @@ internal static class TestNodeFactory
                 DataInput("End", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(end)),
                 DataInput("Step", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(step))
             },
-            Outputs: new[] { ExecOutput("ExitPath"), ExecOutput("LoopPath"), DataOutput("Index", typeof(int).FullName ?? "System.Int32") });
+            Outputs: new[] { ExecOutput("Exit"), ExecOutput("LoopPath"), DataOutput("Index", typeof(int).FullName ?? "System.Int32") });
 
     public static NodeData SinkInt(string id)
         => new(id, "Sink", true, false,
@@ -277,16 +276,16 @@ internal sealed class NodeSuiteTestContext : INodeMethodContext
     }
 
     [Node("For Loop Step", isCallable: true)]
-    public void ForLoopStep(ExecutionPath Enter, int Start, int End, int Step, out ExecutionPath ExitPath, out ExecutionPath LoopPath, out int Index)
+    public void ForLoopStep(int Start, int End, int Step, out ExecutionPath Exit, out ExecutionPath LoopPath, out int Index)
     {
         ForLoopCalls++;
-        ExitPath = new ExecutionPath();
+        Exit = new ExecutionPath();
         LoopPath = new ExecutionPath();
 
         if (Step == 0)
         {
             Index = Start;
-            ExitPath.Signal();
+            Exit.Signal();
             return;
         }
 
@@ -301,7 +300,7 @@ internal sealed class NodeSuiteTestContext : INodeMethodContext
         {
             Index = (int)(current - Step);
             _loopState.Remove(key);
-            ExitPath.Signal();
+            Exit.Signal();
             return;
         }
 

@@ -11,9 +11,21 @@ public interface INodeExecutionContext
 
     bool IsNodeExecuted(string nodeId);
     void MarkNodeExecuted(string nodeId);
+    void ClearNodeExecuted(string nodeId);
 
     object? GetVariable(string key);
     void SetVariable(string key, object? value);
+
+    // Loop iteration state (scoped to an execution run)
+    bool TryGetLoopState<T>(string key, out T value);
+    void SetLoopState(string key, object value);
+    void ClearLoopState(string key);
+
+    // Iteration generation for loop scoping (prevents stale IsNodeExecuted in loop bodies)
+    int CurrentGeneration { get; }
+    void PushGeneration();
+    void PopGeneration();
+    void ClearExecutedForNodes(IEnumerable<string> nodeIds);
 
     INodeExecutionContext CreateChild(string scopeName, bool inheritVariables = true);
 }

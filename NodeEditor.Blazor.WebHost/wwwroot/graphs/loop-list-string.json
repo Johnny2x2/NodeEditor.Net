@@ -64,7 +64,7 @@
       ],
       "outputs": [
         {
-          "name": "ExitPath",
+          "name": "Exit",
           "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
           "isInput": false,
           "isExecution": true,
@@ -436,7 +436,7 @@
     { "outputNodeId": "start-loop", "outputSocketName": "Exit", "inputNodeId": "for-loop", "inputSocketName": "Enter", "isExecution": true },
     { "outputNodeId": "for-loop", "outputSocketName": "LoopPath", "inputNodeId": "consume-loop", "inputSocketName": "Enter", "isExecution": true },
     { "outputNodeId": "consume-loop", "outputSocketName": "Exit", "inputNodeId": "for-loop", "inputSocketName": "Enter", "isExecution": true },
-    { "outputNodeId": "for-loop", "outputSocketName": "ExitPath", "inputNodeId": "marker-loop", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "for-loop", "outputSocketName": "Exit", "inputNodeId": "marker-loop", "inputSocketName": "Enter", "isExecution": true },
     { "outputNodeId": "for-loop", "outputSocketName": "Index", "inputNodeId": "consume-loop", "inputSocketName": "Value", "isExecution": false },
 
     { "outputNodeId": "start-list", "outputSocketName": "Exit", "inputNodeId": "consume-list", "inputSocketName": "Enter", "isExecution": true },

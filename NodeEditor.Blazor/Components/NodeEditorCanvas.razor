@@ -168,8 +168,11 @@
 
     private void OnStateChanged(object? sender, EventArgs e)
     {
-        UpdateCulling();
-        StateHasChanged();
+        _ = InvokeAsync(() =>
+        {
+            UpdateCulling();
+            StateHasChanged();
+        });
     }
 
     private void OnZoomChanged(object? sender, ZoomChangedEventArgs e)

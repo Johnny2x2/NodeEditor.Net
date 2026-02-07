@@ -182,6 +182,109 @@ public sealed class ExecutionEngineTests
     }
 
     [Fact]
+    public async Task Loop_ForLoopStep_IteratesBodyInParallelMode()
+    {
+        // ForLoopStep(0..2) → body Marker → engine handles loopback
+        // After loop exits → end Marker
+        var nodes = new List<NodeData>
+        {
+            TestNodes.Start("start"),
+            TestNodes.ForLoopStep("loop", start: 0, end: 2, step: 1),
+            TestNodes.Marker("body"),
+            TestNodes.Marker("end")
+        };
+
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "loop", "Enter"),
+            TestConnections.Exec("loop", "LoopPath", "body", "Enter"),
+            TestConnections.Exec("loop", "Exit", "end", "Enter")
+        };
+
+        var context = new NodeExecutionContext();
+        var service = TestNodes.CreateExecutor();
+        var testContext = new TestNodeContext();
+
+        var options = new NodeExecutionOptions(ExecutionMode.Parallel, AllowBackground: false, MaxDegreeOfParallelism: 4);
+        await service.ExecuteAsync(nodes, connections, context, testContext, options, CancellationToken.None);
+
+        // Loop should iterate: invocations at index 0, 1, 2 (LoopPath), then exit at index 3 (>End, Exit) = 4 calls
+        Assert.Equal(4, testContext.ForLoopCalls);
+        Assert.True(context.IsNodeExecuted("end"));
+    }
+
+    [Fact]
+    public async Task Loop_ForLoopStep_NoBodyNodes_StillIterates()
+    {
+        // Loop with no LoopPath connections — loop still iterates internally
+        var nodes = new List<NodeData>
+        {
+            TestNodes.Start("start"),
+            TestNodes.ForLoopStep("loop", start: 0, end: 1, step: 1),
+            TestNodes.Marker("end")
+        };
+
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "loop", "Enter"),
+            TestConnections.Exec("loop", "Exit", "end", "Enter")
+        };
+
+        var context = new NodeExecutionContext();
+        var service = TestNodes.CreateExecutor();
+        var testContext = new TestNodeContext();
+
+        await service.ExecuteAsync(nodes, connections, context, testContext, NodeExecutionOptions.Default, CancellationToken.None);
+
+        // index 0 → LoopPath, index 1 → LoopPath, index 2 (>End) → Exit = 3 calls
+        Assert.True(testContext.ForLoopCalls >= 2, $"Expected at least 2 loop calls but got {testContext.ForLoopCalls}");
+        Assert.True(context.IsNodeExecuted("end"));
+    }
+
+    [Fact]
+    public async Task StepMode_GatePausesAndResumes()
+    {
+        var nodes = new List<NodeData>
+        {
+            TestNodes.Start("start"),
+            TestNodes.Marker("a"),
+            TestNodes.Marker("b")
+        };
+
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "a", "Enter"),
+            TestConnections.Exec("a", "Exit", "b", "Enter")
+        };
+
+        var context = new NodeExecutionContext();
+        var service = TestNodes.CreateExecutor();
+        var testContext = new TestNodeContext();
+
+        // Start in paused mode (step mode)
+        service.Gate.StartPaused();
+
+        var execTask = Task.Run(async () =>
+            await service.ExecuteAsync(nodes, connections, context, testContext, NodeExecutionOptions.Default, CancellationToken.None));
+
+        // Allow some time for the engine to hit the gate
+        await Task.Delay(50);
+        Assert.False(context.IsNodeExecuted("start"), "Node should not have executed yet while paused");
+
+        // Step once — should execute one node (start)
+        service.Gate.StepOnce();
+        await Task.Delay(50);
+
+        // Resume to let the rest finish
+        service.Gate.Resume();
+        await execTask;
+
+        Assert.True(context.IsNodeExecuted("start"));
+        Assert.True(context.IsNodeExecuted("a"));
+        Assert.True(context.IsNodeExecuted("b"));
+    }
+
+    [Fact]
     public async Task GroupExecution_ReturnsOutputsToParentContext()
     {
         var groupNodes = new List<NodeData>
@@ -261,6 +364,22 @@ internal static class TestNodes
             },
             Outputs: new[] { DataOutput("Result", typeof(int).FullName ?? "System.Int32") });
 
+    public static NodeData ForLoopStep(string id, int start, int end, int step)
+        => new(id, "For Loop Step", true, false,
+            Inputs: new[]
+            {
+                ExecInput("Enter"),
+                DataInput("Start", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(start)),
+                DataInput("End", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(end)),
+                DataInput("Step", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(step))
+            },
+            Outputs: new[]
+            {
+                ExecOutput("Exit"),
+                ExecOutput("LoopPath"),
+                DataOutput("Index", typeof(int).FullName ?? "System.Int32")
+            });
+
     private static SocketData ExecInput(string name)
         => new(name, typeof(ExecutionPath).FullName ?? nameof(ExecutionPath), true, true);
 
@@ -287,6 +406,7 @@ internal sealed class TestNodeContext : INodeMethodContext
 {
     private int _current;
     private int _max;
+    private readonly Dictionary<string, double> _loopState = new(StringComparer.Ordinal);
 
     public NodeData? CurrentProcessingNode { get; set; }
 
@@ -297,6 +417,8 @@ internal sealed class TestNodeContext : INodeMethodContext
     public int MaxConcurrent => _max;
 
     public int ConstValue { get; set; } = 42;
+
+    public int ForLoopCalls { get; private set; }
 
     [Node("Start")]
     public void Start(out ExecutionPath Exit)
@@ -376,6 +498,41 @@ internal sealed class TestNodeContext : INodeMethodContext
     public void Sum(int A, int B, out int Result)
     {
         Result = A + B;
+    }
+
+    [Node("For Loop Step")]
+    public void ForLoopStep(int Start, int End, int Step, out ExecutionPath Exit, out ExecutionPath LoopPath, out int Index)
+    {
+        ForLoopCalls++;
+        Exit = new ExecutionPath();
+        LoopPath = new ExecutionPath();
+
+        if (Step == 0)
+        {
+            Index = Start;
+            Exit.Signal();
+            return;
+        }
+
+        var key = CurrentProcessingNode?.Id ?? "loop";
+        if (!_loopState.TryGetValue(key, out var current))
+        {
+            current = Start;
+        }
+
+        var shouldExit = Step > 0 ? current > End : current < End;
+        if (shouldExit)
+        {
+            Index = (int)(current - Step);
+            _loopState.Remove(key);
+            Exit.Signal();
+            return;
+        }
+
+        Index = (int)current;
+        current += Step;
+        _loopState[key] = current;
+        LoopPath.Signal();
     }
 
     private void UpdateMax(int current)

@@ -12,6 +12,11 @@ public interface INodeExecutionService
     event EventHandler<ExecutionLayerEventArgs>? LayerStarted;
     event EventHandler<ExecutionLayerEventArgs>? LayerCompleted;
 
+    /// <summary>
+    /// Gets the execution gate for step/pause control.
+    /// </summary>
+    ExecutionGate Gate { get; }
+
     Task ExecuteAsync(
         IReadOnlyList<NodeData> nodes,
         IReadOnlyList<ConnectionData> connections,

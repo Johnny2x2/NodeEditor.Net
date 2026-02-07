@@ -22,6 +22,10 @@
 
 <div class="node-editor-toolbar">
 	<button @onclick="StartExecutionAsync" disabled="@_isExecuting">Start</button>
+	<button @onclick="StartSteppedAsync" disabled="@_isExecuting" title="Start in step-by-step mode">Step Start</button>
+	<button @onclick="StepOnce" disabled="@(!_isPaused)" title="Execute one node">Step</button>
+	<button @onclick="PauseExecution" disabled="@(!_isExecuting || _isPaused)" title="Pause execution">Pause</button>
+	<button @onclick="ResumeExecution" disabled="@(!_isPaused)" title="Resume execution">Resume</button>
 	<button @onclick="StopExecution" disabled="@(!_isExecuting)">Stop</button>
 	<button @onclick="CreateNewGraph" disabled="@_isExecuting">New</button>
 	<button @onclick="SaveGraphLocalAsync" disabled="@_isExecuting"
@@ -81,6 +85,7 @@
 	private NodeEditorCanvas? _canvasRef;
 	private CancellationTokenSource? _executionCts;
 	private bool _isExecuting;
+	private bool _isPaused;
 	private string _executionStatus = "Idle";
 	private CompositeNodeContext? _nodeContext;
 	private string? _loadStatus;
@@ -91,7 +96,7 @@
 	private readonly List<GraphPreset> _presets = new()
 	{
 		new GraphPreset("Loop + Lists + Strings", "graphs/loop-list-string.json"),
-		new GraphPreset("Parallel Split/Join", "graphs/parallel.json")
+		new GraphPreset("Parallel Execution", "graphs/parallel.json")
 	};
 
 	private bool IsLocalGraphSelected => _selectedPreset.StartsWith("local:", StringComparison.Ordinal);
@@ -131,6 +136,7 @@
 		ExecutionService.NodeStarted += OnNodeStarted;
 		ExecutionService.NodeCompleted += OnNodeCompleted;
 		ExecutionService.NodeFailed += OnNodeFailed;
+		ExecutionService.Gate.StateChanged += OnGateStateChanged;
 
 		AddDefaultStartNode();
 	}
@@ -159,6 +165,7 @@
 		ExecutionService.NodeStarted -= OnNodeStarted;
 		ExecutionService.NodeCompleted -= OnNodeCompleted;
 		ExecutionService.NodeFailed -= OnNodeFailed;
+		ExecutionService.Gate.StateChanged -= OnGateStateChanged;
 	}
 
 	public async ValueTask DisposeAsync()
@@ -200,6 +207,7 @@
 
 		try
 		{
+			ExecutionService.Gate.Run();
 			await ExecutionService.ExecuteAsync(
 				executionNodes,
 				EditorState.Connections.ToList(),
@@ -208,9 +216,11 @@
 				null,
 				_executionCts.Token).ConfigureAwait(false);
 
-			EditorState.ApplyExecutionContext(context);
-
-			_executionStatus = "Completed";
+			await InvokeAsync(() =>
+			{
+				EditorState.ApplyExecutionContext(context);
+				_executionStatus = "Completed";
+			});
 		}
 		catch (OperationCanceledException)
 		{
@@ -262,6 +272,90 @@
 
 		_executionStatus = "Canceling";
 		_executionCts?.Cancel();
+	}
+
+	private async Task StartSteppedAsync()
+	{
+		if (_isExecuting) return;
+
+		_nodeContext ??= new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
+
+		_isExecuting = true;
+		_isPaused = true;
+		_executionStatus = "Paused (Step mode)";
+		EditorState.ResetNodeExecutionState();
+
+		_executionCts?.Dispose();
+		_executionCts = new CancellationTokenSource();
+
+		var context = new NodeExecutionContext();
+		VariableNodeExecutor.SeedVariables(context, EditorState.Variables);
+		var executionNodes = EditorState.BuildExecutionNodes();
+
+		try
+		{
+			ExecutionService.Gate.StartPaused();
+			await ExecutionService.ExecuteAsync(
+				executionNodes,
+				EditorState.Connections.ToList(),
+				context,
+				_nodeContext ?? throw new InvalidOperationException("Node context is not initialized."),
+				null,
+				_executionCts.Token).ConfigureAwait(false);
+
+			await InvokeAsync(() =>
+			{
+				EditorState.ApplyExecutionContext(context);
+				_executionStatus = "Completed";
+			});
+		}
+		catch (OperationCanceledException)
+		{
+			_executionStatus = "Canceled";
+		}
+		catch (Exception ex)
+		{
+			_executionStatus = $"Failed: {ex.Message}";
+		}
+		finally
+		{
+			_isExecuting = false;
+			_isPaused = false;
+			ExecutionService.Gate.Complete();
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private void StepOnce()
+	{
+		if (!_isPaused) return;
+		_executionStatus = "Stepping...";
+		ExecutionService.Gate.StepOnce();
+	}
+
+	private void PauseExecution()
+	{
+		if (!_isExecuting || _isPaused) return;
+		ExecutionService.Gate.Pause();
+		_isPaused = true;
+		_executionStatus = "Paused";
+	}
+
+	private void ResumeExecution()
+	{
+		if (!_isPaused) return;
+		ExecutionService.Gate.Resume();
+		_isPaused = false;
+		_executionStatus = "Running";
+	}
+
+	private void OnGateStateChanged(object? sender, EventArgs e)
+	{
+		_ = InvokeAsync(() =>
+		{
+			_isPaused = ExecutionService.Gate.State == ExecutionState.Paused;
+			StateHasChanged();
+		});
 	}
 
 	private void CreateNewGraph()
@@ -519,7 +613,7 @@
 			},
 			Outputs: new[]
 			{
-				new SocketData("ExitPath", execType, false, true),
+				new SocketData("Exit", execType, false, true),
 				new SocketData("LoopPath", execType, false, true),
 				new SocketData("Index", intType, false, false)
 			}))
@@ -672,8 +766,9 @@
 			Position = new Point2D(1180, 320)
 		};
 
-		var startParallel = new NodeViewModel(new NodeData(
-			Id: "start-parallel",
+		// Parallel demo: two independent execution chains run concurrently via layer parallelism
+		var startParallelA = new NodeViewModel(new NodeData(
+			Id: "start-parallel-a",
 			Name: "Start",
 			Callable: true,
 			ExecInit: true,
@@ -681,21 +776,6 @@
 			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
 		{
 			Position = new Point2D(60, 480)
-		};
-
-		var splitParallel = new NodeViewModel(new NodeData(
-			Id: "split-parallel",
-			Name: "Parallel Split",
-			Callable: false,
-			ExecInit: false,
-			Inputs: new[] { new SocketData("Start", execType, true, true) },
-			Outputs: new[]
-			{
-				new SocketData("PathA", execType, false, true),
-				new SocketData("PathB", execType, false, true)
-			}))
-		{
-			Position = new Point2D(260, 460)
 		};
 
 		var delayA = new NodeViewModel(new NodeData(
@@ -710,7 +790,18 @@
 			},
 			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
 		{
-			Position = new Point2D(520, 430)
+			Position = new Point2D(260, 460)
+		};
+
+		var startParallelB = new NodeViewModel(new NodeData(
+			Id: "start-parallel-b",
+			Name: "Start",
+			Callable: true,
+			ExecInit: true,
+			Inputs: Array.Empty<SocketData>(),
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(60, 560)
 		};
 
 		var delayB = new NodeViewModel(new NodeData(
@@ -725,33 +816,7 @@
 			},
 			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
 		{
-			Position = new Point2D(520, 520)
-		};
-
-		var joinParallel = new NodeViewModel(new NodeData(
-			Id: "join-parallel",
-			Name: "Parallel Join",
-			Callable: false,
-			ExecInit: false,
-			Inputs: new[]
-			{
-				new SocketData("PathA", execType, true, true),
-				new SocketData("PathB", execType, true, true)
-			},
-			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
-		{
-			Position = new Point2D(760, 480)
-		};
-
-		var markerParallel = new NodeViewModel(new NodeData(
-			Id: "marker-parallel",
-			Name: "Marker",
-			Callable: true,
-			ExecInit: false,
-			Inputs: new[] { new SocketData("Enter", execType, true, true) },
-			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
-		{
-			Position = new Point2D(980, 480)
+			Position = new Point2D(260, 540)
 		};
 
 		EditorState.AddNode(startLoop);
@@ -767,17 +832,14 @@
 		EditorState.AddNode(stringConcat);
 		EditorState.AddNode(stringLength);
 		EditorState.AddNode(consumeString);
-		EditorState.AddNode(startParallel);
-		EditorState.AddNode(splitParallel);
+		EditorState.AddNode(startParallelA);
 		EditorState.AddNode(delayA);
+		EditorState.AddNode(startParallelB);
 		EditorState.AddNode(delayB);
-		EditorState.AddNode(joinParallel);
-		EditorState.AddNode(markerParallel);
 
 		EditorState.AddConnection(new ConnectionData("start-loop", "for-loop", "Exit", "Enter", true));
 		EditorState.AddConnection(new ConnectionData("for-loop", "consume-loop", "LoopPath", "Enter", true));
-		EditorState.AddConnection(new ConnectionData("consume-loop", "for-loop", "Exit", "Enter", true));
-		EditorState.AddConnection(new ConnectionData("for-loop", "marker-loop", "ExitPath", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("for-loop", "marker-loop", "Exit", "Enter", true));
 		EditorState.AddConnection(new ConnectionData("for-loop", "consume-loop", "Index", "Value", false));
 
 		EditorState.AddConnection(new ConnectionData("start-list", "consume-list", "Exit", "Enter", true));
@@ -791,11 +853,8 @@
 		EditorState.AddConnection(new ConnectionData("start-list", "consume-string", "Exit", "Enter", true));
 		EditorState.AddConnection(new ConnectionData("string-length", "consume-string", "Length", "Value", false));
 
-		EditorState.AddConnection(new ConnectionData("start-parallel", "split-parallel", "Exit", "Start", true));
-		EditorState.AddConnection(new ConnectionData("split-parallel", "delay-a", "PathA", "Enter", true));
-		EditorState.AddConnection(new ConnectionData("split-parallel", "delay-b", "PathB", "Enter", true));
-		EditorState.AddConnection(new ConnectionData("delay-a", "join-parallel", "Exit", "PathA", true));
-		EditorState.AddConnection(new ConnectionData("delay-b", "join-parallel", "Exit", "PathB", true));
-		EditorState.AddConnection(new ConnectionData("join-parallel", "marker-parallel", "Exit", "Enter", true));
+		// Parallel: two independent chains run concurrently
+		EditorState.AddConnection(new ConnectionData("start-parallel-a", "delay-a", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("start-parallel-b", "delay-b", "Exit", "Enter", true));
 	}
 }

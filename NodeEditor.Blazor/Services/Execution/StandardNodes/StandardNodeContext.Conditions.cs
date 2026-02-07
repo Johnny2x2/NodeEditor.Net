@@ -23,12 +23,11 @@ public sealed partial class StandardNodeContext
     }
 
     [Node("While Loop", "Conditions/Loops", "Basic", "While loop.", true)]
-    public void WhileLoop(bool Condition, ExecutionPath ReturnPath, out ExecutionPath ExitPath, out ExecutionPath LoopPath)
+    public void WhileLoop(bool Condition, out ExecutionPath Exit, out ExecutionPath LoopPath)
     {
         ReportRunning();
         LoopPath = new ExecutionPath();
-        ReturnPath = new ExecutionPath();
-        ExitPath = new ExecutionPath();
+        Exit = new ExecutionPath();
 
         if (Condition)
         {
@@ -36,17 +35,16 @@ public sealed partial class StandardNodeContext
         }
         else
         {
-            ExitPath.Signal();
+            Exit.Signal();
         }
     }
 
     [Node("For Loop", "Conditions/Loops", "Basic", "For loop.", true)]
-    public void ForLoop(int LoopTimes, ExecutionPath Start, ExecutionPath ReturnPath, out ExecutionPath ExitPath, out ExecutionPath LoopPath, out int Index)
+    public void ForLoop(int LoopTimes, out ExecutionPath Exit, out ExecutionPath LoopPath, out int Index)
     {
         ReportRunning();
         LoopPath = new ExecutionPath();
-        ExitPath = new ExecutionPath();
-        ReturnPath = new ExecutionPath();
+        Exit = new ExecutionPath();
 
         var key = GetStateKey("for");
         if (!TryGetState(key, out int currentIndex))
@@ -59,7 +57,7 @@ public sealed partial class StandardNodeContext
         {
             Index = Math.Max(0, currentIndex - 1);
             ClearState(key);
-            ExitPath.Signal();
+            Exit.Signal();
         }
         else
         {
@@ -71,12 +69,11 @@ public sealed partial class StandardNodeContext
     }
 
     [Node("ForEach Loop", "Conditions/Loops", "Basic", "Iterate list values.", true)]
-    public void ForEachLoop(SerializableList List, ExecutionPath ReturnPath, out ExecutionPath ExitPath, out ExecutionPath LoopPath, out object Obj)
+    public void ForEachLoop(SerializableList List, out ExecutionPath Exit, out ExecutionPath LoopPath, out object Obj)
     {
         ReportRunning();
         LoopPath = new ExecutionPath();
-        ExitPath = new ExecutionPath();
-        ReturnPath = new ExecutionPath();
+        Exit = new ExecutionPath();
         Obj = new object();
 
         var key = GetStateKey("foreach");
@@ -99,7 +96,7 @@ public sealed partial class StandardNodeContext
             }
 
             ClearState(key);
-            ExitPath.Signal();
+            Exit.Signal();
         }
         else
         {
@@ -114,17 +111,16 @@ public sealed partial class StandardNodeContext
     }
 
     [Node("For Loop Step", "Conditions/Loops", "Basic", "For loop with step.", true)]
-    public void ForLoopStep(int StartValue, int EndValue, int Step, ExecutionPath Start, ExecutionPath ReturnPath, out ExecutionPath ExitPath, out ExecutionPath LoopPath, out int Index)
+    public void ForLoopStep(int StartValue, int EndValue, int Step, out ExecutionPath Exit, out ExecutionPath LoopPath, out int Index)
     {
         ReportRunning();
         LoopPath = new ExecutionPath();
-        ExitPath = new ExecutionPath();
-        ReturnPath = new ExecutionPath();
+        Exit = new ExecutionPath();
 
         if (Step == 0)
         {
             Index = StartValue;
-            ExitPath.Signal();
+            Exit.Signal();
             return;
         }
 
@@ -140,7 +136,7 @@ public sealed partial class StandardNodeContext
         {
             Index = current - Step;
             ClearState(key);
-            ExitPath.Signal();
+            Exit.Signal();
             return;
         }
 
@@ -151,12 +147,11 @@ public sealed partial class StandardNodeContext
     }
 
     [Node("Do While Loop", "Conditions/Loops", "Basic", "Do-while loop.", true)]
-    public void DoWhileLoop(bool Condition, ExecutionPath ReturnPath, out ExecutionPath ExitPath, out ExecutionPath LoopPath)
+    public void DoWhileLoop(bool Condition, out ExecutionPath Exit, out ExecutionPath LoopPath)
     {
         ReportRunning();
         LoopPath = new ExecutionPath();
-        ReturnPath = new ExecutionPath();
-        ExitPath = new ExecutionPath();
+        Exit = new ExecutionPath();
 
         var key = GetStateKey("do-while");
         if (!TryGetState(key, out bool _))
@@ -173,21 +168,20 @@ public sealed partial class StandardNodeContext
         else
         {
             ClearState(key);
-            ExitPath.Signal();
+            Exit.Signal();
         }
     }
 
     [Node("Repeat Until", "Conditions/Loops", "Basic", "Repeat until condition is true.", true)]
-    public void RepeatUntil(bool Condition, ExecutionPath ReturnPath, out ExecutionPath ExitPath, out ExecutionPath LoopPath)
+    public void RepeatUntil(bool Condition, out ExecutionPath Exit, out ExecutionPath LoopPath)
     {
         ReportRunning();
         LoopPath = new ExecutionPath();
-        ReturnPath = new ExecutionPath();
-        ExitPath = new ExecutionPath();
+        Exit = new ExecutionPath();
 
         if (Condition)
         {
-            ExitPath.Signal();
+            Exit.Signal();
         }
         else
         {
