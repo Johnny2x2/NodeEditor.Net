@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components.Web;
+using System;
 using NodeEditor.Blazor.Components;
 using NodeEditor.Blazor.Models;
 using NodeEditor.Blazor.Services.Registry;
@@ -52,6 +53,11 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
 
     // ── Variable drag-and-drop ──
     private VariableDragData? _pendingVariableDrag;
+
+    // ── Clipboard (copy/paste) ──
+    private List<GraphNodeData> _clipboardNodes = new();
+    private List<ConnectionData> _clipboardConnections = new();
+    private int _pasteSequence;
 
     public CanvasInteractionHandler(
         ICoordinateConverter coordinateConverter,
@@ -407,6 +413,18 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
         {
             _state.SelectAll();
         }
+        else if (e.CtrlKey && (e.Key == "c" || e.Key == "C"))
+        {
+            CopySelectionToClipboard();
+        }
+        else if (e.CtrlKey && (e.Key == "x" || e.Key == "X"))
+        {
+            CutSelectionToClipboard();
+        }
+        else if (e.CtrlKey && (e.Key == "v" || e.Key == "V"))
+        {
+            PasteClipboard();
+        }
         else if (e.CtrlKey && (e.Key == "z" || e.Key == "Z"))
         {
             _state.RequestUndo();
@@ -467,6 +485,30 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
         };
 
         _state.AddNode(nodeViewModel);
+    }
+
+    // ────────────────────────── Clipboard actions ──────────────────────────
+
+    public void CopySelectionToClipboard()
+    {
+        CopySelectionToClipboardInternal();
+    }
+
+    public void CutSelectionToClipboard()
+    {
+        CopySelectionToClipboardInternal();
+        _state.RemoveSelectedNodes();
+    }
+
+    public void DeleteSelection()
+    {
+        if (_state.SelectedConnection is not null)
+        {
+            _state.RemoveConnection(_state.SelectedConnection);
+            return;
+        }
+
+        _state.RemoveSelectedNodes();
     }
 
     // ────────────────────────── Cancel all interactions ──────────────────────────
@@ -547,6 +589,101 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
             ? _state.Nodes.Where(n => n.IsSelected)
             : new[] { _draggingNode };
     }
+
+    private void CopySelectionToClipboardInternal()
+    {
+        var selectedNodes = _state.Nodes.Where(n => n.IsSelected).ToList();
+        if (selectedNodes.Count == 0)
+        {
+            _clipboardNodes.Clear();
+            _clipboardConnections.Clear();
+            _pasteSequence = 0;
+            return;
+        }
+
+        var selectedIds = selectedNodes.Select(n => n.Data.Id).ToHashSet();
+
+        _clipboardNodes = selectedNodes
+            .Select(n => new GraphNodeData(n.Data, n.Position, n.Size))
+            .ToList();
+
+        _clipboardConnections = _state.Connections
+            .Where(c => selectedIds.Contains(c.OutputNodeId) && selectedIds.Contains(c.InputNodeId))
+            .ToList();
+
+        _pasteSequence = 0;
+    }
+
+    private void PasteClipboard()
+    {
+        if (_clipboardNodes.Count == 0)
+        {
+            return;
+        }
+
+        var offset = new Point2D(30 * (_pasteSequence + 1), 30 * (_pasteSequence + 1));
+        var idMap = new Dictionary<string, string>();
+        var newNodeIds = new List<string>();
+
+        foreach (var node in _clipboardNodes)
+        {
+            var newId = Guid.NewGuid().ToString("N");
+            idMap[node.Data.Id] = newId;
+
+            var newData = CloneNodeData(node.Data, newId);
+            var newViewModel = new NodeViewModel(newData)
+            {
+                Position = new Point2D(node.Position.X + offset.X, node.Position.Y + offset.Y),
+                Size = node.Size
+            };
+
+            _state.AddNode(newViewModel);
+            newNodeIds.Add(newViewModel.Data.Id);
+        }
+
+        foreach (var connection in _clipboardConnections)
+        {
+            if (!idMap.TryGetValue(connection.OutputNodeId, out var newOutputId))
+                continue;
+            if (!idMap.TryGetValue(connection.InputNodeId, out var newInputId))
+                continue;
+
+            var newConnection = connection with
+            {
+                OutputNodeId = newOutputId,
+                InputNodeId = newInputId
+            };
+
+            _state.AddConnection(newConnection);
+        }
+
+        _state.SelectNodes(newNodeIds, clearExisting: true);
+        _pasteSequence++;
+    }
+
+    private static NodeData CloneNodeData(NodeData data, string newId)
+    {
+        var inputs = data.Inputs.Select(CloneSocket).ToList();
+        var outputs = data.Outputs.Select(CloneSocket).ToList();
+
+        return new NodeData(
+            newId,
+            data.Name,
+            data.Callable,
+            data.ExecInit,
+            inputs,
+            outputs,
+            data.DefinitionId);
+    }
+
+    private static SocketData CloneSocket(SocketData socket) =>
+        new(
+            socket.Name,
+            socket.TypeName,
+            socket.IsInput,
+            socket.IsExecution,
+            socket.Value,
+            socket.EditorHint);
 
     private bool IsValidConnection(ConnectionData connection, SocketViewModel targetSocket)
     {

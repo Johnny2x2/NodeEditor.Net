@@ -82,6 +82,12 @@ public interface ICanvasInteractionHandler
     void HandleDragOver(DragEventArgs e);
     void HandleDrop(DragEventArgs e, Point2D canvasPoint, INodeRegistryService? registry);
 
+    // ── Clipboard ──
+
+    void CopySelectionToClipboard();
+    void CutSelectionToClipboard();
+    void DeleteSelection();
+
     // ── Utility ──
 
     void CancelInteraction();

@@ -5,6 +5,9 @@
      style="@NodeStyle"
      @onpointerdown="OnNodePointerDown"
      @onpointerdown:stopPropagation
+    @oncontextmenu="HandleNodeContextMenu"
+    @oncontextmenu:preventDefault
+    @oncontextmenu:stopPropagation
      @key="Node.Data.Id">
     
     <div class="ne-node-header">
@@ -69,6 +72,9 @@
     [Parameter]
     public EventCallback<NodePointerEventArgs> OnNodeDragStart { get; set; }
 
+    [Parameter]
+    public EventCallback<NodePointerEventArgs> OnNodeContextMenu { get; set; }
+
     private string NodeStyle =>
         $"left: {Node.Position.X}px; top: {Node.Position.Y}px; " +
         $"width: {Node.Size.Width}px; min-height: {Node.Size.Height}px;";
@@ -99,6 +105,18 @@
                     Position = new Point2D(e.ClientX, e.ClientY)
                 });
             }
+        }
+    }
+
+    private async Task HandleNodeContextMenu(MouseEventArgs e)
+    {
+        if (OnNodeContextMenu.HasDelegate)
+        {
+            await OnNodeContextMenu.InvokeAsync(new NodePointerEventArgs
+            {
+                NodeId = Node.Data.Id,
+                Position = new Point2D(e.ClientX, e.ClientY)
+            });
         }
     }
 

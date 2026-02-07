@@ -38,6 +38,28 @@
                        OnSelect="AddNodeFromDefinition"
                        OnClose="CloseContextMenu" />
 
+    @if (_isNodeContextMenuOpen)
+    {
+        <div class="ne-context-menu"
+             style="@NodeContextMenuStyle"
+             @onpointerdown:stopPropagation
+             @oncontextmenu:preventDefault
+             @onkeydown="OnNodeContextMenuKeyDown"
+             tabindex="0">
+            <div class="ne-context-menu-category-items">
+                <button class="ne-context-menu-item" @onclick="OnNodeMenuCopy">
+                    <div class="ne-context-menu-item-name">Copy</div>
+                </button>
+                <button class="ne-context-menu-item" @onclick="OnNodeMenuCut">
+                    <div class="ne-context-menu-item-name">Cut</div>
+                </button>
+                <button class="ne-context-menu-item" @onclick="OnNodeMenuDelete">
+                    <div class="ne-context-menu-item-name">Delete</div>
+                </button>
+            </div>
+        </div>
+    }
+
     <div class="ne-viewport" style="@ViewportTransformStyle">
         @* Connection layer (SVG) - rendered below nodes *@
         <svg class="ne-connections" @ref="_svgRef">
@@ -65,7 +87,8 @@
                                    @key="node.Data.Id"
                                    OnSocketPointerDown="OnSocketPointerDown"
                                    OnSocketPointerUp="OnSocketPointerUp"
-                                   OnNodeDragStart="OnNodeDragStart" />
+                                   OnNodeDragStart="OnNodeDragStart"
+                                   OnNodeContextMenu="OnNodeContextMenu" />
                 }
             </div>
         </CascadingValue>
@@ -80,6 +103,9 @@
 
     private IReadOnlyList<NodeViewModel> _visibleNodes = Array.Empty<NodeViewModel>();
     private IReadOnlyList<ConnectionData> _visibleConnections = Array.Empty<ConnectionData>();
+
+    private bool _isNodeContextMenuOpen;
+    private Point2D _nodeContextMenuScreenPosition = Point2D.Zero;
 
     private readonly Dictionary<string, Point2D> _socketPositionCache = new();
 
@@ -97,6 +123,9 @@
 
     private string ViewportTransformStyle =>
         $"transform: translate({Interaction.PanOffset.X}px, {Interaction.PanOffset.Y}px) scale({Interaction.Zoom});";
+
+    private string NodeContextMenuStyle =>
+        $"left: {_nodeContextMenuScreenPosition.X}px; top: {_nodeContextMenuScreenPosition.Y}px;";
 
     // ────────────────────────── Public API (called by parent) ──────────────────────────
 
@@ -218,6 +247,11 @@
 
     private async Task OnPointerDown(PointerEventArgs e)
     {
+        if (_isNodeContextMenuOpen && e.Button == 0)
+        {
+            CloseNodeContextMenu();
+        }
+
         await _canvasRef.FocusAsync();
         await UpdateCanvasScreenOffsetAsync();
         Interaction.HandlePointerDown(e, ToCanvasPoint(new Point2D(e.ClientX, e.ClientY)));
@@ -243,6 +277,7 @@
 
     private void OnContextMenu(MouseEventArgs e)
     {
+        CloseNodeContextMenu();
         Interaction.OpenContextMenu(ToCanvasPoint(new Point2D(e.ClientX, e.ClientY)));
         StateHasChanged();
     }
@@ -336,6 +371,56 @@
     private void CloseContextMenu()
     {
         Interaction.CloseContextMenu();
+    }
+
+    // ────────────────────────── Node context menu ──────────────────────────
+
+    private async Task OnNodeContextMenu(NodePointerEventArgs e)
+    {
+        await UpdateCanvasScreenOffsetAsync();
+
+        Interaction.CloseContextMenu();
+
+        if (!State.SelectedNodeIds.Contains(e.NodeId))
+        {
+            State.SelectNode(e.NodeId, clearExisting: true);
+        }
+
+        _nodeContextMenuScreenPosition = ToCanvasPoint(e.Position);
+        _isNodeContextMenuOpen = true;
+        StateHasChanged();
+    }
+
+    private void CloseNodeContextMenu()
+    {
+        _isNodeContextMenuOpen = false;
+    }
+
+    private void OnNodeMenuCopy()
+    {
+        Interaction.CopySelectionToClipboard();
+        CloseNodeContextMenu();
+    }
+
+    private void OnNodeMenuCut()
+    {
+        Interaction.CutSelectionToClipboard();
+        CloseNodeContextMenu();
+    }
+
+    private void OnNodeMenuDelete()
+    {
+        Interaction.DeleteSelection();
+        CloseNodeContextMenu();
+    }
+
+    private void OnNodeContextMenuKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            CloseNodeContextMenu();
+            StateHasChanged();
+        }
     }
 
     // ────────────────────────── Connection selection ──────────────────────────

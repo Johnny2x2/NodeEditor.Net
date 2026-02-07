@@ -1,5 +1,7 @@
 @inject INodeRegistryService Registry
+@inject IJSRuntime JSRuntime
 @implements IDisposable
+@implements IAsyncDisposable
 
 @if (IsOpen)
 {
@@ -13,7 +15,24 @@
             @ref="_menuRef">
         <ContextMenuSearch @ref="_searchRef" Value="@_search" ValueChanged="OnSearchChanged" />
         <div class="ne-context-menu-list">
-            @if (_catalog.Categories.Count == 0)
+            @if (!string.IsNullOrWhiteSpace(_search))
+            {
+                @if (_catalog.All.Count == 0)
+                {
+                    <div class="ne-context-menu-empty">No nodes found.</div>
+                }
+                else
+                {
+                    <div class="ne-context-menu-category-items">
+                        @foreach (var definition in _catalog.All)
+                        {
+                            <ContextMenuItem Definition="definition"
+                                            OnSelect="OnSelectDefinition" />
+                        }
+                    </div>
+                }
+            }
+            else if (_catalog.Categories.Count == 0)
             {
                 <div class="ne-context-menu-empty">No nodes found.</div>
             }
@@ -22,6 +41,17 @@
                 @if (_categoryStack.Count > 0)
                 {
                     <button class="ne-context-menu-back" @onclick="NavigateUp">← Back</button>
+                }
+
+                @if (_categoryStack.Count > 0 && _categoryStack[^1].Nodes.Count > 0)
+                {
+                    <div class="ne-context-menu-category-items">
+                        @foreach (var definition in _categoryStack[^1].Nodes)
+                        {
+                            <ContextMenuItem Definition="definition"
+                                            OnSelect="OnSelectDefinition" />
+                        }
+                    </div>
                 }
 
                 @foreach (var category in CurrentCategories)
@@ -38,6 +68,7 @@
     private NodeCatalog _catalog = NodeCatalog.Create(Array.Empty<NodeDefinition>());
     private string _search = string.Empty;
     private bool _focusPending;
+    private bool _positionPending;
     private ContextMenuSearch? _searchRef;
     private readonly List<NodeCategoryGroup> _categoryStack = new();
 
@@ -67,6 +98,7 @@
         if (IsOpen)
         {
             _focusPending = true;
+            _positionPending = true;
         }
     }
 
@@ -91,6 +123,12 @@
                 // Ignore focus errors if the element is no longer available.
             }
         }
+
+        if (_positionPending && IsOpen)
+        {
+            _positionPending = false;
+            await UpdateMenuPositionAsync();
+        }
     }
 
     public void Dispose()
@@ -114,6 +152,7 @@
     {
         _search = value;
         RefreshCatalog();
+        _positionPending = true;
         await InvokeAsync(StateHasChanged);
     }
 
@@ -131,7 +170,14 @@
     {
         if (e.Key == "Escape")
         {
-            await CloseAsync();
+            if (_categoryStack.Count > 0)
+            {
+                NavigateUp();
+            }
+            else
+            {
+                await CloseAsync();
+            }
         }
     }
 
@@ -139,6 +185,7 @@
     {
         _search = string.Empty;
         RefreshCatalog();
+        _positionPending = false;
 
         if (OnClose.HasDelegate)
         {
@@ -176,23 +223,6 @@
         builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => NavigateInto(category)));
         builder.AddContent(seq++, category.Name);
         builder.CloseElement();
-
-        if (category.Nodes.Count > 0)
-        {
-            builder.OpenElement(seq++, "div");
-            builder.AddAttribute(seq++, "class", "ne-context-menu-category-items");
-
-            foreach (var definition in category.Nodes)
-            {
-                builder.OpenComponent<ContextMenuItem>(seq++);
-                builder.AddAttribute(seq++, nameof(ContextMenuItem.Definition), definition);
-                builder.AddAttribute(seq++, nameof(ContextMenuItem.OnSelect),
-                    EventCallback.Factory.Create<NodeDefinition>(this, OnSelectDefinition));
-                builder.CloseComponent();
-            }
-
-            builder.CloseElement();
-        }
 
         builder.CloseElement();
     };

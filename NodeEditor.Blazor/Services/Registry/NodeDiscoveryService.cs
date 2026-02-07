@@ -66,9 +66,9 @@ public sealed class NodeDiscoveryService
         var outputs = new List<SocketData>();
 
         var name = string.IsNullOrWhiteSpace(attribute.Name) ? method.Name : attribute.Name;
-        var category = !string.IsNullOrWhiteSpace(attribute.Category)
-            ? attribute.Category
-            : string.IsNullOrWhiteSpace(attribute.Menu) ? "General" : attribute.Menu;
+        var menu = attribute.Menu ?? string.Empty;
+        var category = attribute.Category ?? string.Empty;
+        var resolvedCategory = ResolveCategory(menu, category);
         var description = attribute.Description ?? string.Empty;
 
         if (attribute.IsCallable)
@@ -120,7 +120,7 @@ public sealed class NodeDiscoveryService
         return new NodeDefinition(
             id,
             name,
-            category,
+            resolvedCategory,
             description,
             inputsSnapshot,
             outputsSnapshot,
@@ -132,6 +132,45 @@ public sealed class NodeDiscoveryService
                 inputsSnapshot,
                 outputsSnapshot,
                 id));
+    }
+
+    private static string ResolveCategory(string menu, string category)
+    {
+        var hasMenu = !string.IsNullOrWhiteSpace(menu);
+        var hasCategory = !string.IsNullOrWhiteSpace(category);
+
+        if (hasMenu && hasCategory)
+        {
+            if (string.Equals(menu, category, StringComparison.OrdinalIgnoreCase))
+            {
+                return category;
+            }
+
+            if (string.Equals(category, "General", StringComparison.OrdinalIgnoreCase))
+            {
+                return menu;
+            }
+
+            if (string.Equals(category, "Basic", StringComparison.OrdinalIgnoreCase)
+                && menu.Contains('/', StringComparison.Ordinal))
+            {
+                return menu;
+            }
+
+            return $"{menu}/{category}";
+        }
+
+        if (hasCategory)
+        {
+            return category;
+        }
+
+        if (hasMenu)
+        {
+            return menu;
+        }
+
+        return "General";
     }
 
     private static SocketData CreateSocket(string name, Type type, bool isInput, SocketEditorHint? editorHint = null)
