@@ -29,13 +29,18 @@ public interface INodeEditorState
     event EventHandler<GraphEventEventArgs>? EventAdded;
     event EventHandler<GraphEventEventArgs>? EventRemoved;
     event EventHandler<GraphEventChangedEventArgs>? EventChanged;
+    event EventHandler<OverlayEventArgs>? OverlayAdded;
+    event EventHandler<OverlayEventArgs>? OverlayRemoved;
+    event EventHandler<OverlaySelectionChangedEventArgs>? OverlaySelectionChanged;
 
     // Collections
     ObservableCollection<NodeViewModel> Nodes { get; }
     ObservableCollection<ConnectionData> Connections { get; }
     ObservableCollection<GraphVariable> Variables { get; }
     ObservableCollection<GraphEvent> Events { get; }
+    ObservableCollection<OverlayViewModel> Overlays { get; }
     HashSet<string> SelectedNodeIds { get; }
+    HashSet<string> SelectedOverlayIds { get; }
     ConnectionData? SelectedConnection { get; }
 
     // Viewport
@@ -69,6 +74,17 @@ public interface INodeEditorState
     void SelectNodes(IEnumerable<string> nodeIds, bool clearExisting = true);
     void SelectAll();
     void RemoveSelectedNodes();
+
+    // Overlay selection
+    void SelectOverlay(string overlayId, bool clearExisting = true);
+    void ToggleSelectOverlay(string overlayId);
+    void ClearOverlaySelection();
+    void SelectOverlays(IEnumerable<string> overlayIds, bool clearExisting = true);
+    void RemoveSelectedOverlays();
+
+    // Overlay operations
+    OverlayViewModel AddOverlay(OverlayViewModel overlay);
+    void RemoveOverlay(string overlayId);
 
     // Undo/redo
     void RequestUndo();

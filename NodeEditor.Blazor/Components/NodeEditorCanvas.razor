@@ -36,6 +36,7 @@
     <CanvasContextMenu IsOpen="Interaction.IsContextMenuOpen"
                        Position="Interaction.ContextMenuScreenPosition"
                        OnSelect="AddNodeFromDefinition"
+                       OnAddOverlay="AddOverlayFromContextMenu"
                        OnClose="CloseContextMenu" />
 
     @if (_isNodeContextMenuOpen)
@@ -61,6 +62,17 @@
     }
 
     <div class="ne-viewport" style="@ViewportTransformStyle">
+        @* Overlay layer (HTML) - rendered below connections and nodes *@
+        <div class="ne-overlays">
+            @foreach (var overlay in _visibleOverlays)
+            {
+                <OrganizerOverlay Overlay="overlay"
+                                  OnOverlayPointerDown="OnOverlayPointerDown"
+                                  OnOverlayResizePointerDown="OnOverlayResizePointerDown"
+                                  @key="overlay.Id" />
+            }
+        </div>
+
         @* Connection layer (SVG) - rendered below nodes *@
         <svg class="ne-connections" @ref="_svgRef">
             @foreach (var connection in _visibleConnections)
@@ -103,6 +115,7 @@
 
     private IReadOnlyList<NodeViewModel> _visibleNodes = Array.Empty<NodeViewModel>();
     private IReadOnlyList<ConnectionData> _visibleConnections = Array.Empty<ConnectionData>();
+    private IReadOnlyList<OverlayViewModel> _visibleOverlays = Array.Empty<OverlayViewModel>();
 
     private bool _isNodeContextMenuOpen;
     private Point2D _nodeContextMenuScreenPosition = Point2D.Zero;
@@ -190,6 +203,9 @@
         State.SocketValuesChanged += OnStateChanged;
         State.ZoomChanged += OnZoomChanged;
         State.ViewportChanged += OnViewportChanged;
+        State.OverlayAdded += OnStateChanged;
+        State.OverlayRemoved += OnStateChanged;
+        State.OverlaySelectionChanged += OnStateChanged;
 
         UpdateCulling();
     }
@@ -208,6 +224,9 @@
         State.SocketValuesChanged -= OnStateChanged;
         State.ZoomChanged -= OnZoomChanged;
         State.ViewportChanged -= OnViewportChanged;
+        State.OverlayAdded -= OnStateChanged;
+        State.OverlayRemoved -= OnStateChanged;
+        State.OverlaySelectionChanged -= OnStateChanged;
     }
 
     // ────────────────────────── State event handlers ──────────────────────────
@@ -302,6 +321,16 @@
         Interaction.HandleNodeDragStart(e, ToCanvasPoint(e.Position));
     }
 
+    private void OnOverlayPointerDown(OverlayPointerEventArgs e)
+    {
+        Interaction.HandleOverlayPointerDown(e, ToCanvasPoint(e.Position));
+    }
+
+    private void OnOverlayResizePointerDown(OverlayPointerEventArgs e)
+    {
+        Interaction.HandleOverlayResizeHandleDown(e, ToCanvasPoint(e.Position));
+    }
+
     private void OnDragOver(DragEventArgs e)
     {
         Interaction.HandleDragOver(e);
@@ -366,6 +395,20 @@
             Position = Interaction.ContextMenuGraphPosition
         };
         State.AddNode(nodeViewModel);
+    }
+
+    private void AddOverlayFromContextMenu()
+    {
+        var overlay = new OverlayViewModel(new OverlayData(
+            Id: Guid.NewGuid().ToString("N"),
+            Title: "Overlay",
+            Body: string.Empty,
+            Position: Interaction.ContextMenuGraphPosition,
+            Size: new Size2D(320, 200),
+            Color: "#ff4d4d",
+            Opacity: 0.2));
+
+        State.AddOverlay(overlay);
     }
 
     private void CloseContextMenu()
@@ -457,6 +500,7 @@
         {
             _visibleNodes = State.Nodes;
             _visibleConnections = State.Connections;
+            _visibleOverlays = State.Overlays;
             return;
         }
 
@@ -474,5 +518,6 @@
 
         _visibleNodes = ViewportCuller.GetVisibleNodes(State.Nodes, screenViewport, alwaysInclude);
         _visibleConnections = ViewportCuller.GetVisibleConnections(State.Connections, _visibleNodes, alwaysInclude);
+        _visibleOverlays = State.Overlays;
     }
 }

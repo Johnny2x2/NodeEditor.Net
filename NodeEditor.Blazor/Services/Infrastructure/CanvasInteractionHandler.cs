@@ -32,12 +32,23 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
     private Point2D _dragStart;
     private NodeViewModel? _draggingNode;
 
+    // ── Overlay dragging/resizing ──
+    private bool _isDraggingOverlay;
+    private bool _isResizingOverlay;
+    private Point2D _overlayDragStart;
+    private OverlayViewModel? _draggingOverlay;
+    private Size2D _overlayResizeStartSize;
+    private Point2D _overlayResizeStartGraph;
+    private List<NodeViewModel> _overlayDragNodes = new();
+    private List<OverlayViewModel> _overlayDragOverlays = new();
+
     // ── Selection ──
     private bool _isSelecting;
     private bool _selectionAdditive;
     private Point2D _selectionStartScreen;
     private Point2D _selectionCurrentScreen;
     private HashSet<string> _selectionBase = new();
+    private HashSet<string> _overlaySelectionBase = new();
 
     // ── Connection drawing ──
     private ConnectionData? _pendingConnection;
@@ -75,6 +86,8 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
     public bool IsDraggingNode => _isDraggingNode;
     public bool IsSelecting => _isSelecting;
     public bool IsTouchGesture => _isTouchGesture;
+    public bool IsDraggingOverlay => _isDraggingOverlay;
+    public bool IsResizingOverlay => _isResizingOverlay;
     public Point2D PanOffset => _panOffset;
     public double Zoom => _zoom;
     public Point2D SelectionStart => _selectionStartScreen;
@@ -130,6 +143,42 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
             _panOffset = new Point2D(canvasPoint.X - _panStart.X, canvasPoint.Y - _panStart.Y);
             _state.Viewport = new Rect2D(_panOffset.X, _panOffset.Y, _state.Viewport.Width, _state.Viewport.Height);
         }
+        else if (_isDraggingOverlay && _draggingOverlay is not null)
+        {
+            var screenDelta = new Point2D(canvasPoint.X - _overlayDragStart.X, canvasPoint.Y - _overlayDragStart.Y);
+            var graphDelta = _coordinateConverter.ScreenDeltaToGraph(screenDelta);
+
+            _draggingOverlay.Position = new Point2D(
+                _draggingOverlay.Position.X + graphDelta.X,
+                _draggingOverlay.Position.Y + graphDelta.Y);
+
+            foreach (var node in _overlayDragNodes)
+            {
+                node.Position = new Point2D(
+                    node.Position.X + graphDelta.X,
+                    node.Position.Y + graphDelta.Y);
+            }
+
+            foreach (var overlay in _overlayDragOverlays)
+            {
+                overlay.Position = new Point2D(
+                    overlay.Position.X + graphDelta.X,
+                    overlay.Position.Y + graphDelta.Y);
+            }
+
+            _overlayDragStart = canvasPoint;
+            RaiseStateChanged();
+        }
+        else if (_isResizingOverlay && _draggingOverlay is not null)
+        {
+            var graphPoint = _coordinateConverter.ScreenToGraph(canvasPoint);
+            var delta = new Point2D(graphPoint.X - _overlayResizeStartGraph.X, graphPoint.Y - _overlayResizeStartGraph.Y);
+
+            var newWidth = Math.Max(120, _overlayResizeStartSize.Width + delta.X);
+            var newHeight = Math.Max(80, _overlayResizeStartSize.Height + delta.Y);
+            _draggingOverlay.Size = new Size2D(newWidth, newHeight);
+            RaiseStateChanged();
+        }
         else if (_isDraggingNode && _draggingNode is not null)
         {
             var screenDelta = new Point2D(canvasPoint.X - _dragStart.X, canvasPoint.Y - _dragStart.Y);
@@ -162,6 +211,11 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
         _isPanning = false;
         _isDraggingNode = false;
         _draggingNode = null;
+        _isDraggingOverlay = false;
+        _isResizingOverlay = false;
+        _draggingOverlay = null;
+        _overlayDragNodes = new List<NodeViewModel>();
+        _overlayDragOverlays = new List<OverlayViewModel>();
         _pendingConnection = null;
         _pendingConnectionEndGraph = null;
 
@@ -240,6 +294,61 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
         if (!node.IsSelected)
         {
             _state.SelectNode(node.Data.Id, clearExisting: true);
+        }
+    }
+
+    // ────────────────────────── Overlay drag/resize ──────────────────────────
+
+    public void HandleOverlayPointerDown(OverlayPointerEventArgs e, Point2D canvasPoint)
+    {
+        var overlay = _state.Overlays.FirstOrDefault(o => o.Id == e.OverlayId);
+        if (overlay is null) return;
+
+        _isSelecting = false;
+        _isDraggingOverlay = true;
+        _isResizingOverlay = false;
+        _draggingOverlay = overlay;
+        _overlayDragStart = canvasPoint;
+
+        if (e.CtrlKey || e.ShiftKey)
+        {
+            _state.ToggleSelectOverlay(overlay.Id);
+        }
+        else
+        {
+            _state.SelectOverlay(overlay.Id, clearExisting: true);
+        }
+
+        var overlayRect = new Rect2D(overlay.Position.X, overlay.Position.Y, overlay.Size.Width, overlay.Size.Height);
+        _overlayDragNodes = _state.Nodes
+            .Where(n => overlayRect.Intersects(new Rect2D(n.Position.X, n.Position.Y, n.Size.Width, n.Size.Height)))
+            .ToList();
+
+        _overlayDragOverlays = _state.Overlays
+            .Where(o => o.Id != overlay.Id)
+            .Where(o => overlayRect.Intersects(new Rect2D(o.Position.X, o.Position.Y, o.Size.Width, o.Size.Height)))
+            .ToList();
+    }
+
+    public void HandleOverlayResizeHandleDown(OverlayPointerEventArgs e, Point2D canvasPoint)
+    {
+        var overlay = _state.Overlays.FirstOrDefault(o => o.Id == e.OverlayId);
+        if (overlay is null) return;
+
+        _isSelecting = false;
+        _isDraggingOverlay = false;
+        _isResizingOverlay = true;
+        _draggingOverlay = overlay;
+        _overlayResizeStartGraph = _coordinateConverter.ScreenToGraph(canvasPoint);
+        _overlayResizeStartSize = overlay.Size;
+
+        if (e.CtrlKey || e.ShiftKey)
+        {
+            _state.ToggleSelectOverlay(overlay.Id);
+        }
+        else
+        {
+            _state.SelectOverlay(overlay.Id, clearExisting: true);
         }
     }
 
@@ -402,6 +511,8 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
         {
             if (_state.SelectedConnection is not null)
                 _state.RemoveConnection(_state.SelectedConnection);
+            else if (_state.SelectedOverlayIds.Count > 0)
+                _state.RemoveSelectedOverlays();
             else
                 _state.RemoveSelectedNodes();
         }
@@ -508,6 +619,12 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
             return;
         }
 
+        if (_state.SelectedOverlayIds.Count > 0)
+        {
+            _state.RemoveSelectedOverlays();
+            return;
+        }
+
         _state.RemoveSelectedNodes();
     }
 
@@ -518,6 +635,10 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
         _isPanning = false;
         _isDraggingNode = false;
         _draggingNode = null;
+        _isDraggingOverlay = false;
+        _isResizingOverlay = false;
+        _draggingOverlay = null;
+        _overlayDragOverlays = new List<OverlayViewModel>();
         _pendingConnection = null;
         _pendingConnectionEndGraph = null;
         _isSelecting = false;
@@ -538,6 +659,7 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
         _selectionCurrentScreen = _selectionStartScreen;
         _selectionAdditive = e.CtrlKey || e.ShiftKey;
         _selectionBase = _selectionAdditive ? _state.SelectedNodeIds.ToHashSet() : new HashSet<string>();
+        _overlaySelectionBase = _selectionAdditive ? _state.SelectedOverlayIds.ToHashSet() : new HashSet<string>();
 
         _state.ClearConnectionSelection();
 
@@ -556,12 +678,20 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
             .Select(n => n.Data.Id)
             .ToHashSet();
 
+        var selectedOverlays = _state.Overlays
+            .Where(o => selectionRectGraph.Intersects(
+                new Rect2D(o.Position.X, o.Position.Y, o.Size.Width, o.Size.Height)))
+            .Select(o => o.Id)
+            .ToHashSet();
+
         if (_selectionAdditive)
         {
             selected.UnionWith(_selectionBase);
+            selectedOverlays.UnionWith(_overlaySelectionBase);
         }
 
         _state.SelectNodes(selected, clearExisting: true);
+        _state.SelectOverlays(selectedOverlays, clearExisting: true);
 
         if (finalize)
         {

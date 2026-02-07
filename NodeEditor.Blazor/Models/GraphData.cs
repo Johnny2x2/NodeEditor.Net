@@ -9,7 +9,8 @@ public sealed record class GraphData(
     IReadOnlyList<ConnectionData> Connections,
     IReadOnlyList<GraphVariable> Variables,
     IReadOnlyList<GraphEvent>? Events = null,
-    int SchemaVersion = 1);
+    IReadOnlyList<OverlayData>? Overlays = null,
+    int SchemaVersion = 2);
 
 /// <summary>
 /// A node with both its domain data and spatial layout.

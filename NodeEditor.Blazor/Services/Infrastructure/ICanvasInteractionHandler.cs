@@ -20,6 +20,8 @@ public interface ICanvasInteractionHandler
     bool IsDraggingNode { get; }
     bool IsSelecting { get; }
     bool IsTouchGesture { get; }
+    bool IsDraggingOverlay { get; }
+    bool IsResizingOverlay { get; }
 
     Point2D PanOffset { get; }
     double Zoom { get; }
@@ -57,6 +59,11 @@ public interface ICanvasInteractionHandler
     // ── Node drag ──
 
     void HandleNodeDragStart(NodePointerEventArgs e, Point2D canvasPoint);
+
+    // ── Overlay drag/resize ──
+
+    void HandleOverlayPointerDown(OverlayPointerEventArgs e, Point2D canvasPoint);
+    void HandleOverlayResizeHandleDown(OverlayPointerEventArgs e, Point2D canvasPoint);
 
     // ── Touch events ──
 

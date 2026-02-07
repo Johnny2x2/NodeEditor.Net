@@ -8,7 +8,7 @@ namespace NodeEditor.Blazor.Services.Serialization;
 
 public sealed class GraphSerializer : IGraphSerializer
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     private readonly INodeRegistryService _registry;
     private readonly IConnectionValidator _connectionValidator;
@@ -341,12 +341,39 @@ public sealed class GraphSerializer : IGraphSerializer
         return new GraphEvent(dto.Id, dto.Name);
     }
 
+    private static OverlayDto ToDto(OverlayData overlay)
+    {
+        return new OverlayDto(
+            overlay.Id,
+            overlay.Title,
+            overlay.Body,
+            overlay.Position.X,
+            overlay.Position.Y,
+            overlay.Size.Width,
+            overlay.Size.Height,
+            overlay.Color,
+            overlay.Opacity);
+    }
+
+    private static OverlayData ToOverlay(OverlayDto dto)
+    {
+        return new OverlayData(
+            dto.Id,
+            dto.Title,
+            dto.Body,
+            new Point2D(dto.X, dto.Y),
+            new Size2D(dto.Width, dto.Height),
+            dto.Color,
+            dto.Opacity);
+    }
+
     private GraphData ToGraphData(GraphDto dto, List<string> warnings)
     {
         var nodes = dto.Nodes ?? new List<NodeDto>();
         var connections = dto.Connections ?? new List<ConnectionDto>();
         var variables = dto.Variables ?? new List<GraphVariableDto>();
         var events = dto.Events ?? new List<GraphEventDto>();
+        var overlays = dto.Overlays ?? new List<OverlayDto>();
 
         var graphNodes = new List<GraphNodeData>();
         var nodeMap = new Dictionary<string, GraphNodeData>(StringComparer.Ordinal);
@@ -370,12 +397,14 @@ public sealed class GraphSerializer : IGraphSerializer
 
         var graphVariables = variables.Select(ToVariable).ToList();
         var graphEvents = events.Select(ToEvent).ToList();
+        var graphOverlays = overlays.Select(ToOverlay).ToList();
 
         return new GraphData(
             graphNodes,
             graphConnections,
             graphVariables,
             graphEvents,
+            graphOverlays,
             CurrentVersion);
     }
 
@@ -398,7 +427,8 @@ public sealed class GraphSerializer : IGraphSerializer
                 zoom),
             SelectedNodeIds: selectedNodeIds,
             Variables: graphData.Variables.Select(ToDto).ToList(),
-            Events: graphData.Events?.Select(ToDto).ToList());
+            Events: graphData.Events?.Select(ToDto).ToList(),
+            Overlays: graphData.Overlays?.Select(ToDto).ToList());
     }
 
     private List<PluginDependencyDto> BuildRequiredPlugins(GraphData graphData)

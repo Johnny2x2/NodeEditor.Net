@@ -135,6 +135,21 @@ public class NodeEditorState : INodeEditorState
     public event EventHandler<GraphEventChangedEventArgs>? EventChanged;
 
     /// <summary>
+    /// Raised when an overlay is added.
+    /// </summary>
+    public event EventHandler<OverlayEventArgs>? OverlayAdded;
+
+    /// <summary>
+    /// Raised when an overlay is removed.
+    /// </summary>
+    public event EventHandler<OverlayEventArgs>? OverlayRemoved;
+
+    /// <summary>
+    /// Raised when overlay selection changes.
+    /// </summary>
+    public event EventHandler<OverlaySelectionChangedEventArgs>? OverlaySelectionChanged;
+
+    /// <summary>
     /// Gets the collection of all nodes in the editor.
     /// Note: Use AddNode() and RemoveNode() methods instead of modifying this collection directly
     /// to ensure events are raised properly.
@@ -163,9 +178,19 @@ public class NodeEditorState : INodeEditorState
     public ObservableCollection<GraphEvent> Events { get; } = new();
 
     /// <summary>
+    /// Gets the collection of all organizer overlays.
+    /// </summary>
+    public ObservableCollection<OverlayViewModel> Overlays { get; } = new();
+
+    /// <summary>
     /// Gets the set of IDs for currently selected nodes.
     /// </summary>
     public HashSet<string> SelectedNodeIds { get; } = new();
+
+    /// <summary>
+    /// Gets the set of IDs for currently selected overlays.
+    /// </summary>
+    public HashSet<string> SelectedOverlayIds { get; } = new();
 
     /// <summary>
     /// Gets the currently selected connection, if any.
@@ -207,7 +232,16 @@ public class NodeEditorState : INodeEditorState
             vm.Position,
             vm.Size)).ToList();
 
-        return new GraphData(nodes, Connections.ToList(), Variables.ToList(), Events.ToList());
+        var overlays = Overlays.Select(overlay => new OverlayData(
+            overlay.Id,
+            overlay.Title,
+            overlay.Body,
+            overlay.Position,
+            overlay.Size,
+            overlay.Color,
+            overlay.Opacity)).ToList();
+
+        return new GraphData(nodes, Connections.ToList(), Variables.ToList(), Events.ToList(), overlays);
     }
 
     /// <summary>
@@ -249,6 +283,14 @@ public class NodeEditorState : INodeEditorState
         foreach (var connection in graphData.Connections)
         {
             AddConnection(connection);
+        }
+
+        if (graphData.Overlays is not null)
+        {
+            foreach (var overlay in graphData.Overlays)
+            {
+                AddOverlay(new OverlayViewModel(overlay));
+            }
         }
     }
 
@@ -424,6 +466,16 @@ public class NodeEditorState : INodeEditorState
     }
 
     /// <summary>
+    /// Adds an overlay to the graph and raises the <see cref="OverlayAdded"/> event.
+    /// </summary>
+    public OverlayViewModel AddOverlay(OverlayViewModel overlay)
+    {
+        Overlays.Add(overlay);
+        OverlayAdded?.Invoke(this, new OverlayEventArgs(overlay));
+        return overlay;
+    }
+
+    /// <summary>
     /// Removes a node from the graph by ID and raises the <see cref="NodeRemoved"/> event.
     /// Also removes the node from the current selection if selected.
     /// </summary>
@@ -441,6 +493,22 @@ public class NodeEditorState : INodeEditorState
         Nodes.Remove(node);
         SelectedNodeIds.Remove(nodeId);
         NodeRemoved?.Invoke(this, new NodeEventArgs(node));
+    }
+
+    /// <summary>
+    /// Removes an overlay from the graph by ID and raises the <see cref="OverlayRemoved"/> event.
+    /// </summary>
+    public void RemoveOverlay(string overlayId)
+    {
+        var overlay = Overlays.FirstOrDefault(o => o.Id == overlayId);
+        if (overlay is null)
+        {
+            return;
+        }
+
+        Overlays.Remove(overlay);
+        SelectedOverlayIds.Remove(overlayId);
+        OverlayRemoved?.Invoke(this, new OverlayEventArgs(overlay));
     }
 
     /// <summary>
@@ -525,7 +593,7 @@ public class NodeEditorState : INodeEditorState
     /// <param name="clearNodeSelection">If true, clears any selected nodes first.</param>
     public void SelectConnection(ConnectionData connection, bool clearNodeSelection = true)
     {
-        if (clearNodeSelection && SelectedNodeIds.Count > 0)
+        if (clearNodeSelection && (SelectedNodeIds.Count > 0 || SelectedOverlayIds.Count > 0))
         {
             ClearSelection();
         }
@@ -570,6 +638,7 @@ public class NodeEditorState : INodeEditorState
         if (clearExisting)
         {
             ClearSelectionInternal();
+            ClearOverlaySelectionInternal();
         }
 
         var node = Nodes.FirstOrDefault(n => n.Data.Id == nodeId);
@@ -631,11 +700,19 @@ public class NodeEditorState : INodeEditorState
 
         // Only create a copy if there are subscribers
         var previousSelection = SelectionChanged != null ? SelectedNodeIds.ToHashSet() : null;
+        var previousOverlaySelection = OverlaySelectionChanged != null ? SelectedOverlayIds.ToHashSet() : null;
+
         ClearSelectionInternal();
+        ClearOverlaySelectionInternal();
         
         if (previousSelection != null)
         {
             SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(previousSelection, new HashSet<string>()));
+        }
+
+        if (previousOverlaySelection != null)
+        {
+            OverlaySelectionChanged?.Invoke(this, new OverlaySelectionChangedEventArgs(previousOverlaySelection, new HashSet<string>()));
         }
     }
 
@@ -653,6 +730,7 @@ public class NodeEditorState : INodeEditorState
         if (clearExisting)
         {
             ClearSelectionInternal();
+            ClearOverlaySelectionInternal();
         }
 
         foreach (var nodeId in nodeIds)
@@ -679,6 +757,7 @@ public class NodeEditorState : INodeEditorState
     public void SelectAll()
     {
         SelectNodes(Nodes.Select(n => n.Data.Id), clearExisting: true);
+        SelectOverlays(Overlays.Select(o => o.Id), clearExisting: false);
     }
 
     /// <summary>
@@ -695,6 +774,129 @@ public class NodeEditorState : INodeEditorState
         if (selected.Count > 0)
         {
             SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(selected.ToHashSet(), SelectedNodeIds.ToHashSet()));
+        }
+    }
+
+    /// <summary>
+    /// Selects an overlay by ID and raises the <see cref="OverlaySelectionChanged"/> event.
+    /// </summary>
+    public void SelectOverlay(string overlayId, bool clearExisting = true)
+    {
+        ClearConnectionSelection();
+
+        var previousSelection = OverlaySelectionChanged != null ? SelectedOverlayIds.ToHashSet() : null;
+
+        if (clearExisting)
+        {
+            ClearOverlaySelectionInternal();
+            ClearSelectionInternal();
+        }
+
+        var overlay = Overlays.FirstOrDefault(o => o.Id == overlayId);
+        if (overlay is null)
+        {
+            return;
+        }
+
+        SelectedOverlayIds.Add(overlayId);
+        overlay.IsSelected = true;
+
+        if (previousSelection != null)
+        {
+            OverlaySelectionChanged?.Invoke(this, new OverlaySelectionChangedEventArgs(previousSelection, SelectedOverlayIds.ToHashSet()));
+        }
+    }
+
+    /// <summary>
+    /// Toggles the selection state of an overlay and raises the <see cref="OverlaySelectionChanged"/> event.
+    /// </summary>
+    public void ToggleSelectOverlay(string overlayId)
+    {
+        ClearConnectionSelection();
+
+        var previousSelection = OverlaySelectionChanged != null ? SelectedOverlayIds.ToHashSet() : null;
+
+        var overlay = Overlays.FirstOrDefault(o => o.Id == overlayId);
+        if (overlay is null)
+        {
+            return;
+        }
+
+        if (SelectedOverlayIds.Contains(overlayId))
+        {
+            SelectedOverlayIds.Remove(overlayId);
+            overlay.IsSelected = false;
+        }
+        else
+        {
+            SelectedOverlayIds.Add(overlayId);
+            overlay.IsSelected = true;
+        }
+
+        if (previousSelection != null)
+        {
+            OverlaySelectionChanged?.Invoke(this, new OverlaySelectionChangedEventArgs(previousSelection, SelectedOverlayIds.ToHashSet()));
+        }
+    }
+
+    /// <summary>
+    /// Clears all selected overlays and raises the <see cref="OverlaySelectionChanged"/> event.
+    /// </summary>
+    public void ClearOverlaySelection()
+    {
+        var previousSelection = OverlaySelectionChanged != null ? SelectedOverlayIds.ToHashSet() : null;
+        ClearOverlaySelectionInternal();
+
+        if (previousSelection != null)
+        {
+            OverlaySelectionChanged?.Invoke(this, new OverlaySelectionChangedEventArgs(previousSelection, new HashSet<string>()));
+        }
+    }
+
+    /// <summary>
+    /// Selects a set of overlays and raises the <see cref="OverlaySelectionChanged"/> event.
+    /// </summary>
+    public void SelectOverlays(IEnumerable<string> overlayIds, bool clearExisting = true)
+    {
+        var previousSelection = OverlaySelectionChanged != null ? SelectedOverlayIds.ToHashSet() : null;
+
+        if (clearExisting)
+        {
+            ClearOverlaySelectionInternal();
+        }
+
+        foreach (var overlayId in overlayIds)
+        {
+            var overlay = Overlays.FirstOrDefault(o => o.Id == overlayId);
+            if (overlay is null)
+            {
+                continue;
+            }
+
+            SelectedOverlayIds.Add(overlayId);
+            overlay.IsSelected = true;
+        }
+
+        if (previousSelection != null)
+        {
+            OverlaySelectionChanged?.Invoke(this, new OverlaySelectionChangedEventArgs(previousSelection, SelectedOverlayIds.ToHashSet()));
+        }
+    }
+
+    /// <summary>
+    /// Removes all selected overlays.
+    /// </summary>
+    public void RemoveSelectedOverlays()
+    {
+        var selected = SelectedOverlayIds.ToList();
+        foreach (var overlayId in selected)
+        {
+            RemoveOverlay(overlayId);
+        }
+
+        if (selected.Count > 0)
+        {
+            OverlaySelectionChanged?.Invoke(this, new OverlaySelectionChangedEventArgs(selected.ToHashSet(), SelectedOverlayIds.ToHashSet()));
         }
     }
 
@@ -936,7 +1138,14 @@ public class NodeEditorState : INodeEditorState
             RemoveNode(node.Data.Id);
         }
 
+        var overlaysToRemove = Overlays.ToList();
+        foreach (var overlay in overlaysToRemove)
+        {
+            RemoveOverlay(overlay.Id);
+        }
+
         ClearSelectionInternal();
+        ClearOverlaySelectionInternal();
         ClearConnectionSelection();
         Variables.Clear();
         Events.Clear();
@@ -953,6 +1162,18 @@ public class NodeEditorState : INodeEditorState
         foreach (var node in Nodes)
         {
             node.IsSelected = false;
+        }
+    }
+
+    /// <summary>
+    /// Internal method to clear overlay selection without raising events.
+    /// </summary>
+    private void ClearOverlaySelectionInternal()
+    {
+        SelectedOverlayIds.Clear();
+        foreach (var overlay in Overlays)
+        {
+            overlay.IsSelected = false;
         }
     }
 }

@@ -8,6 +8,7 @@ public sealed record class GraphDto(
     List<string> SelectedNodeIds,
     List<GraphVariableDto>? Variables = null,
     List<GraphEventDto>? Events = null,
+    List<OverlayDto>? Overlays = null,
     List<PluginDependencyDto>? RequiredPlugins = null);
 
 public sealed record class NodeDto(
@@ -51,3 +52,14 @@ public sealed record class PluginDependencyDto(
 public sealed record class GraphEventDto(
     string Id,
     string Name);
+
+public sealed record class OverlayDto(
+    string Id,
+    string Title,
+    string Body,
+    double X,
+    double Y,
+    double Width,
+    double Height,
+    string Color,
+    double Opacity);

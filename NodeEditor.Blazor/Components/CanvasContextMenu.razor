@@ -2,6 +2,7 @@
 <ContextMenu IsOpen="IsOpen"
              Position="Position"
              OnSelect="OnSelectCallback"
+             OnAddOverlay="OnAddOverlayCallback"
              OnClose="OnCloseCallback" />
 
 @code {
@@ -15,11 +16,22 @@
     public EventCallback<NodeDefinition> OnSelect { get; set; }
 
     [Parameter]
+    public EventCallback OnAddOverlay { get; set; }
+
+    [Parameter]
     public EventCallback OnClose { get; set; }
 
     private async Task OnSelectCallback(NodeDefinition definition)
     {
         await OnSelect.InvokeAsync(definition);
+    }
+
+    private async Task OnAddOverlayCallback()
+    {
+        if (OnAddOverlay.HasDelegate)
+        {
+            await OnAddOverlay.InvokeAsync();
+        }
     }
 
     private async Task OnCloseCallback()

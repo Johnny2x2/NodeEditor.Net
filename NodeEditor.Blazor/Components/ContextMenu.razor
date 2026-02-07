@@ -13,6 +13,11 @@
             @onwheel:stopPropagation
             tabindex="0"
             @ref="_menuRef">
+        <div class="ne-context-menu-overlay-actions">
+            <button class="ne-context-menu-overlay-button" @onclick="OnAddOverlayClicked">
+                Add Organizer Overlay
+            </button>
+        </div>
         <ContextMenuSearch @ref="_searchRef" Value="@_search" ValueChanged="OnSearchChanged" />
         <div class="ne-context-menu-list">
             @if (!string.IsNullOrWhiteSpace(_search))
@@ -80,6 +85,9 @@
 
     [Parameter]
     public EventCallback<NodeDefinition> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback OnAddOverlay { get; set; }
 
     [Parameter]
     public EventCallback OnClose { get; set; }
@@ -161,6 +169,16 @@
         if (OnSelect.HasDelegate)
         {
             await OnSelect.InvokeAsync(definition);
+        }
+
+        await CloseAsync();
+    }
+
+    private async Task OnAddOverlayClicked()
+    {
+        if (OnAddOverlay.HasDelegate)
+        {
+            await OnAddOverlay.InvokeAsync();
         }
 
         await CloseAsync();

@@ -144,3 +144,31 @@ public sealed class GraphEventChangedEventArgs : EventArgs
     public GraphEvent PreviousEvent { get; }
     public GraphEvent CurrentEvent { get; }
 }
+
+/// <summary>
+/// Event args for overlay-related state changes.
+/// </summary>
+public sealed class OverlayEventArgs : EventArgs
+{
+    public OverlayEventArgs(OverlayViewModel overlay)
+    {
+        Overlay = overlay;
+    }
+
+    public OverlayViewModel Overlay { get; }
+}
+
+/// <summary>
+/// Event args for overlay selection changes.
+/// </summary>
+public sealed class OverlaySelectionChangedEventArgs : EventArgs
+{
+    public OverlaySelectionChangedEventArgs(HashSet<string> previousSelection, HashSet<string> currentSelection)
+    {
+        PreviousSelection = previousSelection;
+        CurrentSelection = currentSelection;
+    }
+
+    public HashSet<string> PreviousSelection { get; }
+    public HashSet<string> CurrentSelection { get; }
+}
