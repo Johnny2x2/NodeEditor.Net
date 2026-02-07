@@ -43,8 +43,19 @@ public partial class NodeEditorCanvas
 
         if (_canvasJsModule is not null)
         {
-            await _canvasJsModule.InvokeVoidAsync("disconnectCanvasObserver", _canvasRef);
-            await _canvasJsModule.DisposeAsync();
+            try
+            {
+                await _canvasJsModule.InvokeVoidAsync("disconnectCanvasObserver", _canvasRef);
+                await _canvasJsModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Ignored
+            }
+            catch (TaskCanceledException)
+            {
+                // Ignored
+            }
         }
 
         _dotNetRef?.Dispose();

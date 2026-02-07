@@ -16,6 +16,11 @@ html, body {
     height: 100%;
 }
 
+.node-editor-toolbar {
+    position: relative;
+    z-index: 10001;
+}
+
 a, .btn-link {
     color: #006bb7;
 }
