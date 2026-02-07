@@ -29,14 +29,22 @@
         <div class="ne-properties-section">
             <div class="ne-properties-subtitle">Inputs</div>
 
-            @if (_selectedNode.Inputs.Count == 0)
+            @{ var inputSockets = _selectedNode.Inputs.Where(i => !i.Data.IsExecution).ToList(); }
+
+            @if (inputSockets.Count == 0)
             {
                 <div class="ne-properties-empty">No inputs.</div>
             }
             else
             {
-                @foreach (var input in _selectedNode.Inputs)
+                @foreach (var input in inputSockets)
                 {
+                    var editor = EditorRegistry.GetEditor(input.Data);
+                    if (editor is null)
+                    {
+                        continue;
+                    }
+
                     var isConnected = IsInputConnected(input);
                     <div class="ne-properties-row">
                         <div class="ne-properties-label">
@@ -47,7 +55,7 @@
                             }
                         </div>
                         <div class="ne-properties-editor">
-                            @RenderEditor(input)
+                            @RenderEditor(input, editor)
                         </div>
                     </div>
                 }
@@ -149,12 +157,11 @@
         _isDraggingPanel = false;
     }
 
-    private RenderFragment RenderEditor(SocketViewModel socket)
+    private RenderFragment RenderEditor(SocketViewModel socket, INodeCustomEditor editor)
     {
-        var editor = EditorRegistry.GetEditor(socket.Data);
-        if (editor is null || _selectedNode is null)
+        if (_selectedNode is null)
         {
-            return builder => { builder.AddContent(0, "No editor"); };
+            return builder => { };
         }
 
         var context = new SocketEditorContext
