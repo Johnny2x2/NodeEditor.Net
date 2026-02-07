@@ -175,6 +175,7 @@
     private void OnZoomChanged(object? sender, ZoomChangedEventArgs e)
     {
         CoordinateConverter.SyncFromState(State);
+        Interaction.Attach(State, State.Zoom, new Point2D(State.Viewport.X, State.Viewport.Y));
         UpdateCulling();
         StateHasChanged();
     }
@@ -182,6 +183,7 @@
     private void OnViewportChanged(object? sender, ViewportChangedEventArgs e)
     {
         CoordinateConverter.SyncFromState(State);
+        Interaction.Attach(State, State.Zoom, new Point2D(State.Viewport.X, State.Viewport.Y));
         UpdateCulling();
         StateHasChanged();
     }

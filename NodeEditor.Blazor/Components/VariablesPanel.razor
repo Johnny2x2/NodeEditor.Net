@@ -7,13 +7,14 @@
 
 <div class="ne-variables-panel @(_isCollapsed ? "ne-variables-panel--collapsed" : "")"
      style="@PanelStyle"
-     @onpointermove="OnPanelPointerMove"
-     @onpointerup="OnPanelPointerUp"
-     @onpointerleave="OnPanelPointerUp">
+    @onmousemove="OnPanelMouseMove"
+    @onmouseup="OnPanelMouseUp"
+    @onmouseleave="OnPanelMouseUp">
     <div class="ne-variables-header ne-panel-drag-handle"
-         @onpointerdown="OnPanelPointerDown"
-         @onpointerdown:preventDefault
-         @onpointerup="OnHeaderPointerUp">
+        @onmousedown="OnPanelMouseDown"
+        @onmousedown:preventDefault
+        @onmousedown:stopPropagation
+        @onmouseup="OnHeaderMouseUp">
         <span class="ne-variables-header-icon">@(_isCollapsed ? "▶" : "▼")</span>
         Variables
         @if (!_isCollapsed)
@@ -159,7 +160,7 @@
 
     private void ToggleCollapse() => _isCollapsed = !_isCollapsed;
 
-    private void OnPanelPointerDown(PointerEventArgs e)
+    private void OnPanelMouseDown(MouseEventArgs e)
     {
         _isDraggingPanel = true;
         _panelDragMoved = false;
@@ -167,7 +168,7 @@
         _panelDragStartOffset = _panelDragOffset;
     }
 
-    private void OnPanelPointerMove(PointerEventArgs e)
+    private void OnPanelMouseMove(MouseEventArgs e)
     {
         if (!_isDraggingPanel)
         {
@@ -180,12 +181,12 @@
         StateHasChanged();
     }
 
-    private void OnPanelPointerUp(PointerEventArgs e)
+    private void OnPanelMouseUp(MouseEventArgs e)
     {
         _isDraggingPanel = false;
     }
 
-    private void OnHeaderPointerUp(PointerEventArgs e)
+    private void OnHeaderMouseUp(MouseEventArgs e)
     {
         if (!_panelDragMoved)
         {

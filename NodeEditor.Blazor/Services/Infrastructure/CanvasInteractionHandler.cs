@@ -175,6 +175,8 @@ public sealed class CanvasInteractionHandler : ICanvasInteractionHandler
         if (Math.Abs(newZoom - _zoom) > double.Epsilon)
         {
             var newPan = _coordinateConverter.ComputeZoomCenteredPan(canvasPoint, _zoom, newZoom);
+            _zoom = newZoom;
+            _panOffset = newPan;
             _state.Zoom = newZoom;
             _state.Viewport = new Rect2D(newPan.X, newPan.Y, _state.Viewport.Width, _state.Viewport.Height);
         }

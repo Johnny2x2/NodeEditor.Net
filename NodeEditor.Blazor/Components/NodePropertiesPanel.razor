@@ -6,12 +6,13 @@
 
 <div class="ne-properties-panel"
      style="@PanelStyle"
-     @onpointermove="OnPanelPointerMove"
-     @onpointerup="OnPanelPointerUp"
-     @onpointerleave="OnPanelPointerUp">
+    @onmousemove="OnPanelMouseMove"
+    @onmouseup="OnPanelMouseUp"
+    @onmouseleave="OnPanelMouseUp">
     <div class="ne-properties-header ne-panel-drag-handle"
-         @onpointerdown="OnPanelPointerDown"
-         @onpointerdown:preventDefault>
+        @onmousedown="OnPanelMouseDown"
+        @onmousedown:preventDefault
+        @onmousedown:stopPropagation>
         Properties
     </div>
 
@@ -120,7 +121,7 @@
             : State.Nodes.FirstOrDefault(n => n.Data.Id == selectedId);
     }
 
-    private void OnPanelPointerDown(PointerEventArgs e)
+    private void OnPanelMouseDown(MouseEventArgs e)
     {
         _isDraggingPanel = true;
         _panelDragMoved = false;
@@ -128,7 +129,7 @@
         _panelDragStartOffset = _panelDragOffset;
     }
 
-    private void OnPanelPointerMove(PointerEventArgs e)
+    private void OnPanelMouseMove(MouseEventArgs e)
     {
         if (!_isDraggingPanel)
         {
@@ -141,7 +142,7 @@
         StateHasChanged();
     }
 
-    private void OnPanelPointerUp(PointerEventArgs e)
+    private void OnPanelMouseUp(MouseEventArgs e)
     {
         _isDraggingPanel = false;
     }
