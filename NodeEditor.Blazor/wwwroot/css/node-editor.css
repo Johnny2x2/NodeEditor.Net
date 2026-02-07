@@ -615,6 +615,17 @@
     height: 14px;
 }
 
+.ne-editor-list {
+    display: inline-flex;
+    align-items: center;
+}
+
+.ne-editor-list-label {
+    font-size: 11px;
+    color: rgba(177, 155, 255, 0.85);
+    font-style: italic;
+}
+
 /* ============================================
    Responsive adjustments
    ============================================ */
@@ -1748,6 +1759,11 @@
 .ne-variables-type-badge--bool {
     background: rgba(255, 100, 100, 0.15);
     color: #ff8888;
+}
+
+.ne-variables-type-badge--list {
+    background: rgba(150, 120, 255, 0.15);
+    color: #b19bff;
 }
 
 .ne-variables-type-badge--object {

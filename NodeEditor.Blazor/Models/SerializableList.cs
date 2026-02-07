@@ -1,8 +1,10 @@
 using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace NodeEditor.Blazor.Models;
 
 [Serializable]
+[JsonConverter(typeof(SerializableListJsonConverter))]
 public sealed class SerializableList : ISerializable
 {
     private readonly object _syncRoot = new();

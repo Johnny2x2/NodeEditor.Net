@@ -92,14 +92,31 @@ public static class VariableNodeExecutor
     /// Seeds the execution context with default values from all graph variables.
     /// Should be called before execution starts.
     /// </summary>
-    public static void SeedVariables(INodeExecutionContext context, IEnumerable<GraphVariable> variables)
+    public static void SeedVariables(INodeExecutionContext context, IEnumerable<GraphVariable> variables, ISocketTypeResolver? typeResolver = null)
     {
         foreach (var variable in variables)
         {
             if (variable.DefaultValue?.Json is not null)
             {
-                // Deserialize to object for the runtime store
-                var value = variable.DefaultValue.Json.Value.Deserialize<object>();
+                // Try to resolve the concrete type so we get a proper object, not a raw JsonElement
+                Type? targetType = null;
+                if (typeResolver is not null)
+                {
+                    targetType = typeResolver.Resolve(variable.TypeName);
+                }
+
+                targetType ??= Type.GetType(variable.TypeName, throwOnError: false);
+
+                object? value;
+                if (targetType is not null)
+                {
+                    value = variable.DefaultValue.Json.Value.Deserialize(targetType);
+                }
+                else
+                {
+                    value = variable.DefaultValue.Json.Value.Deserialize<object>();
+                }
+
                 context.SetVariable(variable.Id, value);
             }
             else

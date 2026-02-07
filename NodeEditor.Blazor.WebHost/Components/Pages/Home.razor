@@ -16,6 +16,7 @@
 @inject IGraphSerializer GraphSerializer
 @inject VariableNodeFactory VariableNodeFactory
 @inject EventNodeFactory EventNodeFactory
+@inject ISocketTypeResolver SocketTypeResolver
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 
@@ -211,7 +212,7 @@
 		var context = new NodeExecutionContext();
 
 		// Seed graph variables into the execution context
-		VariableNodeExecutor.SeedVariables(context, EditorState.Variables);
+		VariableNodeExecutor.SeedVariables(context, EditorState.Variables, SocketTypeResolver);
 
 		var executionNodes = EditorState.BuildExecutionNodes();
 
@@ -299,7 +300,7 @@
 		_executionCts = new CancellationTokenSource();
 
 		var context = new NodeExecutionContext();
-		VariableNodeExecutor.SeedVariables(context, EditorState.Variables);
+		VariableNodeExecutor.SeedVariables(context, EditorState.Variables, SocketTypeResolver);
 		var executionNodes = EditorState.BuildExecutionNodes();
 
 		try

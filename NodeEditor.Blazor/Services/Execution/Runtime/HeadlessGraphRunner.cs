@@ -10,13 +10,16 @@ public sealed class HeadlessGraphRunner
 {
     private readonly INodeExecutionService _executionService;
     private readonly IGraphSerializer _serializer;
+    private readonly ISocketTypeResolver? _typeResolver;
 
     public HeadlessGraphRunner(
         INodeExecutionService executionService,
-        IGraphSerializer serializer)
+        IGraphSerializer serializer,
+        ISocketTypeResolver? typeResolver = null)
     {
         _executionService = executionService ?? throw new ArgumentNullException(nameof(executionService));
         _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+        _typeResolver = typeResolver;
     }
 
     /// <summary>
@@ -39,7 +42,7 @@ public sealed class HeadlessGraphRunner
         var executionContext = context ?? new NodeExecutionContext();
         var effectiveNodeContext = nodeContext ?? new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
 
-        VariableNodeExecutor.SeedVariables(executionContext, graphData.Variables);
+        VariableNodeExecutor.SeedVariables(executionContext, graphData.Variables, _typeResolver);
 
         await _executionService.ExecuteAsync(
             nodes,

@@ -43,6 +43,7 @@
                     <option value="System.Int32">Integer</option>
                     <option value="System.String">String</option>
                     <option value="System.Boolean">Boolean</option>
+                    <option value="NodeEditor.Blazor.Models.SerializableList">List</option>
                     <option value="System.Object">Object</option>
                 </select>
                 <div class="ne-variables-add-actions">
@@ -87,6 +88,7 @@
                         <option value="System.Int32" selected="@(variable.TypeName == "System.Int32")">Integer</option>
                         <option value="System.String" selected="@(variable.TypeName == "System.String")">String</option>
                         <option value="System.Boolean" selected="@(variable.TypeName == "System.Boolean")">Boolean</option>
+                        <option value="NodeEditor.Blazor.Models.SerializableList" selected="@(variable.TypeName == "NodeEditor.Blazor.Models.SerializableList")">List</option>
                         <option value="System.Object" selected="@(variable.TypeName == "System.Object")">Object</option>
                     </select>
 
@@ -313,6 +315,7 @@
         "System.Int32" => SocketValue.FromObject(0),
         "System.String" => SocketValue.FromObject(""),
         "System.Boolean" => SocketValue.FromObject(false),
+        "NodeEditor.Blazor.Models.SerializableList" => SocketValue.FromObject(new SerializableList()),
         _ => null
     };
 
@@ -322,6 +325,7 @@
         "System.Int32" => "Int",
         "System.String" => "Str",
         "System.Boolean" => "Bool",
+        "NodeEditor.Blazor.Models.SerializableList" => "List",
         "System.Object" => "Obj",
         _ => typeName.Split('.').Last()
     };
@@ -332,6 +336,7 @@
         "System.Int32" => "int",
         "System.String" => "string",
         "System.Boolean" => "bool",
+        "NodeEditor.Blazor.Models.SerializableList" => "list",
         "System.Object" => "object",
         _ => "unknown"
     };
