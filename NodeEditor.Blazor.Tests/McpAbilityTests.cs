@@ -379,7 +379,7 @@ public sealed class McpGraphAbilityTests
         Assert.Equal("MyEvent", state.Events[0].Name);
     }
 
-    private static Services.Serialization.IGraphSerializer CreateSerializer()
+    private static NodeEditor.Net.Services.Serialization.IGraphSerializer CreateSerializer()
     {
         var registry = new NodeEditor.Net.Services.Registry.NodeRegistryService(
             new NodeEditor.Net.Services.Registry.NodeDiscoveryService());

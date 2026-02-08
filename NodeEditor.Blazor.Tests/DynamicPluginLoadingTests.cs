@@ -96,7 +96,8 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         foreach (var file in Directory.GetFiles(sourceDir))
         {
             var fileName = Path.GetFileName(file);
-            if (fileName.Equals("NodeEditor.Net.dll", StringComparison.OrdinalIgnoreCase))
+            if (fileName.Equals("NodeEditor.Net.dll", StringComparison.OrdinalIgnoreCase) ||
+                fileName.Equals("NodeEditor.Blazor.dll", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -316,7 +317,7 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         object? actualContext = nodeContext;
         System.Reflection.MethodInfo? methodInfo = null;
         
-        if (nodeContext is NodeEditor.Net.Services.Execution.Context.CompositeNodeContext composite)
+        if (nodeContext is NodeEditor.Net.Services.Execution.CompositeNodeContext composite)
         {
             output.WriteLine($"NodeContext is CompositeNodeContext with {composite.Contexts.Count} contexts");
             

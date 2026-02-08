@@ -20,7 +20,7 @@ builder.Services.AddScoped(sp =>
     return new HttpClient { BaseAddress = new Uri(nav.BaseUri) };
 });
 builder.Services.AddNodeEditor();
-builder.Services.AddScoped<NodeEditor.Net.Services.Execution.Runtime.BackgroundExecutionWorker>();
+builder.Services.AddScoped<NodeEditor.Net.Services.Execution.BackgroundExecutionWorker>();
 
 // Configure plugin loading
 builder.Services.Configure<PluginOptions>(options =>
