@@ -1,6 +1,6 @@
 # NodeEditor.Mcp
 
-Model Context Protocol (MCP) server for NodeEditorMax. This server exposes NodeEditor abilities and tools over MCP, supporting both **stdio** (standalone) and **HTTP/SSE** (embedded in WebHost) transports.
+Model Context Protocol (MCP) server for NodeEditor. This server exposes NodeEditor abilities and tools over MCP, supporting both **stdio** (standalone) and **HTTP/SSE** (embedded in WebHost) transports.
 
 ## What this server does
 - Exposes a discovery-based ability system (nodes, connections, graph, execution, plugins, logging, overlays, catalog).
@@ -222,7 +222,7 @@ Browser (Blazor circuit)
 
 ## Security
 - API keys are generated cryptographically (32 random bytes, URL-safe Base64).
-- Keys are stored on disk at `%LocalAppData%/NodeEditorMax/mcp-api-key.dat`.
+- Keys are stored on disk at `%LocalAppData%/NodeEditor/mcp-api-key.dat`.
 - Validation uses `CryptographicOperations.FixedTimeEquals` to prevent timing attacks.
 - Keys can be revoked and regenerated from the Settings panel.
 
@@ -251,5 +251,5 @@ Then configure your client to run the published executable directly.
 - **Plugin abilities not showing**: ensure plugins are loaded, then call `discover_abilities` with `includePlugins = true`.
 
 ## Server info
-- Name: NodeEditorMax
+- Name: NodeEditor
 - Version: 1.0.0

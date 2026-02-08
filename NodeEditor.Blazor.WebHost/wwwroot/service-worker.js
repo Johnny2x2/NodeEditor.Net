@@ -1,4 +1,4 @@
-// Service Worker for NodeEditorMax PWA
+// Service Worker for NodeEditor PWA
 const CACHE_NAME = 'nodeeditormax-v1';
 const OFFLINE_URL = '/';
 

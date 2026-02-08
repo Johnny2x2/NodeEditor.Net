@@ -4,13 +4,13 @@ namespace NodeEditor.Net.Services.Mcp;
 
 /// <summary>
 /// Generates, persists, and validates MCP API keys.
-/// Keys are stored at <c>%LocalAppData%/NodeEditorMax/mcp-api-key.dat</c>.
+/// Keys are stored at <c>%LocalAppData%/NodeEditor/mcp-api-key.dat</c>.
 /// Thread-safe for concurrent validation from MCP request middleware.
 /// </summary>
 public sealed class McpApiKeyService
 {
     private static readonly string DefaultStorageDir =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NodeEditorMax");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NodeEditor");
 
     private readonly string _storageDir;
     private readonly string _keyFilePath;
@@ -20,7 +20,7 @@ public sealed class McpApiKeyService
     private bool? _cachedEnabled;
 
     /// <summary>
-    /// Creates a service using the default storage directory (<c>%LocalAppData%/NodeEditorMax</c>).
+    /// Creates a service using the default storage directory (<c>%LocalAppData%/NodeEditor</c>).
     /// </summary>
     public McpApiKeyService() : this(DefaultStorageDir) { }
 

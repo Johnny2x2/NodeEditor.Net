@@ -35,7 +35,7 @@ public sealed class TokenBasedAuthProvider : IPluginMarketplaceAuthProvider
 
         _tokenStorePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "NodeEditorMax", "auth-tokens.dat");
+            "NodeEditor", "auth-tokens.dat");
 
         if (!string.IsNullOrEmpty(_options.RemoteApiUrl))
         {

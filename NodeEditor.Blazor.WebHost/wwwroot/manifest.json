@@ -1,6 +1,6 @@
 {
-  "name": "NodeEditorMax",
-  "short_name": "NodeEditorMax",
+  "name": "NodeEditor",
+  "short_name": "NodeEditor",
   "description": "Visual Node-Based Programming Editor",
   "start_url": "/",
   "display": "standalone",

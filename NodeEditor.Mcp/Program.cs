@@ -30,7 +30,7 @@ builder.Services
     {
         options.ServerInfo = new()
         {
-            Name = "NodeEditorMax",
+            Name = "NodeEditor",
             Version = "1.0.0"
         };
     })

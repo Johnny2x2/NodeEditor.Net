@@ -51,7 +51,7 @@ public sealed class RemotePluginMarketplaceSource : IPluginMarketplaceSource, ID
             _httpClient.BaseAddress = new Uri(_options.RemoteApiUrl);
         }
 
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "NodeEditorMax-Marketplace/1.0");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "NodeEditor-Marketplace/1.0");
         _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
     }

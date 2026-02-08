@@ -28,7 +28,7 @@ public sealed class FileBasedMarketplaceCache : IPluginMarketplaceCache
 
         var basePath = options.Value.CacheDirectory ??
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "NodeEditorMax", "marketplace-cache");
+                "NodeEditor", "marketplace-cache");
 
         _cacheDirectory = basePath;
         Directory.CreateDirectory(_cacheDirectory);

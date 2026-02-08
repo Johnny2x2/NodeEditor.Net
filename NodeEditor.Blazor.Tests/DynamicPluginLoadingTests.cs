@@ -120,7 +120,7 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            var slnx = Path.Combine(current.FullName, "NodeEditorMax.slnx");
+            var slnx = Path.Combine(current.FullName, "NodeEditor.slnx");
             if (File.Exists(slnx))
             {
                 return current.FullName;
