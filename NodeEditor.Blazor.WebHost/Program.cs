@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Options;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Plugins;
+using NodeEditor.Net.Services.Plugins.Marketplace;
 using NodeEditor.Blazor.Services;
-using NodeEditor.Blazor.Services.Plugins;
-using NodeEditor.Blazor.Services.Plugins.Marketplace;
 using NodeEditor.Blazor.WebHost.Components;
-using NodeEditor.Blazor.Services.Mcp;
+using NodeEditor.Net.Services.Mcp;
 using NodeEditor.Mcp;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,7 +20,7 @@ builder.Services.AddScoped(sp =>
     return new HttpClient { BaseAddress = new Uri(nav.BaseUri) };
 });
 builder.Services.AddNodeEditor();
-builder.Services.AddScoped<NodeEditor.Blazor.Services.Execution.BackgroundExecutionWorker>();
+builder.Services.AddScoped<NodeEditor.Net.Services.Execution.BackgroundExecutionWorker>();
 
 // Configure plugin loading
 builder.Services.Configure<PluginOptions>(options =>

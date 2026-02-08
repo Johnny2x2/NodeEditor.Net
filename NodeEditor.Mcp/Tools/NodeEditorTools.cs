@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol.Server;
-using NodeEditor.Blazor.Services.Logging;
+using NodeEditor.Net.Services.Logging;
 using NodeEditor.Mcp.Abilities;
 
 namespace NodeEditor.Mcp.Tools;

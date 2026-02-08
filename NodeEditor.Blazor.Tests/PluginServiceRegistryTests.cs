@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using NodeEditor.Blazor.Services.Plugins;
+using NodeEditor.Net.Services.Plugins;
 
 namespace NodeEditor.Blazor.Tests;
 

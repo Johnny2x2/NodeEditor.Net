@@ -1,13 +1,14 @@
 # Copilot instructions for NodeEditorMax
 
 ## Big picture
-- This repo centers on the NodeEditor.Blazor component library (event-driven state + MVVM) with a web host and plugins.
-- State is centralized in `NodeEditor.Blazor/Services/NodeEditorState.cs`; UI components subscribe to its events for rendering (`NodeEditor.Blazor/Components/*`).
-- Models vs ViewModels are separated: data classes in `NodeEditor.Blazor/Models` and bindable wrappers in `NodeEditor.Blazor/ViewModels`.
+- This repo has a 3-tier architecture: `NodeEditor.Net` (pure .NET 10 core library — models, ViewModels, services, execution, plugins, serialization) → `NodeEditor.Blazor` (Razor component library — Blazor UI components and Blazor-specific services) → `NodeEditor.Blazor.WebHost` (runnable Blazor Server demo).
+- State is centralized in `NodeEditor.Net/Services/Core/NodeEditorState.cs`; UI components subscribe to its events for rendering (`NodeEditor.Blazor/Components/*`).
+- Models vs ViewModels are separated: data classes in `NodeEditor.Net/Models` and bindable wrappers in `NodeEditor.Net/ViewModels`.
 - Nodes are discovered via `[Node]` attributes on `INodeContext` methods and registered through `NodeRegistryService`.
 - Plugins implement `INodePlugin` and are loaded via `PluginLoader`; manifests live in `plugin.json`.
 
 ## Key files to orient
+- Core state management: `NodeEditor.Net/Services/Core/NodeEditorState.cs`
 - DI setup and service registrations: `NodeEditor.Blazor/Services/NodeEditorServiceExtensions.cs`
 - Canvas + node rendering: `NodeEditor.Blazor/Components/NodeEditorCanvas.razor`, `NodeEditor.Blazor/Components/NodeComponent.razor`
 - Connection rendering: `NodeEditor.Blazor/Components/ConnectionPath.razor`

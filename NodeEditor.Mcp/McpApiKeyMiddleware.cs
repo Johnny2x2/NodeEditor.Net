@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
-using NodeEditor.Blazor.Services.Logging;
-using NodeEditor.Blazor.Services.Mcp;
+using NodeEditor.Net.Services.Logging;
+using NodeEditor.Net.Services.Mcp;
 
 namespace NodeEditor.Mcp;
 

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using NodeEditor.Blazor.Services.Registry;
+using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Mcp.Abilities;
 

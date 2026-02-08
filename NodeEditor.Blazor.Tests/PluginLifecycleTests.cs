@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
-using NodeEditor.Blazor.Services.Plugins;
-using NodeEditor.Blazor.Services.Registry;
+using NodeEditor.Net.Services.Plugins;
+using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Blazor.Tests;
 

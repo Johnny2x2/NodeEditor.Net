@@ -8,7 +8,8 @@
     ".NETCoreApp,Version=v10.0": {
       "NodeEditor.Plugins.TestA/1.0.0": {
         "dependencies": {
-          "NodeEditor.Blazor": "1.0.0"
+          "NodeEditor.Blazor": "1.0.0",
+          "NodeEditor.Net": "1.0.0"
         },
         "runtime": {
           "NodeEditor.Plugins.TestA.dll": {}
@@ -259,13 +260,25 @@
       "NodeEditor.Blazor/1.0.0": {
         "dependencies": {
           "Microsoft.AspNetCore.Components.Web": "10.0.2",
+          "NodeEditor.Net": "1.0.0"
+        },
+        "runtime": {
+          "NodeEditor.Blazor.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "NodeEditor.Net/1.0.0": {
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.2",
           "Microsoft.Extensions.Http": "10.0.2",
           "Microsoft.Extensions.Logging.Abstractions": "10.0.2",
           "Microsoft.Extensions.Options": "10.0.2",
           "System.Security.Cryptography.ProtectedData": "10.0.0"
         },
         "runtime": {
-          "NodeEditor.Blazor.dll": {
+          "NodeEditor.Net.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
@@ -427,6 +440,11 @@
       "hashPath": "system.security.cryptography.protecteddata.10.0.0.nupkg.sha512"
     },
     "NodeEditor.Blazor/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "NodeEditor.Net/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

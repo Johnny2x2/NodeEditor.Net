@@ -1,7 +1,8 @@
 using System.Text.Json;
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services;
-using NodeEditor.Blazor.ViewModels;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Infrastructure;
+using NodeEditor.Net.ViewModels;
 using NodeEditor.Mcp.Abilities;
 
 namespace NodeEditor.Blazor.Tests;
@@ -100,11 +101,11 @@ public sealed class McpAbilityRegistryTests
         Assert.Contains("not found", result.Message!);
     }
 
-    private static Services.Registry.INodeRegistryService CreateMinimalNodeRegistry()
+    private static NodeEditor.Net.Services.Registry.INodeRegistryService CreateMinimalNodeRegistry()
     {
         // Use the real NodeRegistryService but don't initialize with any assemblies
-        return new Services.Registry.NodeRegistryService(
-            new Services.Registry.NodeDiscoveryService());
+        return new NodeEditor.Net.Services.Registry.NodeRegistryService(
+            new NodeEditor.Net.Services.Registry.NodeDiscoveryService());
     }
 }
 
@@ -221,8 +222,8 @@ public sealed class McpNodeAbilityTests
     private static (NodeAbilityProvider, NodeEditorState) CreateProvider()
     {
         var state = new NodeEditorState();
-        var registry = new Services.Registry.NodeRegistryService(
-            new Services.Registry.NodeDiscoveryService());
+        var registry = new NodeEditor.Net.Services.Registry.NodeRegistryService(
+            new NodeEditor.Net.Services.Registry.NodeDiscoveryService());
         return (new NodeAbilityProvider(state, registry), state);
     }
 
@@ -378,14 +379,14 @@ public sealed class McpGraphAbilityTests
         Assert.Equal("MyEvent", state.Events[0].Name);
     }
 
-    private static Services.Serialization.IGraphSerializer CreateSerializer()
+    private static NodeEditor.Net.Services.Serialization.IGraphSerializer CreateSerializer()
     {
-        var registry = new Services.Registry.NodeRegistryService(
-            new Services.Registry.NodeDiscoveryService());
+        var registry = new NodeEditor.Net.Services.Registry.NodeRegistryService(
+            new NodeEditor.Net.Services.Registry.NodeDiscoveryService());
         var typeResolver = new SocketTypeResolver();
         var validator = new ConnectionValidator(typeResolver);
-        var migrator = new Services.Serialization.GraphSchemaMigrator();
-        return new Services.Serialization.GraphSerializer(registry, validator, migrator);
+        var migrator = new NodeEditor.Net.Services.Serialization.GraphSchemaMigrator();
+        return new NodeEditor.Net.Services.Serialization.GraphSerializer(registry, validator, migrator);
     }
 
     private static JsonElement EmptyParams() => JsonDocument.Parse("{}").RootElement;

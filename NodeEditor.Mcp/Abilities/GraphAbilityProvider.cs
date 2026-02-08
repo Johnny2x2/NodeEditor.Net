@@ -1,7 +1,7 @@
 using System.Text.Json;
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services;
-using NodeEditor.Blazor.Services.Serialization;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Serialization;
 
 namespace NodeEditor.Mcp.Abilities;
 
@@ -230,7 +230,7 @@ public sealed class GraphAbilityProvider : IAbilityProvider
             ? SocketValue.FromObject(dv)
             : null;
 
-        var variable = new Blazor.Models.GraphVariable(
+        var variable = new GraphVariable(
             Id: Guid.NewGuid().ToString("N"),
             Name: nameEl.GetString()!,
             TypeName: typeEl.GetString()!,
@@ -265,7 +265,7 @@ public sealed class GraphAbilityProvider : IAbilityProvider
         if (!p.TryGetProperty("name", out var nameEl))
             return new AbilityResult(false, "Missing required parameter 'name'.");
 
-        var evt = new Blazor.Models.GraphEvent(
+        var evt = new GraphEvent(
             Id: Guid.NewGuid().ToString("N"),
             Name: nameEl.GetString()!);
 

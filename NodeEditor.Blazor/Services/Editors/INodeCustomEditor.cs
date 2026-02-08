@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Components;
-using NodeEditor.Blazor.Models;
+using NodeEditor.Net.Models;
 
 namespace NodeEditor.Blazor.Services.Editors;
 

@@ -1,4 +1,4 @@
-using NodeEditor.Blazor.Services.Mcp;
+using NodeEditor.Net.Services.Mcp;
 
 namespace NodeEditor.Blazor.Tests;
 
@@ -186,7 +186,7 @@ public sealed class McpApiKeyServiceTests
     [Fact]
     public void SetEnabled_SurvivesNewInstance()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), "NodeEditorMax-Tests", Guid.NewGuid().ToString("N"));
+        var tempDir = Path.Combine(Path.GetTempPath(), "NodeEditor-Tests", Guid.NewGuid().ToString("N"));
         var service = new McpApiKeyService(tempDir);
         service.SetEnabled(true);
 
@@ -213,7 +213,7 @@ public sealed class McpApiKeyServiceTests
     /// </summary>
     private static McpApiKeyService CreateIsolatedService()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), "NodeEditorMax-Tests", Guid.NewGuid().ToString("N"));
+        var tempDir = Path.Combine(Path.GetTempPath(), "NodeEditor-Tests", Guid.NewGuid().ToString("N"));
         return new McpApiKeyService(tempDir);
     }
 }

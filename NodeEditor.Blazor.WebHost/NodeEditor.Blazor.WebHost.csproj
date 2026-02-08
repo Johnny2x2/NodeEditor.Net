@@ -5,7 +5,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <ApplicationIcon>Full-Logo.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Full-Logo.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />

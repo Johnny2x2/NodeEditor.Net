@@ -1,5 +1,5 @@
-using NodeEditor.Blazor.Adapters;
-using NodeEditor.Blazor.Models;
+using NodeEditor.Net.Adapters;
+using NodeEditor.Net.Models;
 
 namespace NodeEditor.Blazor.Tests;
 

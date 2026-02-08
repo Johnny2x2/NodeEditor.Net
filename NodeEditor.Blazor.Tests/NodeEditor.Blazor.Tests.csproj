@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <!-- Core library -->
+    <ProjectReference Include="..\NodeEditor.Net\NodeEditor.Net.csproj" />
     <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
 
     <!-- MCP tools library -->

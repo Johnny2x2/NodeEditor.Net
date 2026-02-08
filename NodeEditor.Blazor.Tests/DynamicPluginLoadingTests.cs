@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services;
-using NodeEditor.Blazor.Services.Execution;
-using NodeEditor.Blazor.Services.Plugins;
-using NodeEditor.Blazor.Services.Registry;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Plugins;
+using NodeEditor.Net.Services.Registry;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -79,10 +79,15 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         }
 
         var projectRoot = Path.Combine(repoRoot, "NodeEditor.Plugins.TestA");
-        var buildOutput = Path.Combine(projectRoot, "bin", "Debug", "net10.0");
-        var sourceDir = Directory.Exists(buildOutput)
-            ? buildOutput
-            : Path.Combine(repoRoot, "plugin-repository", "NodeEditor.Plugins.TestA");
+        var debugOutput = Path.Combine(projectRoot, "bin", "Debug", "net10.0");
+        var releaseOutput = Path.Combine(projectRoot, "bin", "Release", "net10.0");
+        string sourceDir;
+        if (Directory.Exists(debugOutput))
+            sourceDir = debugOutput;
+        else if (Directory.Exists(releaseOutput))
+            sourceDir = releaseOutput;
+        else
+            sourceDir = Path.Combine(repoRoot, "plugin-repository", "NodeEditor.Plugins.TestA");
 
         if (!Directory.Exists(sourceDir))
         {
@@ -96,7 +101,8 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         foreach (var file in Directory.GetFiles(sourceDir))
         {
             var fileName = Path.GetFileName(file);
-            if (fileName.Equals("NodeEditor.Blazor.dll", StringComparison.OrdinalIgnoreCase))
+            if (fileName.Equals("NodeEditor.Net.dll", StringComparison.OrdinalIgnoreCase) ||
+                fileName.Equals("NodeEditor.Blazor.dll", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -119,7 +125,7 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            var slnx = Path.Combine(current.FullName, "NodeEditorMax.slnx");
+            var slnx = Path.Combine(current.FullName, "NodeEditor.slnx");
             if (File.Exists(slnx))
             {
                 return current.FullName;
@@ -316,7 +322,7 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         object? actualContext = nodeContext;
         System.Reflection.MethodInfo? methodInfo = null;
         
-        if (nodeContext is NodeEditor.Blazor.Services.Execution.CompositeNodeContext composite)
+        if (nodeContext is NodeEditor.Net.Services.Execution.CompositeNodeContext composite)
         {
             output.WriteLine($"NodeContext is CompositeNodeContext with {composite.Contexts.Count} contexts");
             
