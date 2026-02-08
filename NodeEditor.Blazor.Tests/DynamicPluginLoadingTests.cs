@@ -79,10 +79,15 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         }
 
         var projectRoot = Path.Combine(repoRoot, "NodeEditor.Plugins.TestA");
-        var buildOutput = Path.Combine(projectRoot, "bin", "Debug", "net10.0");
-        var sourceDir = Directory.Exists(buildOutput)
-            ? buildOutput
-            : Path.Combine(repoRoot, "plugin-repository", "NodeEditor.Plugins.TestA");
+        var debugOutput = Path.Combine(projectRoot, "bin", "Debug", "net10.0");
+        var releaseOutput = Path.Combine(projectRoot, "bin", "Release", "net10.0");
+        string sourceDir;
+        if (Directory.Exists(debugOutput))
+            sourceDir = debugOutput;
+        else if (Directory.Exists(releaseOutput))
+            sourceDir = releaseOutput;
+        else
+            sourceDir = Path.Combine(repoRoot, "plugin-repository", "NodeEditor.Plugins.TestA");
 
         if (!Directory.Exists(sourceDir))
         {
