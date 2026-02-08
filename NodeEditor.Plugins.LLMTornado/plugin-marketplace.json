@@ -1,0 +1,13 @@
+{
+  "author": "NodeEditor",
+  "description": "LLM integration plugin powered by LlmTornado. Provides chat completion, embeddings, vision, and utility nodes.",
+  "longDescription": "# LLM Tornado Plugin\n\nIntegrates LLM capabilities into NodeEditor.Net via the LlmTornado library.\n\n## Features\n- Simple Chat completion\n- Structured chat with message building\n- Text embeddings\n- Vision / multi-modal support\n- Conversation history management\n- Prompt formatting utilities\n- Token estimation\n\n## Configuration\nSet the `LLMTORNADO_API_KEY` and `LLMTORNADO_PROVIDER` environment variables before running.",
+  "category": "LLM",
+  "tags": ["llm", "ai", "chat", "openai", "anthropic", "embeddings", "vision"],
+  "homepageUrl": "https://github.com/Johnny2x2/NodeEditor.Net",
+  "repositoryUrl": "https://github.com/Johnny2x2/NodeEditor.Net",
+  "license": "MIT",
+  "releaseNotes": "Initial release with core chat, embedding, vision, and utility nodes.",
+  "publishedAt": "2026-02-08T00:00:00Z",
+  "lastUpdatedAt": "2026-02-08T00:00:00Z"
+}

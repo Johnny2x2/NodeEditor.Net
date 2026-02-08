@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LlmTornado" Version="3.8.45" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NodeEditor.Net\NodeEditor.Net.csproj" />
+    <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
+  </ItemGroup>
+
+</Project>
