@@ -28,8 +28,7 @@ public sealed class EmbeddingContext : INodeContext
 
         try
         {
-            var config = LLMTornadoConfiguration.FromEnvironment();
-            var api = config.CreateApi();
+            var api = LLMTornadoConfiguration.GetOrCreateApi();
 
             var embeddingModel = !string.IsNullOrWhiteSpace(Model)
                 ? (EmbeddingModel)Model

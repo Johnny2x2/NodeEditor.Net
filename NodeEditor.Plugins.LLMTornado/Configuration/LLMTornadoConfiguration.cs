@@ -15,6 +15,27 @@ public sealed class LLMTornadoConfiguration
     public string? BaseUrl { get; set; }
     public Dictionary<string, string> ProviderKeys { get; set; } = new();
 
+    private static TornadoApi? _cachedApi;
+    private static string? _cachedApiKey;
+
+    /// <summary>
+    /// Returns a cached <see cref="TornadoApi"/> instance, re-creating it only
+    /// when the primary API key environment variable changes.
+    /// </summary>
+    public static TornadoApi GetOrCreateApi()
+    {
+        var currentKey = Environment.GetEnvironmentVariable("LLMTORNADO_API_KEY");
+        if (_cachedApi is not null && currentKey == _cachedApiKey)
+        {
+            return _cachedApi;
+        }
+
+        var config = FromEnvironment();
+        _cachedApi = config.CreateApi();
+        _cachedApiKey = currentKey;
+        return _cachedApi;
+    }
+
     public static LLMTornadoConfiguration FromEnvironment()
     {
         var config = new LLMTornadoConfiguration

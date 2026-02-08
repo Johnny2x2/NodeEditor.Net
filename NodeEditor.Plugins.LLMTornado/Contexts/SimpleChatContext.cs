@@ -30,8 +30,7 @@ public sealed class SimpleChatContext : INodeContext
 
         try
         {
-            var config = LLMTornadoConfiguration.FromEnvironment();
-            var api = config.CreateApi();
+            var api = LLMTornadoConfiguration.GetOrCreateApi();
 
             var messages = new List<ChatMessage>();
             if (!string.IsNullOrWhiteSpace(SystemMessage))
@@ -93,8 +92,7 @@ public sealed class SimpleChatContext : INodeContext
 
         try
         {
-            var config = LLMTornadoConfiguration.FromEnvironment();
-            var api = config.CreateApi();
+            var api = LLMTornadoConfiguration.GetOrCreateApi();
 
             var request = new ChatRequest
             {
@@ -149,8 +147,7 @@ public sealed class SimpleChatContext : INodeContext
 
         try
         {
-            var config = LLMTornadoConfiguration.FromEnvironment();
-            var api = config.CreateApi();
+            var api = LLMTornadoConfiguration.GetOrCreateApi();
 
             var messages = new List<ChatMessage>();
             if (!string.IsNullOrWhiteSpace(SystemMessage))
