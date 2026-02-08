@@ -8,70 +8,10 @@
     ".NETCoreApp,Version=v10.0": {
       "NodeEditor.Plugins.TestB/1.0.0": {
         "dependencies": {
-          "NodeEditor.Blazor": "1.0.0"
+          "NodeEditor.Net": "1.0.0"
         },
         "runtime": {
           "NodeEditor.Plugins.TestB.dll": {}
-        }
-      },
-      "Microsoft.AspNetCore.Authorization/10.0.2": {
-        "dependencies": {
-          "Microsoft.AspNetCore.Metadata": "10.0.2",
-          "Microsoft.Extensions.Diagnostics": "10.0.2",
-          "Microsoft.Extensions.Logging.Abstractions": "10.0.2",
-          "Microsoft.Extensions.Options": "10.0.2"
-        },
-        "runtime": {
-          "lib/net10.0/Microsoft.AspNetCore.Authorization.dll": {
-            "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.225.61305"
-          }
-        }
-      },
-      "Microsoft.AspNetCore.Components/10.0.2": {
-        "dependencies": {
-          "Microsoft.AspNetCore.Authorization": "10.0.2"
-        },
-        "runtime": {
-          "lib/net10.0/Microsoft.AspNetCore.Components.dll": {
-            "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.225.61305"
-          }
-        }
-      },
-      "Microsoft.AspNetCore.Components.Forms/10.0.2": {
-        "dependencies": {
-          "Microsoft.AspNetCore.Components": "10.0.2",
-          "Microsoft.Extensions.Validation": "10.0.2"
-        },
-        "runtime": {
-          "lib/net10.0/Microsoft.AspNetCore.Components.Forms.dll": {
-            "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.225.61305"
-          }
-        }
-      },
-      "Microsoft.AspNetCore.Components.Web/10.0.2": {
-        "dependencies": {
-          "Microsoft.AspNetCore.Components": "10.0.2",
-          "Microsoft.AspNetCore.Components.Forms": "10.0.2",
-          "Microsoft.Extensions.DependencyInjection": "10.0.2",
-          "Microsoft.Extensions.Primitives": "10.0.2",
-          "Microsoft.JSInterop": "10.0.2"
-        },
-        "runtime": {
-          "lib/net10.0/Microsoft.AspNetCore.Components.Web.dll": {
-            "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.225.61305"
-          }
-        }
-      },
-      "Microsoft.AspNetCore.Metadata/10.0.2": {
-        "runtime": {
-          "lib/net10.0/Microsoft.AspNetCore.Metadata.dll": {
-            "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.225.61305"
-          }
         }
       },
       "Microsoft.Extensions.Configuration/10.0.2": {
@@ -228,26 +168,6 @@
           }
         }
       },
-      "Microsoft.Extensions.Validation/10.0.2": {
-        "dependencies": {
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.2",
-          "Microsoft.Extensions.Options": "10.0.2"
-        },
-        "runtime": {
-          "lib/net10.0/Microsoft.Extensions.Validation.dll": {
-            "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.225.61305"
-          }
-        }
-      },
-      "Microsoft.JSInterop/10.0.2": {
-        "runtime": {
-          "lib/net10.0/Microsoft.JSInterop.dll": {
-            "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.225.61305"
-          }
-        }
-      },
       "System.Security.Cryptography.ProtectedData/10.0.0": {
         "runtime": {
           "lib/net10.0/System.Security.Cryptography.ProtectedData.dll": {
@@ -256,16 +176,16 @@
           }
         }
       },
-      "NodeEditor.Blazor/1.0.0": {
+      "NodeEditor.Net/1.0.0": {
         "dependencies": {
-          "Microsoft.AspNetCore.Components.Web": "10.0.2",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.2",
           "Microsoft.Extensions.Http": "10.0.2",
           "Microsoft.Extensions.Logging.Abstractions": "10.0.2",
           "Microsoft.Extensions.Options": "10.0.2",
           "System.Security.Cryptography.ProtectedData": "10.0.0"
         },
         "runtime": {
-          "NodeEditor.Blazor.dll": {
+          "NodeEditor.Net.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
@@ -278,41 +198,6 @@
       "type": "project",
       "serviceable": false,
       "sha512": ""
-    },
-    "Microsoft.AspNetCore.Authorization/10.0.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-jt8hYpw0IvpP05w3Jq8M1lvdYIs1D4KV9BHC7nQese8hnoDbWQSLvQTAJOYn+12WGbElS3bUy0mFKIPTQHVsTA==",
-      "path": "microsoft.aspnetcore.authorization/10.0.2",
-      "hashPath": "microsoft.aspnetcore.authorization.10.0.2.nupkg.sha512"
-    },
-    "Microsoft.AspNetCore.Components/10.0.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-SGSzfG80VYk7OnI84uh0u7+EwjLom2bd1zfEMR8UqPQ7ta95FGIL2WiMSQfxFXbZCIj7TfmRxdLzWv7UHzdmFw==",
-      "path": "microsoft.aspnetcore.components/10.0.2",
-      "hashPath": "microsoft.aspnetcore.components.10.0.2.nupkg.sha512"
-    },
-    "Microsoft.AspNetCore.Components.Forms/10.0.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-mnueytimy9NplvAbbogpiwzMkU0lyVL8QpbC/V59KB/Uw5C5+a/eIMaCcMTqSy5TwQqsduWc944jFdpsSTKi1Q==",
-      "path": "microsoft.aspnetcore.components.forms/10.0.2",
-      "hashPath": "microsoft.aspnetcore.components.forms.10.0.2.nupkg.sha512"
-    },
-    "Microsoft.AspNetCore.Components.Web/10.0.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-RT31dJl7LUUIp8kqv1UyrJSbRsrSHYs+iMUPVOFvrrWUPchpLiMG+/GP3nDr3+y/7Zi8iI0LnHtg8/d5gYAEpw==",
-      "path": "microsoft.aspnetcore.components.web/10.0.2",
-      "hashPath": "microsoft.aspnetcore.components.web.10.0.2.nupkg.sha512"
-    },
-    "Microsoft.AspNetCore.Metadata/10.0.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-Tg9rNk9WMKypEe99sqhyD0pyMDkxurt1K1fBFAgI0kG5nKXRODKI9AK0ztqZkpIez/KBR+XJXieCG52nmZi1gA==",
-      "path": "microsoft.aspnetcore.metadata/10.0.2",
-      "hashPath": "microsoft.aspnetcore.metadata.10.0.2.nupkg.sha512"
     },
     "Microsoft.Extensions.Configuration/10.0.2": {
       "type": "package",
@@ -405,20 +290,6 @@
       "path": "microsoft.extensions.primitives/10.0.2",
       "hashPath": "microsoft.extensions.primitives.10.0.2.nupkg.sha512"
     },
-    "Microsoft.Extensions.Validation/10.0.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-DxC10RCtbtJ5swXy073890ZEM95EaCT2OOd7a9I8zkxWIZWbydZ7SPLZjkVNWJzc2Mhxnr79L65Mrd5QmusDtw==",
-      "path": "microsoft.extensions.validation/10.0.2",
-      "hashPath": "microsoft.extensions.validation.10.0.2.nupkg.sha512"
-    },
-    "Microsoft.JSInterop/10.0.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-CgbAO/rhswsIsHGypdVckBlk8HgWKmxcCRqXm3Jx6pcsNKpiiHa3bpdzxhpzW41Jo5T7Hh3KXTh/u66XcAEkew==",
-      "path": "microsoft.jsinterop/10.0.2",
-      "hashPath": "microsoft.jsinterop.10.0.2.nupkg.sha512"
-    },
     "System.Security.Cryptography.ProtectedData/10.0.0": {
       "type": "package",
       "serviceable": true,
@@ -426,7 +297,7 @@
       "path": "system.security.cryptography.protecteddata/10.0.0",
       "hashPath": "system.security.cryptography.protecteddata.10.0.0.nupkg.sha512"
     },
-    "NodeEditor.Blazor/1.0.0": {
+    "NodeEditor.Net/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
