@@ -280,8 +280,7 @@ public void Clamp(double Value, double Min = 0, double Max = 1, out double Resul
 Use `[SocketEditor]` to select a built-in editor for an input socket. This keeps UIs consistent and avoids custom component code.
 
 ```csharp
-using NodeEditor.Net.Services.Registry;
-using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
 
 [Node("Image Loader", category: "Media")]
@@ -310,8 +309,7 @@ Create custom UI for editing socket values when built-in editors aren't enough.
 ```csharp
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
-using NodeEditor.Net.Services.Registry;
-using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Models;
 using NodeEditor.Blazor.Services.Editors;
 
 namespace MyApp.Editors;
@@ -473,7 +471,6 @@ Package your custom nodes as a reusable plugin.
 using NodeEditor.Net.Services.Registry;
 using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Plugins;
-using NodeEditor.Net.Services.Registry;
 
 namespace MyPlugin;
 
@@ -704,7 +701,6 @@ public async Task HeavyComputation(ExecutionPath Entry, int Iterations, out Exec
 using NodeEditor.Net.Services.Registry;
 using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Plugins;
-using NodeEditor.Net.Services.Registry;
 
 namespace StringPlugin;
 
