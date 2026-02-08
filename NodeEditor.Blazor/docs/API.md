@@ -45,7 +45,7 @@ Complete API reference for NodeEditor.Blazor library.
 
 Central state management class with event-based architecture.
 
-**Namespace:** `NodeEditor.Blazor.Services`
+**Namespace:** `NodeEditor.Net.Services`
 
 #### Properties
 
@@ -146,7 +146,7 @@ Updates socket values from an execution context and raises `SocketValuesChanged`
 
 Executes node graphs with dependency resolution and parallel/sequential modes.
 
-**Namespace:** `NodeEditor.Blazor.Services.Execution`
+**Namespace:** `NodeEditor.Net.Services.Execution`
 
 #### Events
 
@@ -202,7 +202,7 @@ await service.ExecuteAsync(
 
 Manages available node definitions for the context menu and node creation.
 
-**Namespace:** `NodeEditor.Blazor.Services.Registry`
+**Namespace:** `NodeEditor.Net.Services.Registry`
 
 #### Properties
 
@@ -254,7 +254,7 @@ foreach (var category in catalog.Categories)
 
 Serializes and deserializes node graphs to/from JSON.
 
-**Namespace:** `NodeEditor.Blazor.Services.Serialization`
+**Namespace:** `NodeEditor.Net.Services.Serialization`
 
 #### Methods
 
@@ -299,7 +299,7 @@ foreach (var warning in result.Warnings)
 
 Converts between screen coordinates and graph coordinates for pan/zoom operations.
 
-**Namespace:** `NodeEditor.Blazor.Services`
+**Namespace:** `NodeEditor.Net.Services`
 
 #### Properties
 
@@ -344,7 +344,7 @@ Computes the new pan offset for zoom centered on a specific screen point.
 
 Validates whether two sockets can be connected.
 
-**Namespace:** `NodeEditor.Blazor.Services`
+**Namespace:** `NodeEditor.Net.Services`
 
 #### Methods
 
@@ -363,7 +363,7 @@ Returns true if the source and target sockets can be connected.
 
 Resolves socket types for method invocation.
 
-**Namespace:** `NodeEditor.Blazor.Services`
+**Namespace:** `NodeEditor.Net.Services`
 
 #### Methods
 
@@ -381,7 +381,7 @@ Resolves a type name to a .NET type. Returns null if not found.
 
 Performance optimization service that computes which nodes and connections are visible in the current viewport.
 
-**Namespace:** `NodeEditor.Blazor.Services`
+**Namespace:** `NodeEditor.Net.Services`
 
 #### Methods
 
@@ -518,7 +518,7 @@ Right-click context menu for adding nodes.
 
 Immutable data model for a node.
 
-**Namespace:** `NodeEditor.Blazor.Models`
+**Namespace:** `NodeEditor.Net.Models`
 
 ```csharp
 public sealed record class NodeData(
@@ -538,7 +538,7 @@ public sealed record class NodeData(
 
 Immutable data model for a socket.
 
-**Namespace:** `NodeEditor.Blazor.Models`
+**Namespace:** `NodeEditor.Net.Models`
 
 ```csharp
 public sealed record class SocketData(
@@ -557,7 +557,7 @@ public sealed record class SocketData(
 
 Optional editor metadata for a socket, provided via `[SocketEditor]` on node parameters.
 
-**Namespace:** `NodeEditor.Blazor.Models`
+**Namespace:** `NodeEditor.Net.Models`
 
 ```csharp
 public sealed record class SocketEditorHint(
@@ -576,7 +576,7 @@ public sealed record class SocketEditorHint(
 
 Editor types supported by the standard UI layer.
 
-**Namespace:** `NodeEditor.Blazor.Models`
+**Namespace:** `NodeEditor.Net.Models`
 
 ```csharp
 public enum SocketEditorKind
@@ -599,7 +599,7 @@ public enum SocketEditorKind
 
 Attribute for selecting a standard editor on node input parameters.
 
-**Namespace:** `NodeEditor.Blazor.Services.Execution`
+**Namespace:** `NodeEditor.Net.Services.Execution`
 
 ```csharp
 [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
@@ -623,7 +623,7 @@ public sealed class SocketEditorAttribute : Attribute
 
 Immutable data model for a connection.
 
-**Namespace:** `NodeEditor.Blazor.Models`
+**Namespace:** `NodeEditor.Net.Models`
 
 ```csharp
 public sealed record class ConnectionData(
@@ -641,7 +641,7 @@ public sealed record class ConnectionData(
 
 Data transfer object for graph serialization.
 
-**Namespace:** `NodeEditor.Blazor.Models`
+**Namespace:** `NodeEditor.Net.Models`
 
 ```csharp
 public sealed record class GraphDto(
@@ -690,7 +690,7 @@ public readonly record struct Rect2D(double X, double Y, double Width, double He
 
 MVVM view model for a node with observable properties.
 
-**Namespace:** `NodeEditor.Blazor.ViewModels`
+**Namespace:** `NodeEditor.Net.ViewModels`
 
 #### Properties
 
@@ -709,7 +709,7 @@ MVVM view model for a node with observable properties.
 
 MVVM view model for a socket.
 
-**Namespace:** `NodeEditor.Blazor.ViewModels`
+**Namespace:** `NodeEditor.Net.ViewModels`
 
 #### Properties
 
@@ -731,7 +731,7 @@ Sets the socket value and updates the Data property.
 
 Interface for providing node method implementations.
 
-**Namespace:** `NodeEditor.Blazor.Models`
+**Namespace:** `NodeEditor.Net.Models`
 
 ```csharp
 public interface INodeContext
@@ -750,7 +750,7 @@ Methods with `[Node]` attribute will be discovered and registered.
 
 Interface for creating node plugins.
 
-**Namespace:** `NodeEditor.Blazor.Services.Plugins`
+**Namespace:** `NodeEditor.Net.Services.Plugins`
 
 ```csharp
 public interface INodePlugin

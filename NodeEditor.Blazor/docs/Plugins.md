@@ -40,8 +40,8 @@ INodeContext
 Implement the `INodePlugin` interface:
 
 ```csharp
-using NodeEditor.Blazor.Services.Plugins;
-using NodeEditor.Blazor.Services.Registry;
+using NodeEditor.Net.Services.Plugins;
+using NodeEditor.Net.Services.Registry;
 
 namespace MyCompany.NodeEditor.Plugins;
 
@@ -65,8 +65,8 @@ public sealed class MyPlugin : INodePlugin
 Create a class implementing `INodeContext` with node methods:
 
 ```csharp
-using NodeEditor.Blazor.Services.Execution;
-using NodeEditor.Blazor.Services.Registry;
+using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Registry;
 
 namespace MyCompany.NodeEditor.Plugins;
 

@@ -226,7 +226,7 @@ public class MathContext : INodesContext
 
 **After (Blazor):**
 ```csharp
-using NodeEditor.Blazor.Models;
+using NodeEditor.Net.Services.Registry;
 
 public class MathContext : INodeContext
 {
