@@ -1,0 +1,153 @@
+@using NodeEditor.Blazor.ViewModels
+@using NodeEditor.Blazor.Models
+@using NodeEditor.Blazor.Services.Editors
+@inject NodeEditorCustomEditorRegistry EditorRegistry
+
+<div class="ne-socket @SocketClassModifiers"
+     title="@Socket.Data.Name (@Socket.Data.TypeName)"
+     @onpointerdown="OnPointerDownHandler"
+     @onpointerdown:stopPropagation
+     @onpointerup="OnPointerUpHandler"
+    data-node-id="@NodeId"
+    data-socket-name="@Socket.Data.Name"
+    data-socket-type="@Socket.Data.TypeName"
+    data-socket-is-input="@Socket.Data.IsInput.ToString().ToLowerInvariant()">
+    
+    <div class="ne-socket-dot" style="@SocketDotStyle"></div>
+    
+    <span class="ne-socket-label">@Socket.Data.Name</span>
+</div>
+
+@if (ShowEditor)
+{
+    <div class="ne-socket-editor" @onpointerdown:stopPropagation @onclick:stopPropagation>
+        @EditorFragment
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public SocketViewModel Socket { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public string NodeId { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public NodeViewModel Node { get; set; } = null!;
+
+    [Parameter]
+    public bool IsConnected { get; set; }
+
+    [Parameter]
+    public EventCallback<SocketPointerEventArgs> OnPointerDown { get; set; }
+
+    [Parameter]
+    public EventCallback<SocketPointerEventArgs> OnPointerUp { get; set; }
+
+    private bool ShowEditor =>
+        Socket.Data.IsInput &&
+        !Socket.Data.IsExecution &&
+        !IsConnected &&
+        EditorRegistry.GetEditor(Socket.Data) is not null;
+
+    private RenderFragment? EditorFragment
+    {
+        get
+        {
+            var editor = EditorRegistry.GetEditor(Socket.Data);
+            if (editor is null)
+            {
+                return null;
+            }
+
+            var context = new SocketEditorContext
+            {
+                Socket = Socket,
+                Node = Node,
+                SetValue = value =>
+                {
+                    Socket.SetValue(value);
+                    StateHasChanged();
+                }
+            };
+
+            return editor.Render(context);
+        }
+    }
+
+    private string SocketClassModifiers
+    {
+        get
+        {
+            var classes = new List<string>();
+            
+            if (Socket.Data.IsInput)
+                classes.Add("ne-socket--input");
+            else
+                classes.Add("ne-socket--output");
+                
+            if (Socket.Data.IsExecution)
+                classes.Add("ne-socket--execution");
+            else
+                classes.Add("ne-socket--data");
+
+            if (IsConnected)
+                classes.Add("ne-socket--connected");
+                
+            return string.Join(" ", classes);
+        }
+    }
+
+    private string SocketDotStyle
+    {
+        get
+        {
+            var color = GetSocketColor();
+            return $"background-color: rgb({color.R}, {color.G}, {color.B});";
+        }
+    }
+
+    private ColorValue GetSocketColor()
+    {
+        // Execution sockets are white
+        if (Socket.Data.IsExecution)
+            return new ColorValue(255, 255, 255);
+
+        // Color by type name
+        return Socket.Data.TypeName?.ToLowerInvariant() switch
+        {
+            "int" or "int32" or "int64" or "long" => new ColorValue(0, 200, 100),   // Green
+            "float" or "double" or "decimal" => new ColorValue(100, 200, 255),       // Light blue
+            "string" => new ColorValue(255, 150, 200),                                // Pink
+            "bool" or "boolean" => new ColorValue(200, 50, 50),                       // Red
+            "object" => new ColorValue(200, 200, 200),                                // Gray
+            _ => new ColorValue(180, 180, 100)                                        // Yellow-ish for unknown
+        };
+    }
+
+    private async Task OnPointerDownHandler(PointerEventArgs e)
+    {
+        if (OnPointerDown.HasDelegate)
+        {
+            await OnPointerDown.InvokeAsync(new SocketPointerEventArgs
+            {
+                NodeId = NodeId,
+                Socket = Socket,
+                Position = new Point2D(e.ClientX, e.ClientY)
+            });
+        }
+    }
+
+    private async Task OnPointerUpHandler(PointerEventArgs e)
+    {
+        if (OnPointerUp.HasDelegate)
+        {
+            await OnPointerUp.InvokeAsync(new SocketPointerEventArgs
+            {
+                NodeId = NodeId,
+                Socket = Socket,
+                Position = new Point2D(e.ClientX, e.ClientY)
+            });
+        }
+    }
+}

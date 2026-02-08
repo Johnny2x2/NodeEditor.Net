@@ -1,0 +1,28 @@
+@* Selection rectangle overlay rendered on the canvas during marquee selection. *@
+@if (IsVisible)
+{
+    <div class="ne-selection-rect" style="@RectStyle"></div>
+}
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public Point2D Start { get; set; }
+
+    [Parameter]
+    public Point2D Current { get; set; }
+
+    private string RectStyle
+    {
+        get
+        {
+            var left = Math.Min(Start.X, Current.X);
+            var top = Math.Min(Start.Y, Current.Y);
+            var width = Math.Abs(Current.X - Start.X);
+            var height = Math.Abs(Current.Y - Start.Y);
+            return $"left: {left}px; top: {top}px; width: {width}px; height: {height}px;";
+        }
+    }
+}

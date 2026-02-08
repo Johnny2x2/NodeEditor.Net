@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="bunit" Version="2.2.0" />
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="Microsoft.Playwright" Version="1.39.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Core library -->
+    <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
+
+    <!-- MCP tools library -->
+    <ProjectReference Include="..\NodeEditor.Mcp\NodeEditor.Mcp.csproj" />
+
+    <!-- 
+      Plugin projects - ReferenceOutputAssembly=false means:
+      - They are built (as dependencies)
+      - But NOT linked at compile time
+      - Tests load them dynamically from plugins folder
+    -->
+  </ItemGroup>
+
+</Project>

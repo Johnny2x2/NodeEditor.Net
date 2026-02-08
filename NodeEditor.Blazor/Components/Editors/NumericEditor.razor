@@ -1,0 +1,143 @@
+<input class="ne-editor-input ne-editor-number"
+       type="number"
+       value="@CurrentValue"
+       @oninput="OnInput"
+       @onpointerdown:stopPropagation
+       @onclick:stopPropagation />
+
+@code {
+    [Parameter, EditorRequired]
+    public SocketEditorContext Context { get; set; } = null!;
+
+    private string CurrentValue => Context.Value?.ToString() ?? string.Empty;
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        var input = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            Context.SetValueTyped<object?>(null);
+            return;
+        }
+
+        var typeName = Context.Socket.Data.TypeName ?? string.Empty;
+        if (TryParseNumeric(input, typeName, out var value))
+        {
+            Context.SetValueTyped(value);
+            return;
+        }
+
+        if (double.TryParse(input, out var fallback))
+        {
+            Context.SetValueTyped(fallback);
+        }
+    }
+
+    private static bool TryParseNumeric(string input, string typeName, out object? value)
+    {
+        value = null;
+
+        if (typeName.Equals("byte", StringComparison.OrdinalIgnoreCase) || typeName.Equals("System.Byte", StringComparison.OrdinalIgnoreCase))
+        {
+            if (byte.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+        else if (typeName.Equals("sbyte", StringComparison.OrdinalIgnoreCase) || typeName.Equals("System.SByte", StringComparison.OrdinalIgnoreCase))
+        {
+            if (sbyte.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+        else if (typeName.Equals("short", StringComparison.OrdinalIgnoreCase) || typeName.Equals("System.Int16", StringComparison.OrdinalIgnoreCase))
+        {
+            if (short.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+        else if (typeName.Equals("ushort", StringComparison.OrdinalIgnoreCase) || typeName.Equals("System.UInt16", StringComparison.OrdinalIgnoreCase))
+        {
+            if (ushort.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+        else if (typeName.Equals("int", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("int32", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("System.Int32", StringComparison.OrdinalIgnoreCase))
+        {
+            if (int.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+        else if (typeName.Equals("uint", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("uint32", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("System.UInt32", StringComparison.OrdinalIgnoreCase))
+        {
+            if (uint.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+        else if (typeName.Equals("long", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("int64", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("System.Int64", StringComparison.OrdinalIgnoreCase))
+        {
+            if (long.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+        else if (typeName.Equals("ulong", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("uint64", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("System.UInt64", StringComparison.OrdinalIgnoreCase))
+        {
+            if (ulong.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+        else if (typeName.Equals("float", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("single", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("System.Single", StringComparison.OrdinalIgnoreCase))
+        {
+            if (float.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+        else if (typeName.Equals("double", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("System.Double", StringComparison.OrdinalIgnoreCase))
+        {
+            if (double.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+        else if (typeName.Equals("decimal", StringComparison.OrdinalIgnoreCase)
+                 || typeName.Equals("System.Decimal", StringComparison.OrdinalIgnoreCase))
+        {
+            if (decimal.TryParse(input, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

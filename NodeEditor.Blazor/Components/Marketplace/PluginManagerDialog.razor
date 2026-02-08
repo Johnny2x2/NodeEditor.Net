@@ -1,0 +1,391 @@
+@namespace NodeEditor.Blazor.Components.Marketplace
+@using NodeEditor.Blazor.Services.Plugins.Marketplace
+@using NodeEditor.Blazor.Services.Plugins.Marketplace.Models
+@inject AggregatedPluginMarketplaceSource MarketplaceSource
+@inject IPluginInstallationService InstallationService
+
+<div class="ne-plugin-manager-overlay @(IsOpen ? "ne-plugin-manager-overlay--visible" : "")"
+     @onclick="OnOverlayClick">
+    <div class="ne-plugin-manager" @onclick:stopPropagation="true">
+        <div class="ne-plugin-manager-header">
+            <h2 class="ne-plugin-manager-title">Plugin Manager</h2>
+            <button class="ne-plugin-manager-close" @onclick="Close" title="Close">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="ne-plugin-manager-tabs">
+            <button class="ne-plugin-manager-tab @(_activeTab == Tab.Browse ? "ne-plugin-manager-tab--active" : "")"
+                    @onclick="() => SetActiveTab(Tab.Browse)">
+                Browse
+                @if (_availablePlugins.Count > 0)
+                {
+                    <span class="ne-plugin-manager-tab-badge">@_availablePlugins.Count</span>
+                }
+            </button>
+            <button class="ne-plugin-manager-tab @(_activeTab == Tab.Installed ? "ne-plugin-manager-tab--active" : "")"
+                    @onclick="() => SetActiveTab(Tab.Installed)">
+                Installed
+                @if (_installedPlugins.Count > 0)
+                {
+                    <span class="ne-plugin-manager-tab-badge">@_installedPlugins.Count</span>
+                }
+            </button>
+            @if (_updatesAvailable.Count > 0)
+            {
+                <button class="ne-plugin-manager-tab @(_activeTab == Tab.Updates ? "ne-plugin-manager-tab--active" : "")"
+                        @onclick="() => SetActiveTab(Tab.Updates)">
+                    Updates
+                    <span class="ne-plugin-manager-tab-badge ne-plugin-manager-tab-badge--highlight">
+                        @_updatesAvailable.Count
+                    </span>
+                </button>
+            }
+            <button class="ne-plugin-manager-tab @(_activeTab == Tab.Settings ? "ne-plugin-manager-tab--active" : "")"
+                    @onclick="() => SetActiveTab(Tab.Settings)">
+                Settings
+            </button>
+        </div>
+
+        <div class="ne-plugin-manager-content">
+            @if (_activeTab == Tab.Settings)
+            {
+                <div class="ne-plugin-manager-settings">
+                    <MarketplaceSettingsPanel />
+                    <McpSettingsPanel BaseUrl="@McpBaseUrl" RoutePattern="@McpRoutePattern" />
+                </div>
+            }
+            else
+            {
+                <div class="ne-plugin-manager-list-panel">
+                    <PluginSearchBar @bind-SearchText="_searchText"
+                                     @bind-SelectedCategory="_selectedCategory"
+                                     Categories="_categories"
+                                     OnSearch="OnSearch" />
+
+                    <div class="ne-plugin-manager-list">
+                        @if (_isLoading)
+                        {
+                            <div class="ne-plugin-manager-loading">
+                                <div class="ne-plugin-manager-spinner"></div>
+                                <span>Loading plugins...</span>
+                            </div>
+                        }
+                        else if (_displayedPlugins.Count == 0)
+                        {
+                            <div class="ne-plugin-manager-empty">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" opacity="0.4">
+                                    <path d="M20 7h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v3H4c-1.1 0-1.99.9-1.99 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM10 4h4v3h-4V4z" />
+                                </svg>
+                                <p>
+                                    @if (_activeTab == Tab.Browse)
+                                    {
+                                        @("No plugins found. Try a different search.")
+                                    }
+                                    else if (_activeTab == Tab.Installed)
+                                    {
+                                        @("No plugins installed yet.")
+                                    }
+                                    else
+                                    {
+                                        @("All plugins are up to date!")
+                                    }
+                                </p>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var plugin in _displayedPlugins)
+                            {
+                                <PluginCard Plugin="plugin"
+                                            IsSelected="_selectedPlugin?.Id == plugin.Id"
+                                            IsInstalled="IsPluginInstalled(plugin.Id)"
+                                            InstalledVersion="GetInstalledVersion(plugin.Id)"
+                                            OnSelect="() => SelectPlugin(plugin)"
+                                            OnInstall="() => InstallPlugin(plugin)"
+                                            OnUninstall="() => UninstallPlugin(plugin.Id)" />
+                            }
+                        }
+                    </div>
+                </div>
+
+                <div class="ne-plugin-manager-details-panel">
+                    @if (_selectedPlugin is not null)
+                    {
+                        <PluginDetailsPanel Plugin="_selectedPlugin"
+                                            IsInstalled="IsPluginInstalled(_selectedPlugin.Id)"
+                                            InstalledInfo="GetInstalledInfo(_selectedPlugin.Id)"
+                                            IsInstalling="_installingPluginIds.Contains(_selectedPlugin.Id)"
+                                            IsUninstalling="_uninstallingPluginIds.Contains(_selectedPlugin.Id)"
+                                            OnInstall="() => InstallPlugin(_selectedPlugin)"
+                                            OnUninstall="() => UninstallPlugin(_selectedPlugin.Id)"
+                                            OnUpdate="() => UpdatePlugin(_selectedPlugin)" />
+                    }
+                    else
+                    {
+                        <div class="ne-plugin-manager-no-selection">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                            </svg>
+                            <p>Select a plugin to view details</p>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(_statusMessage))
+        {
+            <div class="ne-plugin-manager-status @(_statusIsError ? "ne-plugin-manager-status--error" : "")">
+                @_statusMessage
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+    [Parameter] public string McpBaseUrl { get; set; } = "";
+    [Parameter] public string McpRoutePattern { get; set; } = "/mcp";
+
+    private enum Tab { Browse, Installed, Updates, Settings }
+
+    private Tab _activeTab = Tab.Browse;
+
+    private List<MarketplacePluginInfo> _availablePlugins = new();
+    private List<InstalledPluginInfo> _installedPlugins = new();
+    private List<PluginUpdateInfo> _updatesAvailable = new();
+    private List<MarketplacePluginInfo> _displayedPlugins = new();
+    private List<string> _categories = new();
+
+    private MarketplacePluginInfo? _selectedPlugin;
+    private string _searchText = string.Empty;
+    private string? _selectedCategory;
+
+    private bool _isLoading;
+    private string _statusMessage = string.Empty;
+    private bool _statusIsError;
+
+    private HashSet<string> _installingPluginIds = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _uninstallingPluginIds = new(StringComparer.OrdinalIgnoreCase);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && _availablePlugins.Count == 0)
+        {
+            await LoadDataAsync();
+        }
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var availableTask = MarketplaceSource.SearchAsync();
+            var installedTask = InstallationService.GetInstalledPluginsAsync();
+            var categoriesTask = MarketplaceSource.GetCategoriesAsync();
+
+            await Task.WhenAll(availableTask, installedTask, categoriesTask);
+
+            _availablePlugins = new List<MarketplacePluginInfo>(await availableTask);
+            _installedPlugins = new List<InstalledPluginInfo>(await installedTask);
+            _categories = new List<string>(await categoriesTask);
+
+            _updatesAvailable = new List<PluginUpdateInfo>(
+                await InstallationService.CheckForUpdatesAsync(MarketplaceSource));
+
+            UpdateDisplayedPlugins();
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Failed to load plugins: {ex.Message}", isError: true);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void SetActiveTab(Tab tab)
+    {
+        _activeTab = tab;
+        _selectedPlugin = null;
+        UpdateDisplayedPlugins();
+    }
+
+    private void UpdateDisplayedPlugins()
+    {
+        IEnumerable<MarketplacePluginInfo> source = _activeTab switch
+        {
+            Tab.Browse => _availablePlugins,
+            Tab.Installed => _availablePlugins.Where(p => IsPluginInstalled(p.Id)),
+            Tab.Updates => _availablePlugins.Where(p => _updatesAvailable.Any(u => u.PluginId == p.Id)),
+            Tab.Settings => Enumerable.Empty<MarketplacePluginInfo>(),
+            _ => _availablePlugins
+        };
+
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            var q = _searchText.Trim();
+            source = source.Where(p =>
+                p.Name.Contains(q, StringComparison.OrdinalIgnoreCase)
+                || p.Id.Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (p.Description?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (p.Author?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
+        if (!string.IsNullOrWhiteSpace(_selectedCategory))
+        {
+            source = source.Where(p =>
+                string.Equals(p.Category, _selectedCategory, StringComparison.OrdinalIgnoreCase));
+        }
+
+        _displayedPlugins = source.ToList();
+    }
+
+    private void OnSearch()
+    {
+        UpdateDisplayedPlugins();
+    }
+
+    private void SelectPlugin(MarketplacePluginInfo plugin)
+    {
+        _selectedPlugin = plugin;
+    }
+
+    private bool IsPluginInstalled(string pluginId)
+    {
+        return _installedPlugins.Any(p =>
+            string.Equals(p.Id, pluginId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string? GetInstalledVersion(string pluginId)
+    {
+        return _installedPlugins
+            .FirstOrDefault(p => string.Equals(p.Id, pluginId, StringComparison.OrdinalIgnoreCase))
+            ?.Version;
+    }
+
+    private InstalledPluginInfo? GetInstalledInfo(string pluginId)
+    {
+        return _installedPlugins
+            .FirstOrDefault(p => string.Equals(p.Id, pluginId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task InstallPlugin(MarketplacePluginInfo plugin)
+    {
+        _installingPluginIds.Add(plugin.Id);
+        ShowStatus($"Installing {plugin.Name}...");
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstallationService.InstallAsync(MarketplaceSource, plugin.Id);
+
+            if (result.Success)
+            {
+                ShowStatus($"Successfully installed {plugin.Name}");
+                await LoadDataAsync();
+            }
+            else
+            {
+                ShowStatus($"Failed to install {plugin.Name}: {result.ErrorMessage}", isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Failed to install {plugin.Name}: {ex.Message}", isError: true);
+        }
+        finally
+        {
+            _installingPluginIds.Remove(plugin.Id);
+        }
+    }
+
+    private async Task UninstallPlugin(string pluginId)
+    {
+        var plugin = _availablePlugins.FirstOrDefault(p => p.Id == pluginId);
+        var pluginName = plugin?.Name ?? pluginId;
+
+        _uninstallingPluginIds.Add(pluginId);
+        ShowStatus($"Uninstalling {pluginName}...");
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstallationService.UninstallAsync(pluginId);
+
+            if (result.Success)
+            {
+                ShowStatus($"Successfully uninstalled {pluginName}");
+                await LoadDataAsync();
+            }
+            else
+            {
+                ShowStatus($"Failed to uninstall {pluginName}: {result.ErrorMessage}", isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Failed to uninstall {pluginName}: {ex.Message}", isError: true);
+        }
+        finally
+        {
+            _uninstallingPluginIds.Remove(pluginId);
+        }
+    }
+
+    private async Task UpdatePlugin(MarketplacePluginInfo plugin)
+    {
+        _installingPluginIds.Add(plugin.Id);
+        ShowStatus($"Updating {plugin.Name}...");
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstallationService.UpdateAsync(MarketplaceSource, plugin.Id);
+
+            if (result.Success)
+            {
+                ShowStatus($"Successfully updated {plugin.Name} to v{result.Plugin?.Version}");
+                await LoadDataAsync();
+            }
+            else
+            {
+                ShowStatus($"Failed to update {plugin.Name}: {result.ErrorMessage}", isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Failed to update {plugin.Name}: {ex.Message}", isError: true);
+        }
+        finally
+        {
+            _installingPluginIds.Remove(plugin.Id);
+        }
+    }
+
+    private void ShowStatus(string message, bool isError = false)
+    {
+        _statusMessage = message;
+        _statusIsError = isError;
+    }
+
+    private void OnOverlayClick()
+    {
+        _ = Close();
+    }
+
+    private async Task Close()
+    {
+        await IsOpenChanged.InvokeAsync(false);
+        await OnClosed.InvokeAsync();
+    }
+}

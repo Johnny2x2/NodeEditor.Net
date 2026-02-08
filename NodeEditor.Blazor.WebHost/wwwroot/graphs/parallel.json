@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "start-a",
+      "typeId": null,
+      "name": "Start",
+      "callable": true,
+      "execInit": true,
+      "x": 60,
+      "y": 60,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "delay-a",
+      "typeId": null,
+      "name": "Delay",
+      "callable": true,
+      "execInit": false,
+      "x": 300,
+      "y": 60,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        },
+        {
+          "name": "DelayMs",
+          "typeName": "System.Int32",
+          "isInput": true,
+          "isExecution": false,
+          "value": { "typeName": "System.Int32", "json": 400 }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "marker-a",
+      "typeId": null,
+      "name": "Marker",
+      "callable": true,
+      "execInit": false,
+      "x": 540,
+      "y": 60,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "start-b",
+      "typeId": null,
+      "name": "Start",
+      "callable": true,
+      "execInit": true,
+      "x": 60,
+      "y": 200,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "delay-b",
+      "typeId": null,
+      "name": "Delay",
+      "callable": true,
+      "execInit": false,
+      "x": 300,
+      "y": 200,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        },
+        {
+          "name": "DelayMs",
+          "typeName": "System.Int32",
+          "isInput": true,
+          "isExecution": false,
+          "value": { "typeName": "System.Int32", "json": 700 }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "marker-b",
+      "typeId": null,
+      "name": "Marker",
+      "callable": true,
+      "execInit": false,
+      "x": 540,
+      "y": 200,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    }
+  ],
+  "connections": [
+    { "outputNodeId": "start-a", "outputSocketName": "Exit", "inputNodeId": "delay-a", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "delay-a", "outputSocketName": "Exit", "inputNodeId": "marker-a", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "start-b", "outputSocketName": "Exit", "inputNodeId": "delay-b", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "delay-b", "outputSocketName": "Exit", "inputNodeId": "marker-b", "inputSocketName": "Enter", "isExecution": true }
+  ],
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "width": 1400,
+    "height": 800,
+    "zoom": 1
+  },
+  "selectedNodeIds": []
+}

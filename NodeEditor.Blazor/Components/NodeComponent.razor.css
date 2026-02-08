@@ -1,0 +1,6 @@
+/* NodeComponent scoped styles */
+/* Component-specific overrides */
+
+:host {
+    display: contents;
+}

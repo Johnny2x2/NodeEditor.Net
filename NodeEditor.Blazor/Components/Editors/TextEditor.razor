@@ -1,0 +1,17 @@
+<input class="ne-editor-input ne-editor-text"
+       value="@CurrentValue"
+       @oninput="OnInput"
+       @onpointerdown:stopPropagation
+       @onclick:stopPropagation />
+
+@code {
+    [Parameter, EditorRequired]
+    public SocketEditorContext Context { get; set; } = null!;
+
+    private string CurrentValue => Context.GetStringValue() ?? string.Empty;
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        Context.SetValueTyped(e.Value?.ToString());
+    }
+}

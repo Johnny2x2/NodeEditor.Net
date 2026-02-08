@@ -1,0 +1,187 @@
+@using NodeEditor.Blazor.ViewModels
+@using NodeEditor.Blazor.Models
+
+<div class="ne-node @(Node.IsSelected ? "ne-node--selected" : "") @(Node.IsExecuting ? "ne-node--executing" : "") @(Node.IsError ? "ne-node--error" : "")"
+     style="@NodeStyle"
+     @onpointerdown="OnNodePointerDown"
+     @onpointerdown:stopPropagation
+    @oncontextmenu="HandleNodeContextMenu"
+    @oncontextmenu:preventDefault
+    @oncontextmenu:stopPropagation
+     @key="Node.Data.Id">
+    
+    <div class="ne-node-header">
+        @if (Node.Data.Callable)
+        {
+            <span class="ne-node-exec-icon" title="Callable node">▶</span>
+        }
+        <span class="ne-node-title">@Node.Data.Name</span>
+    </div>
+
+    @if (PreviewImage is not null)
+    {
+        <div class="ne-node-preview">
+            <img src="@PreviewImage.DataUrl" alt="@Node.Data.Name preview" />
+        </div>
+    }
+
+    <div class="ne-node-body">
+        @* Input sockets on the left *@
+        <div class="ne-node-inputs">
+            @foreach (var input in Node.Inputs)
+            {
+                <SocketComponent Socket="input"
+                                 NodeId="@Node.Data.Id"
+                                 Node="Node"
+                                 IsConnected="IsInputConnected(input)"
+                                 OnPointerDown="@OnSocketPointerDown"
+                                 OnPointerUp="@OnSocketPointerUp"
+                                 @key="@($"in-{input.Data.Name}")" />
+            }
+        </div>
+
+        @* Output sockets on the right *@
+        <div class="ne-node-outputs">
+            @foreach (var output in Node.Outputs)
+            {
+                <SocketComponent Socket="output"
+                                 NodeId="@Node.Data.Id"
+                                 Node="Node"
+                                 IsConnected="IsOutputConnected(output)"
+                                 OnPointerDown="@OnSocketPointerDown"
+                                 OnPointerUp="@OnSocketPointerUp"
+                                 @key="@($"out-{output.Data.Name}")" />
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public NodeViewModel Node { get; set; } = null!;
+
+    [Parameter]
+    public IReadOnlyList<ConnectionData> Connections { get; set; } = Array.Empty<ConnectionData>();
+
+    [Parameter]
+    public EventCallback<SocketPointerEventArgs> OnSocketPointerDown { get; set; }
+
+    [Parameter]
+    public EventCallback<SocketPointerEventArgs> OnSocketPointerUp { get; set; }
+
+    [Parameter]
+    public EventCallback<NodePointerEventArgs> OnNodeDragStart { get; set; }
+
+    [Parameter]
+    public EventCallback<NodePointerEventArgs> OnNodeContextMenu { get; set; }
+
+    private string NodeStyle =>
+        $"left: {Node.Position.X}px; top: {Node.Position.Y}px; " +
+        $"width: {Node.Size.Width}px; min-height: {Node.Size.Height}px;";
+
+    private NodeImage? PreviewImage => GetPreviewImage();
+
+    private async Task OnNodePointerDown(PointerEventArgs e)
+    {
+        if (e.Button == 0)
+        {
+            // Ctrl/Shift+click for multi-select, otherwise single select
+            if (e.CtrlKey || e.ShiftKey)
+            {
+                OnToggleSelectNode();
+                return;
+            }
+
+            if (!Node.IsSelected)
+            {
+                OnSelectNode();
+            }
+
+            if (OnNodeDragStart.HasDelegate)
+            {
+                await OnNodeDragStart.InvokeAsync(new NodePointerEventArgs
+                {
+                    NodeId = Node.Data.Id,
+                    Position = new Point2D(e.ClientX, e.ClientY)
+                });
+            }
+        }
+    }
+
+    private async Task HandleNodeContextMenu(MouseEventArgs e)
+    {
+        if (OnNodeContextMenu.HasDelegate)
+        {
+            await OnNodeContextMenu.InvokeAsync(new NodePointerEventArgs
+            {
+                NodeId = Node.Data.Id,
+                Position = new Point2D(e.ClientX, e.ClientY)
+            });
+        }
+    }
+
+    [CascadingParameter]
+    private INodeEditorState? EditorState { get; set; }
+
+    private void OnSelectNode()
+    {
+        EditorState?.SelectNode(Node.Data.Id, clearExisting: true);
+    }
+
+    private void OnToggleSelectNode()
+    {
+        EditorState?.ToggleSelectNode(Node.Data.Id);
+    }
+
+    private bool IsInputConnected(SocketViewModel socket)
+    {
+        return Connections.Any(c =>
+            c.InputNodeId == Node.Data.Id &&
+            c.InputSocketName == socket.Data.Name);
+    }
+
+    private bool IsOutputConnected(SocketViewModel socket)
+    {
+        return Connections.Any(c =>
+            c.OutputNodeId == Node.Data.Id &&
+            c.OutputSocketName == socket.Data.Name);
+    }
+
+    private NodeImage? GetPreviewImage()
+    {
+        if (Node.Outputs is null || Node.Outputs.Count == 0)
+        {
+            return null;
+        }
+
+        var nodeImageTypeName = typeof(NodeImage).FullName ?? nameof(NodeImage);
+
+        foreach (var output in Node.Outputs)
+        {
+            if (output.Data.IsExecution)
+            {
+                continue;
+            }
+
+            var value = output.Data.Value;
+            if (value is null || string.IsNullOrWhiteSpace(value.TypeName))
+            {
+                continue;
+            }
+
+            if (!value.TypeName.Equals(nodeImageTypeName, StringComparison.Ordinal)
+                && !value.TypeName.Equals(nameof(NodeImage), StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var preview = value.ToObject<NodeImage>();
+            if (preview is not null && !string.IsNullOrWhiteSpace(preview.DataUrl))
+            {
+                return preview;
+            }
+        }
+
+        return null;
+    }
+}

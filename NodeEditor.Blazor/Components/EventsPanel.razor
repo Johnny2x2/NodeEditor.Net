@@ -1,0 +1,227 @@
+@using NodeEditor.Blazor.Models
+@using NodeEditor.Blazor.ViewModels
+@implements IDisposable
+
+<div class="ne-events-panel @(_isCollapsed ? "ne-events-panel--collapsed" : "")"
+     style="@PanelStyle"
+    @onmousemove="OnPanelMouseMove"
+    @onmouseup="OnPanelMouseUp"
+    @onmouseleave="OnPanelMouseUp">
+    <div class="ne-events-header ne-panel-drag-handle"
+        @onmousedown="OnPanelMouseDown"
+        @onmousedown:preventDefault
+        @onmousedown:stopPropagation
+        @onmouseup="OnHeaderMouseUp">
+        <span class="ne-events-header-icon">@(_isCollapsed ? "▶" : "▼")</span>
+        Events
+        @if (!_isCollapsed)
+        {
+            <button class="ne-events-add-btn"
+                    @onclick="OpenAddForm"
+                    @onclick:stopPropagation="true"
+                    @onmousedown:stopPropagation="true"
+                    @onmouseup:stopPropagation="true"
+                    title="Add Event">+</button>
+        }
+    </div>
+
+    @if (!_isCollapsed)
+    {
+        @if (_isAddingNew)
+        {
+            <div class="ne-events-add-form">
+                <input class="ne-events-input"
+                       @bind="_newEventName"
+                       @bind:event="oninput"
+                       placeholder="Event name"
+                       @onkeydown="OnAddKeyDown" />
+                <div class="ne-events-add-actions">
+                    <button class="ne-events-btn ne-events-btn--confirm" @onclick="ConfirmAdd">Add</button>
+                    <button class="ne-events-btn ne-events-btn--cancel" @onclick="CancelAdd">Cancel</button>
+                </div>
+            </div>
+        }
+
+        @if (State.Events.Count == 0 && !_isAddingNew)
+        {
+            <div class="ne-events-empty">No events defined. Click + to add one.</div>
+        }
+
+        <div class="ne-events-list">
+            @foreach (var graphEvent in State.Events)
+            {
+                <div class="ne-events-item">
+                    @if (_editingEventId == graphEvent.Id)
+                    {
+                        <input class="ne-events-input ne-events-input--inline"
+                               @bind="_editEventName"
+                               @bind:event="oninput"
+                               @onkeydown="OnEditKeyDown"
+                               @onblur="SaveEdit" />
+                    }
+                    else
+                    {
+                        <span class="ne-events-name" @ondblclick="@(() => StartEdit(graphEvent))">
+                            @graphEvent.Name
+                        </span>
+                    }
+
+                    <span class="ne-events-type-badge">Event</span>
+
+                    <button class="ne-events-node-btn ne-events-node-btn--listener"
+                            @onclick="@(() => OnCreateEventNode.InvokeAsync(new EventNodeRequest(graphEvent.Id, false)))"
+                            @onclick:stopPropagation="true"
+                            title="Create Custom Event (listener) node">L</button>
+
+                    <button class="ne-events-node-btn ne-events-node-btn--trigger"
+                            @onclick="@(() => OnCreateEventNode.InvokeAsync(new EventNodeRequest(graphEvent.Id, true)))"
+                            @onclick:stopPropagation="true"
+                            title="Create Trigger Event node">T</button>
+
+                    <button class="ne-events-delete-btn"
+                            @onclick="@(() => DeleteEvent(graphEvent.Id))"
+                            @onclick:stopPropagation="true"
+                            title="Delete event">✕</button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public INodeEditorState State { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback<EventNodeRequest> OnCreateEventNode { get; set; }
+
+    private bool _isCollapsed;
+    private bool _isAddingNew;
+    private string _newEventName = "";
+
+    private string? _editingEventId;
+    private string _editEventName = "";
+
+    private bool _isDraggingPanel;
+    private bool _panelDragMoved;
+    private Point2D _panelDragStartScreen = Point2D.Zero;
+    private Point2D _panelDragStartOffset = Point2D.Zero;
+    private Point2D _panelDragOffset = Point2D.Zero;
+
+    private string PanelStyle => $"transform: translate({_panelDragOffset.X}px, {_panelDragOffset.Y}px);";
+
+    protected override void OnInitialized()
+    {
+        State.EventAdded += OnStateChanged;
+        State.EventRemoved += OnStateChanged;
+        State.EventChanged += OnStateChanged;
+    }
+
+    public void Dispose()
+    {
+        State.EventAdded -= OnStateChanged;
+        State.EventRemoved -= OnStateChanged;
+        State.EventChanged -= OnStateChanged;
+    }
+
+    private void OnStateChanged(object? sender, EventArgs e) => StateHasChanged();
+
+    // ===== Panel drag =====
+
+    private void OnPanelMouseDown(MouseEventArgs e)
+    {
+        _isDraggingPanel = true;
+        _panelDragMoved = false;
+        _panelDragStartScreen = new Point2D(e.ClientX, e.ClientY);
+        _panelDragStartOffset = _panelDragOffset;
+    }
+
+    private void OnPanelMouseMove(MouseEventArgs e)
+    {
+        if (!_isDraggingPanel) return;
+        var delta = new Point2D(e.ClientX - _panelDragStartScreen.X, e.ClientY - _panelDragStartScreen.Y);
+        _panelDragMoved = _panelDragMoved || Math.Abs(delta.X) > 2 || Math.Abs(delta.Y) > 2;
+        _panelDragOffset = new Point2D(_panelDragStartOffset.X + delta.X, _panelDragStartOffset.Y + delta.Y);
+        StateHasChanged();
+    }
+
+    private void OnPanelMouseUp(MouseEventArgs e) => _isDraggingPanel = false;
+
+    private void OnHeaderMouseUp(MouseEventArgs e)
+    {
+        if (!_panelDragMoved) _isCollapsed = !_isCollapsed;
+    }
+
+    // ===== Add Event =====
+
+    private void OpenAddForm()
+    {
+        _isAddingNew = true;
+        _newEventName = "";
+    }
+
+    private void CancelAdd() => _isAddingNew = false;
+
+    private void ConfirmAdd()
+    {
+        var name = _newEventName?.Trim();
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        // Ensure unique name
+        var baseName = name;
+        var counter = 1;
+        while (State.Events.Any(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        {
+            name = $"{baseName} ({counter++})";
+        }
+
+        var graphEvent = GraphEvent.Create(name);
+        State.AddEvent(graphEvent);
+        _isAddingNew = false;
+    }
+
+    private void OnAddKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") ConfirmAdd();
+        else if (e.Key == "Escape") CancelAdd();
+    }
+
+    // ===== Edit Event =====
+
+    private void StartEdit(GraphEvent graphEvent)
+    {
+        _editingEventId = graphEvent.Id;
+        _editEventName = graphEvent.Name;
+    }
+
+    private void SaveEdit()
+    {
+        if (_editingEventId is null) return;
+        var graphEvent = State.FindEvent(_editingEventId);
+        if (graphEvent is null) { _editingEventId = null; return; }
+
+        var newName = _editEventName?.Trim();
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            _editingEventId = null;
+            return;
+        }
+
+        if (newName != graphEvent.Name)
+        {
+            State.UpdateEvent(graphEvent with { Name = newName });
+        }
+
+        _editingEventId = null;
+    }
+
+    private void OnEditKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") SaveEdit();
+        else if (e.Key == "Escape") _editingEventId = null;
+    }
+
+    // ===== Delete =====
+
+    private void DeleteEvent(string eventId) => State.RemoveEvent(eventId);
+}

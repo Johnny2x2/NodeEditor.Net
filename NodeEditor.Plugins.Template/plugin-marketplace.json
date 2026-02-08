@@ -1,0 +1,13 @@
+{
+  "author": "TODO",
+  "description": "TODO: Short description for Template Plugin.",
+  "longDescription": "# Template Plugin\n\nTODO: Full description and usage.",
+  "category": "SDK",
+  "tags": ["template", "sdk"],
+  "homepageUrl": "",
+  "repositoryUrl": "",
+  "license": "MIT",
+  "releaseNotes": "Initial template release.",
+  "publishedAt": "2026-02-05T00:00:00Z",
+  "lastUpdatedAt": "2026-02-05T00:00:00Z"
+}

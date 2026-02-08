@@ -1,0 +1,399 @@
+@using NodeEditor.Blazor.Models
+@using NodeEditor.Blazor.Services.Editors
+@using NodeEditor.Blazor.ViewModels
+@implements IDisposable
+
+@inject NodeEditorCustomEditorRegistry EditorRegistry
+
+<div class="ne-variables-panel @(_isCollapsed ? "ne-variables-panel--collapsed" : "")"
+     style="@PanelStyle"
+    @onmousemove="OnPanelMouseMove"
+    @onmouseup="OnPanelMouseUp"
+    @onmouseleave="OnPanelMouseUp">
+    <div class="ne-variables-header ne-panel-drag-handle"
+        @onmousedown="OnPanelMouseDown"
+        @onmousedown:preventDefault
+        @onmousedown:stopPropagation
+        @onmouseup="OnHeaderMouseUp">
+        <span class="ne-variables-header-icon">@(_isCollapsed ? "▶" : "▼")</span>
+        Variables
+        @if (!_isCollapsed)
+        {
+            <button class="ne-variables-add-btn"
+                    @onclick="OpenAddForm"
+                    @onclick:stopPropagation="true"
+                    @onmousedown:stopPropagation="true"
+                    @onmouseup:stopPropagation="true"
+                    title="Add Variable">+</button>
+        }
+    </div>
+
+    @if (!_isCollapsed)
+    {
+        @if (_isAddingNew)
+        {
+            <div class="ne-variables-add-form">
+                <input class="ne-variables-input"
+                       @bind="_newVariableName"
+                       @bind:event="oninput"
+                       placeholder="Variable name"
+                       @onkeydown="OnAddKeyDown" />
+                <select class="ne-variables-select" @bind="_newVariableType">
+                    <option value="System.Double">Number</option>
+                    <option value="System.Int32">Integer</option>
+                    <option value="System.String">String</option>
+                    <option value="System.Boolean">Boolean</option>
+                    <option value="NodeEditor.Blazor.Models.SerializableList">List</option>
+                    <option value="System.Object">Object</option>
+                </select>
+                <div class="ne-variables-add-actions">
+                    <button class="ne-variables-btn ne-variables-btn--confirm" @onclick="ConfirmAdd">Add</button>
+                    <button class="ne-variables-btn ne-variables-btn--cancel" @onclick="CancelAdd">Cancel</button>
+                </div>
+            </div>
+        }
+
+        @if (State.Variables.Count == 0 && !_isAddingNew)
+        {
+            <div class="ne-variables-empty">No variables defined. Click + to add one.</div>
+        }
+
+        <div class="ne-variables-list">
+            @foreach (var variable in State.Variables)
+            {
+                <div class="ne-variables-item"
+                     draggable="true"
+                     @ondragstart="@(e => OnVariableDragStart(e, variable))"
+                     @ondragstart:stopPropagation="true"
+                     title="Drag to canvas to create a Get node. Hold Alt while dropping for Set node.">
+
+                    @if (_editingVariableId == variable.Id)
+                    {
+                        <input class="ne-variables-input ne-variables-input--inline"
+                               @bind="_editVariableName"
+                               @bind:event="oninput"
+                               @onkeydown="OnEditKeyDown"
+                               @onblur="SaveEdit" />
+                    }
+                    else
+                    {
+                        <span class="ne-variables-name" @ondblclick="@(() => StartEdit(variable))">
+                            @variable.Name
+                        </span>
+                    }
+
+                    <select class="ne-variables-select ne-variables-select--inline"
+                            @onchange="@(e => OnVariableTypeChanged(variable, e?.Value?.ToString()))">
+                        <option value="System.Double" selected="@(variable.TypeName == "System.Double")">Number</option>
+                        <option value="System.Int32" selected="@(variable.TypeName == "System.Int32")">Integer</option>
+                        <option value="System.String" selected="@(variable.TypeName == "System.String")">String</option>
+                        <option value="System.Boolean" selected="@(variable.TypeName == "System.Boolean")">Boolean</option>
+                        <option value="NodeEditor.Blazor.Models.SerializableList" selected="@(variable.TypeName == "NodeEditor.Blazor.Models.SerializableList")">List</option>
+                        <option value="System.Object" selected="@(variable.TypeName == "System.Object")">Object</option>
+                    </select>
+
+                    <span class="ne-variables-type-badge ne-variables-type-badge--@GetTypeClass(variable.TypeName)">
+                        @GetTypeFriendlyName(variable.TypeName)
+                    </span>
+
+                    <button class="ne-variables-node-btn"
+                            @onclick="@(() => CreateVariableNode(variable, false))"
+                            @onclick:stopPropagation="true"
+                            title="Create Get node">G</button>
+                    <button class="ne-variables-node-btn ne-variables-node-btn--set"
+                            @onclick="@(() => CreateVariableNode(variable, true))"
+                            @onclick:stopPropagation="true"
+                            title="Create Set node">S</button>
+
+                    <button class="ne-variables-delete-btn"
+                            @onclick="@(() => DeleteVariable(variable.Id))"
+                            @onclick:stopPropagation="true"
+                            title="Delete variable">✕</button>
+                </div>
+
+                <div class="ne-variables-editor">
+                    @RenderVariableEditor(variable)
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public INodeEditorState State { get; set; } = null!;
+
+    /// <summary>
+    /// Callback invoked when a variable drag starts, passing the variable ID and the drag event args.
+    /// The parent canvas uses this to know what variable to place on drop.
+    /// </summary>
+    [Parameter]
+    public EventCallback<VariableDragData> OnVariableDrag { get; set; }
+
+    [Parameter]
+    public EventCallback<VariableNodeRequest> OnCreateVariableNode { get; set; }
+
+    private bool _isCollapsed;
+    private bool _isAddingNew;
+    private string _newVariableName = "";
+    private string _newVariableType = "System.Double";
+
+    private string? _editingVariableId;
+    private string _editVariableName = "";
+
+    private bool _isDraggingPanel;
+    private bool _panelDragMoved;
+    private Point2D _panelDragStartScreen = Point2D.Zero;
+    private Point2D _panelDragStartOffset = Point2D.Zero;
+    private Point2D _panelDragOffset = Point2D.Zero;
+
+    private string PanelStyle => $"transform: translate({_panelDragOffset.X}px, {_panelDragOffset.Y}px);";
+
+    protected override void OnInitialized()
+    {
+        State.VariableAdded += OnStateChanged;
+        State.VariableRemoved += OnStateChanged;
+        State.VariableChanged += OnStateChanged;
+    }
+
+    public void Dispose()
+    {
+        State.VariableAdded -= OnStateChanged;
+        State.VariableRemoved -= OnStateChanged;
+        State.VariableChanged -= OnStateChanged;
+    }
+
+    private void OnStateChanged(object? sender, EventArgs e) => StateHasChanged();
+
+    private void ToggleCollapse() => _isCollapsed = !_isCollapsed;
+
+    private void OnPanelMouseDown(MouseEventArgs e)
+    {
+        _isDraggingPanel = true;
+        _panelDragMoved = false;
+        _panelDragStartScreen = new Point2D(e.ClientX, e.ClientY);
+        _panelDragStartOffset = _panelDragOffset;
+    }
+
+    private void OnPanelMouseMove(MouseEventArgs e)
+    {
+        if (!_isDraggingPanel)
+        {
+            return;
+        }
+
+        var delta = new Point2D(e.ClientX - _panelDragStartScreen.X, e.ClientY - _panelDragStartScreen.Y);
+        _panelDragMoved = _panelDragMoved || Math.Abs(delta.X) > 2 || Math.Abs(delta.Y) > 2;
+        _panelDragOffset = new Point2D(_panelDragStartOffset.X + delta.X, _panelDragStartOffset.Y + delta.Y);
+        StateHasChanged();
+    }
+
+    private void OnPanelMouseUp(MouseEventArgs e)
+    {
+        _isDraggingPanel = false;
+    }
+
+    private void OnHeaderMouseUp(MouseEventArgs e)
+    {
+        if (!_panelDragMoved)
+        {
+            ToggleCollapse();
+        }
+    }
+
+    // ===== Add Variable =====
+
+    private void OpenAddForm()
+    {
+        _isAddingNew = true;
+        _newVariableName = "";
+        _newVariableType = "System.Double";
+    }
+
+    private void CancelAdd()
+    {
+        _isAddingNew = false;
+    }
+
+    private void ConfirmAdd()
+    {
+        var name = _newVariableName?.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        // Ensure unique name
+        var baseName = name;
+        var counter = 1;
+        while (State.Variables.Any(v => v.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        {
+            name = $"{baseName} ({counter++})";
+        }
+
+        var defaultValue = GetDefaultValueForType(_newVariableType);
+        var variable = GraphVariable.Create(name, _newVariableType, defaultValue);
+        State.AddVariable(variable);
+
+        _isAddingNew = false;
+    }
+
+    private void OnAddKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") ConfirmAdd();
+        else if (e.Key == "Escape") CancelAdd();
+    }
+
+    // ===== Edit Variable =====
+
+    private void StartEdit(GraphVariable variable)
+    {
+        _editingVariableId = variable.Id;
+        _editVariableName = variable.Name;
+    }
+
+    private void SaveEdit()
+    {
+        if (_editingVariableId is null) return;
+
+        var variable = State.FindVariable(_editingVariableId);
+        if (variable is null) { _editingVariableId = null; return; }
+
+        var newName = _editVariableName?.Trim();
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            _editingVariableId = null;
+            return;
+        }
+
+        if (newName != variable.Name)
+        {
+            State.UpdateVariable(variable with { Name = newName });
+        }
+
+        _editingVariableId = null;
+    }
+
+    private void OnEditKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") SaveEdit();
+        else if (e.Key == "Escape") _editingVariableId = null;
+    }
+
+    // ===== Delete Variable =====
+
+    private void DeleteVariable(string variableId)
+    {
+        State.RemoveVariable(variableId);
+    }
+
+    // ===== Drag =====
+
+    private async Task OnVariableDragStart(DragEventArgs e, GraphVariable variable)
+    {
+        // Set drag data for the canvas drop handler
+        e.DataTransfer.DropEffect = "copy";
+        e.DataTransfer.EffectAllowed = "copy";
+
+        if (OnVariableDrag.HasDelegate)
+        {
+            await OnVariableDrag.InvokeAsync(new VariableDragData(variable.Id, variable.Name));
+        }
+    }
+
+    private async Task CreateVariableNode(GraphVariable variable, bool isSet)
+    {
+        if (OnCreateVariableNode.HasDelegate)
+        {
+            await OnCreateVariableNode.InvokeAsync(new VariableNodeRequest(variable.Id, isSet));
+        }
+    }
+
+    // ===== Helpers =====
+
+    private static SocketValue? GetDefaultValueForType(string typeName) => typeName switch
+    {
+        "System.Double" => SocketValue.FromObject(0.0),
+        "System.Int32" => SocketValue.FromObject(0),
+        "System.String" => SocketValue.FromObject(""),
+        "System.Boolean" => SocketValue.FromObject(false),
+        "NodeEditor.Blazor.Models.SerializableList" => SocketValue.FromObject(new SerializableList()),
+        _ => null
+    };
+
+    private static string GetTypeFriendlyName(string typeName) => typeName switch
+    {
+        "System.Double" => "Num",
+        "System.Int32" => "Int",
+        "System.String" => "Str",
+        "System.Boolean" => "Bool",
+        "NodeEditor.Blazor.Models.SerializableList" => "List",
+        "System.Object" => "Obj",
+        _ => typeName.Split('.').Last()
+    };
+
+    private static string GetTypeClass(string typeName) => typeName switch
+    {
+        "System.Double" => "number",
+        "System.Int32" => "int",
+        "System.String" => "string",
+        "System.Boolean" => "bool",
+        "NodeEditor.Blazor.Models.SerializableList" => "list",
+        "System.Object" => "object",
+        _ => "unknown"
+    };
+
+    private RenderFragment RenderVariableEditor(GraphVariable variable)
+    {
+        var socketData = new SocketData(
+            Name: "Value",
+            TypeName: variable.TypeName,
+            IsInput: true,
+            IsExecution: false,
+            Value: variable.DefaultValue);
+
+        var socketVm = new SocketViewModel(socketData);
+
+        var nodeData = new NodeData(
+            Id: variable.Id,
+            Name: "Variable",
+            Callable: false,
+            ExecInit: false,
+            Inputs: new[] { socketData },
+            Outputs: Array.Empty<SocketData>());
+
+        var nodeVm = new NodeViewModel(nodeData);
+
+        var editor = EditorRegistry.GetEditor(socketData);
+        if (editor is null)
+        {
+            return builder => builder.AddContent(0, "No editor");
+        }
+
+        var context = new SocketEditorContext
+        {
+            Socket = socketVm,
+            Node = nodeVm,
+            SetValue = value =>
+            {
+                var updated = variable with { DefaultValue = SocketValue.FromObject(value) };
+                State.UpdateVariable(updated);
+            }
+        };
+
+        return editor.Render(context);
+    }
+
+    private void OnVariableTypeChanged(GraphVariable variable, string? typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName) || variable.TypeName == typeName)
+        {
+            return;
+        }
+
+        var updated = variable with
+        {
+            TypeName = typeName,
+            DefaultValue = GetDefaultValueForType(typeName)
+        };
+        State.UpdateVariable(updated);
+    }
+}

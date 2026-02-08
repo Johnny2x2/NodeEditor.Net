@@ -1,0 +1,521 @@
+@using NodeEditor.Blazor.Services
+@implements IDisposable
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@inject ICoordinateConverter CoordinateConverter
+@inject ICanvasInteractionHandler Interaction
+@inject IViewportCuller ViewportCuller
+@inject INodeRegistryService _registry
+
+<div class="ne-canvas"
+     @ref="_canvasRef"
+     @onpointerdown="OnPointerDown"
+     @onpointermove="OnPointerMove"
+     @onpointerup="OnPointerUp"
+     @onwheel="OnWheel"
+     @onwheel:preventDefault
+     @onkeydown="OnKeyDown"
+     @oncontextmenu="OnContextMenu"
+     @oncontextmenu:preventDefault
+     @ondragover="OnDragOver"
+     @ondragover:preventDefault
+     @ondrop="OnDrop"
+     @ondrop:preventDefault
+     @ontouchstart="OnTouchStart"
+     @ontouchmove="OnTouchMove"
+     @ontouchend="OnTouchEnd"
+     @ontouchcancel="OnTouchCancel"
+     tabindex="0">
+
+    <SelectionRectangle IsVisible="Interaction.IsSelecting"
+                        Start="Interaction.SelectionStart"
+                        Current="Interaction.SelectionCurrent" />
+
+    <CanvasContextMenu IsOpen="Interaction.IsContextMenuOpen"
+                       Position="Interaction.ContextMenuScreenPosition"
+                       OnSelect="AddNodeFromDefinition"
+                       OnAddOverlay="AddOverlayFromContextMenu"
+                       OnClose="CloseContextMenu" />
+
+    @if (_isNodeContextMenuOpen)
+    {
+        <div class="ne-context-menu"
+             style="@NodeContextMenuStyle"
+             @onpointerdown:stopPropagation
+             @oncontextmenu:preventDefault
+             @onkeydown="OnNodeContextMenuKeyDown"
+             tabindex="0">
+            <div class="ne-context-menu-category-items">
+                <button class="ne-context-menu-item" @onclick="OnNodeMenuCopy">
+                    <div class="ne-context-menu-item-name">Copy</div>
+                </button>
+                <button class="ne-context-menu-item" @onclick="OnNodeMenuCut">
+                    <div class="ne-context-menu-item-name">Cut</div>
+                </button>
+                <button class="ne-context-menu-item" @onclick="OnNodeMenuDelete">
+                    <div class="ne-context-menu-item-name">Delete</div>
+                </button>
+            </div>
+        </div>
+    }
+
+    <div class="ne-viewport" style="@ViewportTransformStyle">
+        @* Overlay layer (HTML) - rendered below connections and nodes *@
+        <div class="ne-overlays">
+            @foreach (var overlay in _visibleOverlays)
+            {
+                <OrganizerOverlay Overlay="overlay"
+                                  OnOverlayPointerDown="OnOverlayPointerDown"
+                                  OnOverlayResizePointerDown="OnOverlayResizePointerDown"
+                                  @key="overlay.Id" />
+            }
+        </div>
+
+        @* Connection layer (SVG) - rendered below nodes *@
+        <svg class="ne-connections" @ref="_svgRef">
+            @foreach (var connection in _visibleConnections)
+            {
+                <ConnectionPath Connection="connection"
+                                Nodes="State.Nodes"
+                                IsSelected="State.SelectedConnection == connection"
+                                OnSelected="OnConnectionSelected"
+                                @key="@GetConnectionKey(connection)" />
+            }
+
+            <ConnectionDrawing Connection="Interaction.PendingConnection"
+                               EndPoint="Interaction.PendingConnectionEndGraph"
+                               Nodes="State.Nodes" />
+        </svg>
+
+        @* Node layer (HTML) - rendered above connections *@
+        <CascadingValue Value="State">
+            <div class="ne-nodes">
+                @foreach (var node in _visibleNodes)
+                {
+                    <NodeComponent Node="node"
+                                   Connections="State.Connections"
+                                   @key="node.Data.Id"
+                                   OnSocketPointerDown="OnSocketPointerDown"
+                                   OnSocketPointerUp="OnSocketPointerUp"
+                                   OnNodeDragStart="OnNodeDragStart"
+                                   OnNodeContextMenu="OnNodeContextMenu" />
+                }
+            </div>
+        </CascadingValue>
+    </div>
+</div>
+
+@code {
+    private ElementReference _canvasRef;
+    private ElementReference _svgRef;
+
+    private Point2D _canvasScreenOffset = Point2D.Zero;
+
+    private IReadOnlyList<NodeViewModel> _visibleNodes = Array.Empty<NodeViewModel>();
+    private IReadOnlyList<ConnectionData> _visibleConnections = Array.Empty<ConnectionData>();
+    private IReadOnlyList<OverlayViewModel> _visibleOverlays = Array.Empty<OverlayViewModel>();
+
+    private bool _isNodeContextMenuOpen;
+    private Point2D _nodeContextMenuScreenPosition = Point2D.Zero;
+
+    private readonly Dictionary<string, Point2D> _socketPositionCache = new();
+
+    [Parameter, EditorRequired]
+    public INodeEditorState State { get; set; } = null!;
+
+    [Parameter]
+    public double MinZoom { get; set; } = 0.1;
+
+    [Parameter]
+    public double MaxZoom { get; set; } = 3.0;
+
+    [Parameter]
+    public double ZoomStep { get; set; } = 0.1;
+
+    private string ViewportTransformStyle =>
+        $"transform: translate({Interaction.PanOffset.X}px, {Interaction.PanOffset.Y}px) scale({Interaction.Zoom});";
+
+    private string NodeContextMenuStyle =>
+        $"left: {_nodeContextMenuScreenPosition.X}px; top: {_nodeContextMenuScreenPosition.Y}px;";
+
+    // ────────────────────────── Public API (called by parent) ──────────────────────────
+
+    /// <summary>
+    /// Call this method from the parent when the VariablesPanel raises its OnVariableDrag callback
+    /// to inform the canvas which variable is being dragged.
+    /// </summary>
+    public void SetPendingVariableDrag(VariableDragData? data)
+    {
+        Interaction.PendingVariableDrag = data;
+    }
+
+    public void CreateVariableNode(string variableId, bool isSetNode)
+    {
+        var variable = State.FindVariable(variableId);
+        if (variable is null) return;
+
+        var definitionId = isSetNode ? variable.SetDefinitionId : variable.GetDefinitionId;
+        var definition = _registry?.Definitions.FirstOrDefault(
+            d => d.Id.Equals(definitionId, StringComparison.Ordinal));
+        if (definition is null) return;
+
+        var nodeData = definition.Factory();
+        var center = GetViewportCenterScreen();
+        var graphPosition = CoordinateConverter.ScreenToGraph(center);
+        var nodeViewModel = new NodeViewModel(nodeData) { Position = graphPosition };
+        State.AddNode(nodeViewModel);
+    }
+
+    public void CreateEventNode(string eventId, bool isTrigger)
+    {
+        var graphEvent = State.FindEvent(eventId);
+        if (graphEvent is null) return;
+
+        var definitionId = isTrigger ? graphEvent.TriggerDefinitionId : graphEvent.ListenerDefinitionId;
+        var definition = _registry?.Definitions.FirstOrDefault(
+            d => d.Id.Equals(definitionId, StringComparison.Ordinal));
+        if (definition is null) return;
+
+        var nodeData = definition.Factory();
+        var center = GetViewportCenterScreen();
+        var graphPosition = CoordinateConverter.ScreenToGraph(center);
+        var nodeViewModel = new NodeViewModel(nodeData) { Position = graphPosition };
+        State.AddNode(nodeViewModel);
+    }
+
+    // ────────────────────────── Lifecycle ──────────────────────────
+
+    protected override void OnInitialized()
+    {
+        CoordinateConverter.SyncFromState(State);
+        Interaction.Attach(State, State.Zoom, new Point2D(State.Viewport.X, State.Viewport.Y));
+        Interaction.StateChanged += OnInteractionStateChanged;
+
+        State.NodeAdded += OnStateChanged;
+        State.NodeRemoved += OnStateChanged;
+        State.ConnectionAdded += OnStateChanged;
+        State.ConnectionRemoved += OnStateChanged;
+        State.SelectionChanged += OnStateChanged;
+        State.ConnectionSelectionChanged += OnStateChanged;
+        State.NodeExecutionStateChanged += OnStateChanged;
+        State.SocketValuesChanged += OnStateChanged;
+        State.ZoomChanged += OnZoomChanged;
+        State.ViewportChanged += OnViewportChanged;
+        State.OverlayAdded += OnStateChanged;
+        State.OverlayRemoved += OnStateChanged;
+        State.OverlaySelectionChanged += OnStateChanged;
+
+        UpdateCulling();
+    }
+
+    public void Dispose()
+    {
+        Interaction.StateChanged -= OnInteractionStateChanged;
+
+        State.NodeAdded -= OnStateChanged;
+        State.NodeRemoved -= OnStateChanged;
+        State.ConnectionAdded -= OnStateChanged;
+        State.ConnectionRemoved -= OnStateChanged;
+        State.SelectionChanged -= OnStateChanged;
+        State.ConnectionSelectionChanged -= OnStateChanged;
+        State.NodeExecutionStateChanged -= OnStateChanged;
+        State.SocketValuesChanged -= OnStateChanged;
+        State.ZoomChanged -= OnZoomChanged;
+        State.ViewportChanged -= OnViewportChanged;
+        State.OverlayAdded -= OnStateChanged;
+        State.OverlayRemoved -= OnStateChanged;
+        State.OverlaySelectionChanged -= OnStateChanged;
+    }
+
+    // ────────────────────────── State event handlers ──────────────────────────
+
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        _ = InvokeAsync(() =>
+        {
+            UpdateCulling();
+            StateHasChanged();
+        });
+    }
+
+    private void OnZoomChanged(object? sender, ZoomChangedEventArgs e)
+    {
+        CoordinateConverter.SyncFromState(State);
+        Interaction.Attach(State, State.Zoom, new Point2D(State.Viewport.X, State.Viewport.Y));
+        UpdateCulling();
+        StateHasChanged();
+    }
+
+    private void OnViewportChanged(object? sender, ViewportChangedEventArgs e)
+    {
+        CoordinateConverter.SyncFromState(State);
+        Interaction.Attach(State, State.Zoom, new Point2D(State.Viewport.X, State.Viewport.Y));
+        UpdateCulling();
+        StateHasChanged();
+    }
+
+    private void OnInteractionStateChanged()
+    {
+        UpdateCulling();
+        StateHasChanged();
+    }
+
+    // ────────────────────────── Event forwarders ──────────────────────────
+
+    private async Task OnPointerDown(PointerEventArgs e)
+    {
+        if (_isNodeContextMenuOpen && e.Button == 0)
+        {
+            CloseNodeContextMenu();
+        }
+
+        await _canvasRef.FocusAsync();
+        await UpdateCanvasScreenOffsetAsync();
+        Interaction.HandlePointerDown(e, ToCanvasPoint(new Point2D(e.ClientX, e.ClientY)));
+        UpdateCulling();
+    }
+
+    private void OnPointerMove(PointerEventArgs e)
+    {
+        Interaction.HandlePointerMove(e, ToCanvasPoint(new Point2D(e.ClientX, e.ClientY)));
+        UpdateCulling();
+    }
+
+    private void OnPointerUp(PointerEventArgs e)
+    {
+        Interaction.HandlePointerUp(e, ToCanvasPoint(new Point2D(e.ClientX, e.ClientY)));
+    }
+
+    private void OnWheel(WheelEventArgs e)
+    {
+        var focus = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
+        Interaction.HandleWheel(e, focus, MinZoom, MaxZoom, ZoomStep);
+    }
+
+    private void OnContextMenu(MouseEventArgs e)
+    {
+        CloseNodeContextMenu();
+        Interaction.OpenContextMenu(ToCanvasPoint(new Point2D(e.ClientX, e.ClientY)));
+        StateHasChanged();
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        Interaction.HandleKeyDown(e);
+    }
+
+    private void OnSocketPointerDown(SocketPointerEventArgs e)
+    {
+        Interaction.HandleSocketPointerDown(e, ToCanvasPoint(e.Position));
+    }
+
+    private void OnSocketPointerUp(SocketPointerEventArgs e)
+    {
+        Interaction.HandleSocketPointerUp(e);
+    }
+
+    private void OnNodeDragStart(NodePointerEventArgs e)
+    {
+        Interaction.HandleNodeDragStart(e, ToCanvasPoint(e.Position));
+    }
+
+    private void OnOverlayPointerDown(OverlayPointerEventArgs e)
+    {
+        Interaction.HandleOverlayPointerDown(e, ToCanvasPoint(e.Position));
+    }
+
+    private void OnOverlayResizePointerDown(OverlayPointerEventArgs e)
+    {
+        Interaction.HandleOverlayResizeHandleDown(e, ToCanvasPoint(e.Position));
+    }
+
+    private void OnDragOver(DragEventArgs e)
+    {
+        Interaction.HandleDragOver(e);
+    }
+
+    private async Task OnDrop(DragEventArgs e)
+    {
+        await UpdateCanvasScreenOffsetAsync();
+        var canvasPoint = ToCanvasPoint(new Point2D(e.ClientX, e.ClientY));
+        Interaction.HandleDrop(e, canvasPoint, _registry);
+    }
+
+    private void OnTouchStart(TouchEventArgs e)
+    {
+        _ = UpdateCanvasScreenOffsetAsync();
+        var touches = e.ChangedTouches.Select(t =>
+        {
+            var pt = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
+            return new TouchPoint2D(t.Identifier, pt.X, pt.Y);
+        }).ToList();
+        Interaction.HandleTouchStart(touches);
+        UpdateCulling();
+        StateHasChanged();
+    }
+
+    private void OnTouchMove(TouchEventArgs e)
+    {
+        var touches = e.Touches.Select(t =>
+        {
+            var pt = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
+            return new TouchPoint2D(t.Identifier, pt.X, pt.Y);
+        }).ToList();
+        Interaction.HandleTouchMove(touches, MinZoom, MaxZoom);
+        UpdateCulling();
+        StateHasChanged();
+    }
+
+    private void OnTouchEnd(TouchEventArgs e)
+    {
+        var remaining = e.Touches.Select(t =>
+        {
+            var pt = ToCanvasPoint(new Point2D(t.ClientX, t.ClientY));
+            return new TouchPoint2D(t.Identifier, pt.X, pt.Y);
+        }).ToList();
+        Interaction.HandleTouchEnd(remaining);
+        StateHasChanged();
+    }
+
+    private void OnTouchCancel(TouchEventArgs e)
+    {
+        Interaction.HandleTouchCancel();
+        StateHasChanged();
+    }
+
+    // ────────────────────────── Context menu callbacks ──────────────────────────
+
+    private void AddNodeFromDefinition(NodeDefinition definition)
+    {
+        var nodeData = definition.Factory();
+        var nodeViewModel = new NodeViewModel(nodeData)
+        {
+            Position = Interaction.ContextMenuGraphPosition
+        };
+        State.AddNode(nodeViewModel);
+    }
+
+    private void AddOverlayFromContextMenu()
+    {
+        var overlay = new OverlayViewModel(new OverlayData(
+            Id: Guid.NewGuid().ToString("N"),
+            Title: "Overlay",
+            Body: string.Empty,
+            Position: Interaction.ContextMenuGraphPosition,
+            Size: new Size2D(320, 200),
+            Color: "#ff4d4d",
+            Opacity: 0.2));
+
+        State.AddOverlay(overlay);
+    }
+
+    private void CloseContextMenu()
+    {
+        Interaction.CloseContextMenu();
+    }
+
+    // ────────────────────────── Node context menu ──────────────────────────
+
+    private async Task OnNodeContextMenu(NodePointerEventArgs e)
+    {
+        await UpdateCanvasScreenOffsetAsync();
+
+        Interaction.CloseContextMenu();
+
+        if (!State.SelectedNodeIds.Contains(e.NodeId))
+        {
+            State.SelectNode(e.NodeId, clearExisting: true);
+        }
+
+        _nodeContextMenuScreenPosition = ToCanvasPoint(e.Position);
+        _isNodeContextMenuOpen = true;
+        StateHasChanged();
+    }
+
+    private void CloseNodeContextMenu()
+    {
+        _isNodeContextMenuOpen = false;
+    }
+
+    private void OnNodeMenuCopy()
+    {
+        Interaction.CopySelectionToClipboard();
+        CloseNodeContextMenu();
+    }
+
+    private void OnNodeMenuCut()
+    {
+        Interaction.CutSelectionToClipboard();
+        CloseNodeContextMenu();
+    }
+
+    private void OnNodeMenuDelete()
+    {
+        Interaction.DeleteSelection();
+        CloseNodeContextMenu();
+    }
+
+    private void OnNodeContextMenuKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            CloseNodeContextMenu();
+            StateHasChanged();
+        }
+    }
+
+    // ────────────────────────── Connection selection ──────────────────────────
+
+    private void OnConnectionSelected(ConnectionData connection)
+    {
+        State.SelectConnection(connection);
+    }
+
+    // ────────────────────────── Helpers ──────────────────────────
+
+    private async Task UpdateCanvasScreenOffsetAsync()
+    {
+        if (_canvasJsModule is null) return;
+        _canvasScreenOffset = await _canvasJsModule.InvokeAsync<Point2D>("getCanvasScreenOffset", _canvasRef);
+    }
+
+    private Point2D ToCanvasPoint(Point2D clientPoint) =>
+        new(clientPoint.X - _canvasScreenOffset.X, clientPoint.Y - _canvasScreenOffset.Y);
+
+    private Point2D GetViewportCenterScreen()
+    {
+        var width = State.Viewport.Width > 0 ? State.Viewport.Width : 800;
+        var height = State.Viewport.Height > 0 ? State.Viewport.Height : 600;
+        return new Point2D(width / 2, height / 2);
+    }
+
+    private static string GetConnectionKey(ConnectionData c) =>
+        $"{c.OutputNodeId}:{c.OutputSocketName}->{c.InputNodeId}:{c.InputSocketName}";
+
+    private void UpdateCulling()
+    {
+        if (State.Viewport.Width <= 0 || State.Viewport.Height <= 0)
+        {
+            _visibleNodes = State.Nodes;
+            _visibleConnections = State.Connections;
+            _visibleOverlays = State.Overlays;
+            return;
+        }
+
+        const double cullPadding = 800;
+        var screenViewport = new Rect2D(
+            -cullPadding,
+            -cullPadding,
+            State.Viewport.Width + cullPadding * 2,
+            State.Viewport.Height + cullPadding * 2);
+
+        var handler = Interaction as CanvasInteractionHandler;
+        var alwaysInclude = Interaction.IsDraggingNode && handler?.DraggingNode is not null
+            ? new[] { handler.DraggingNode.Data.Id }
+            : Array.Empty<string>();
+
+        _visibleNodes = ViewportCuller.GetVisibleNodes(State.Nodes, screenViewport, alwaysInclude);
+        _visibleConnections = ViewportCuller.GetVisibleConnections(State.Connections, _visibleNodes, alwaysInclude);
+        _visibleOverlays = State.Overlays;
+    }
+}

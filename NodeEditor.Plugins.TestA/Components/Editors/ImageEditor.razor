@@ -1,0 +1,193 @@
+@using NodeEditor.Blazor.Services.Editors
+@using NodeEditor.Blazor.Models
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="ne-editor-image">
+    <style>
+        .ne-editor-image {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-width: 200px;
+        }
+
+        .ne-editor-button {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid rgba(102, 153, 255, 0.4);
+            background: rgba(102, 153, 255, 0.15);
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        .ne-editor-button:hover {
+            background: rgba(102, 153, 255, 0.25);
+            border-color: rgba(102, 153, 255, 0.6);
+            color: #ffffff;
+        }
+
+        .ne-editor-image-path {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.6);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .ne-editor-image-preview {
+            margin-top: 4px;
+            max-width: 180px;
+            max-height: 180px;
+            overflow: hidden;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .ne-editor-image-preview img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+    </style>
+
+    <InputFile OnChange="OnFileSelected" 
+               accept="image/*" 
+               id="@_fileInputId"
+               style="display: none;" />
+    
+    <label class="ne-editor-button"
+           for="@_fileInputId"
+           @onpointerdown:stopPropagation
+           @onclick:stopPropagation>
+        📁 Load Image
+    </label>
+    
+    @if (!string.IsNullOrEmpty(CurrentPath))
+    {
+        <div class="ne-editor-image-path" title="@CurrentPath">
+            @DisplayName
+        </div>
+    }
+    
+    @if (PreviewDataUrl != null)
+    {
+        <div class="ne-editor-image-preview">
+            <img src="@PreviewDataUrl" alt="Preview" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public SocketEditorContext Context { get; set; } = null!;
+
+    private string _fileInputId = $"file-input-{Guid.NewGuid():N}";
+    private string? CurrentPath => Context.GetStringValue();
+    private string DisplayName =>
+        string.IsNullOrWhiteSpace(CurrentPath)
+            ? string.Empty
+            : (CurrentPath.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)
+                ? "Loaded image"
+                : System.IO.Path.GetFileName(CurrentPath));
+    private string? PreviewDataUrl { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await base.OnParametersSetAsync();
+        
+        // Load preview if path exists
+        if (!string.IsNullOrEmpty(CurrentPath))
+        {
+            await LoadPreview(CurrentPath);
+        }
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Read file content for preview
+            const long maxFileSize = 10 * 1024 * 1024; // 10 MB limit
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var ms = new System.IO.MemoryStream();
+            await stream.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+            
+            var base64 = Convert.ToBase64String(bytes);
+            var mimeType = file.ContentType;
+            if (string.IsNullOrEmpty(mimeType))
+            {
+                var ext = System.IO.Path.GetExtension(file.Name).ToLowerInvariant();
+                mimeType = ext switch
+                {
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".png" => "image/png",
+                    ".gif" => "image/gif",
+                    ".bmp" => "image/bmp",
+                    ".webp" => "image/webp",
+                    _ => "image/png"
+                };
+            }
+            
+            PreviewDataUrl = $"data:{mimeType};base64,{base64}";
+            
+            // Store data URL directly so execution can pass through without file system access
+            Context.SetValueTyped(PreviewDataUrl);
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading image: {ex.Message}");
+            PreviewDataUrl = null;
+        }
+    }
+
+    private async Task LoadPreview(string path)
+    {
+        try
+        {
+            // Check if it's already a data URL
+            if (path.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+            {
+                PreviewDataUrl = path;
+                return;
+            }
+
+            // Try to load from file system (server-side only)
+            if (System.IO.File.Exists(path))
+            {
+                var bytes = await System.IO.File.ReadAllBytesAsync(path);
+                var base64 = Convert.ToBase64String(bytes);
+                var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+                var mimeType = ext switch
+                {
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".png" => "image/png",
+                    ".gif" => "image/gif",
+                    ".bmp" => "image/bmp",
+                    ".webp" => "image/webp",
+                    _ => "image/png"
+                };
+                PreviewDataUrl = $"data:{mimeType};base64,{base64}";
+            }
+        }
+        catch
+        {
+            // Ignore errors loading preview
+            PreviewDataUrl = null;
+        }
+    }
+}

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="NodeEditor.Blazor.WebHost/NodeEditor.Blazor.WebHost.csproj" />
+  <Project Path="NodeEditor.Blazor/NodeEditor.Blazor.csproj" />
+  <Project Path="NodeEditor.Blazor.Tests/NodeEditor.Blazor.Tests.csproj" />
+  <Project Path="NodeEditor.Mcp/NodeEditor.Mcp.csproj" />
+</Solution>

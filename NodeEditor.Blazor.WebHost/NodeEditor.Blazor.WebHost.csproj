@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
+    <ProjectReference Include="..\NodeEditor.Mcp\NodeEditor.Mcp.csproj" />
+  </ItemGroup>
+
+  <!-- 
+    Plugins are loaded dynamically at runtime from the 'plugins' folder.
+    To install a plugin:
+    1. Build the plugin project separately
+    2. Copy the plugin DLLs and plugin.json to: $(OutDir)plugins/{PluginName}/
+
+    For development convenience, you can use the install-plugins script or
+    manually copy built plugins to the plugins folder.
+  -->
+
+</Project>

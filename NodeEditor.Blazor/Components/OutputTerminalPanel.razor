@@ -1,0 +1,195 @@
+@using NodeEditor.Blazor.Services.Logging
+@implements IDisposable
+
+<div class="ne-output-terminal @(_isCollapsed ? "ne-output-terminal--collapsed" : "")"
+     style="@(IsVisible ? "" : "display: none;")">
+    <div class="ne-output-terminal-header">
+        <span class="ne-output-terminal-title">Output</span>
+
+        <select class="ne-output-terminal-channel-select" @bind="SelectedChannel">
+            @foreach (var ch in _channels)
+            {
+                <option value="@ch">@ch</option>
+            }
+        </select>
+
+        <div class="ne-output-terminal-actions">
+            <label class="ne-output-terminal-toggle-label" title="Automatically clear this channel when execution starts (only for ClearOnRun channels)">
+                <input type="checkbox" @bind="_clearOnRunEnabled" />
+                <span>Clear on Run</span>
+            </label>
+            <button class="ne-output-terminal-btn" @onclick="ClearCurrentChannel" title="Clear this channel">Clear</button>
+            <button class="ne-output-terminal-btn" @onclick="ToggleCollapse" title="@(_isCollapsed ? "Expand" : "Collapse")">
+                @(_isCollapsed ? "▲" : "▼")
+            </button>
+            <button class="ne-output-terminal-btn ne-output-terminal-btn--close" @onclick="Close" title="Close terminal">✕</button>
+        </div>
+    </div>
+
+    @if (!_isCollapsed)
+    {
+        <div class="ne-output-terminal-body" @ref="_bodyRef">
+            @if (_filteredEntries.Count == 0)
+            {
+                <div class="ne-output-terminal-empty">No output for "@SelectedChannel".</div>
+            }
+            else
+            {
+                @foreach (var entry in _filteredEntries)
+                {
+                    <div class="ne-output-terminal-entry ne-output-terminal-entry--@entry.Level.ToString().ToLowerInvariant()">
+                        <span class="ne-output-terminal-timestamp">@entry.Timestamp.ToString("HH:mm:ss.fff")</span>
+                        <span class="ne-output-terminal-level">@FormatLevel(entry.Level)</span>
+                        @if (!string.IsNullOrEmpty(entry.NodeName))
+                        {
+                            <span class="ne-output-terminal-node">[@entry.NodeName]</span>
+                        }
+                        <span class="ne-output-terminal-message">@entry.Message</span>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public INodeEditorLogger Logger { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public ILogChannelRegistry ChannelRegistry { get; set; } = null!;
+
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> IsVisibleChanged { get; set; }
+
+    private bool _isCollapsed;
+    private bool _clearOnRunEnabled = true;
+    private string _selectedChannel = LogChannels.Execution;
+    private List<string> _channels = new();
+    private List<LogEntry> _filteredEntries = new();
+    private ElementReference _bodyRef;
+    private bool _needsScroll;
+
+    private string SelectedChannel
+    {
+        get => _selectedChannel;
+        set
+        {
+            if (_selectedChannel != value)
+            {
+                _selectedChannel = value;
+                RefreshEntries();
+            }
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        RefreshChannels();
+        RefreshEntries();
+
+        Logger.OnLogEntry += OnLogEntry;
+        Logger.OnEntriesCleared += OnEntriesCleared;
+        ChannelRegistry.ChannelsChanged += OnChannelsChanged;
+    }
+
+    public void Dispose()
+    {
+        Logger.OnLogEntry -= OnLogEntry;
+        Logger.OnEntriesCleared -= OnEntriesCleared;
+        ChannelRegistry.ChannelsChanged -= OnChannelsChanged;
+    }
+
+    /// <summary>
+    /// Called by the host (Home.razor) before execution starts.
+    /// Clears channels with ClearOnRun policy if the toggle is enabled.
+    /// </summary>
+    public void NotifyExecutionStarting()
+    {
+        if (_clearOnRunEnabled)
+        {
+            Logger.ClearOnRun();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_needsScroll && !_isCollapsed && IsVisible)
+        {
+            _needsScroll = false;
+            // No JS interop needed — we use CSS scroll-behavior or just let it be
+            // Auto-scroll is handled by the CSS `overflow-anchor` property
+        }
+    }
+
+    private void OnLogEntry(LogEntry entry)
+    {
+        if (string.Equals(entry.Channel, _selectedChannel, StringComparison.OrdinalIgnoreCase))
+        {
+            _filteredEntries.Add(entry);
+            _needsScroll = true;
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnEntriesCleared(string? channel)
+    {
+        if (channel is null || string.Equals(channel, _selectedChannel, StringComparison.OrdinalIgnoreCase))
+        {
+            RefreshEntries();
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnChannelsChanged()
+    {
+        RefreshChannels();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void RefreshChannels()
+    {
+        _channels = ChannelRegistry.Channels.Select(c => c.Name).OrderBy(n => n).ToList();
+
+        // Ensure selected channel still exists
+        if (!_channels.Contains(_selectedChannel))
+        {
+            _selectedChannel = _channels.FirstOrDefault() ?? LogChannels.Execution;
+        }
+    }
+
+    private void RefreshEntries()
+    {
+        _filteredEntries = Logger.GetEntries(_selectedChannel).ToList();
+    }
+
+    private void ClearCurrentChannel()
+    {
+        Logger.Clear(_selectedChannel);
+        RefreshEntries();
+    }
+
+    private void ToggleCollapse()
+    {
+        _isCollapsed = !_isCollapsed;
+    }
+
+    private async Task Close()
+    {
+        await IsVisibleChanged.InvokeAsync(false);
+    }
+
+    private static string FormatLevel(LogLevel level) => level switch
+    {
+        LogLevel.Debug => "DBG",
+        LogLevel.Info => "INF",
+        LogLevel.Warning => "WRN",
+        LogLevel.Error => "ERR",
+        _ => "???"
+    };
+}
