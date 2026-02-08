@@ -1,0 +1,180 @@
+.hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 100px 24px 80px;
+}
+
+.hero-bg {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 24px 24px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 70%);
+}
+
+.hero-glow {
+    position: absolute;
+    top: -20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(102, 153, 255, 0.12) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.hero-content {
+    position: relative;
+    text-align: center;
+    max-width: 860px;
+}
+
+.hero-title {
+    font-size: 3.5rem;
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 24px;
+    color: #ffffff;
+}
+
+.hero-highlight {
+    background: linear-gradient(135deg, #6699ff, #88cc88);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.hero-subtitle {
+    font-size: 1.15rem;
+    color: rgba(224, 224, 240, 0.6);
+    max-width: 640px;
+    margin: 0 auto 36px;
+    line-height: 1.7;
+}
+
+.hero-actions {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+}
+
+.hero-screenshot {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.screenshot-card {
+    text-align: center;
+}
+
+.screenshot-card h4 {
+    margin-top: 16px;
+    font-size: 1.05rem;
+}
+
+.screenshot-card p {
+    color: rgba(224, 224, 240, 0.5);
+    font-size: 0.9rem;
+}
+
+/* Architecture */
+.arch-stack {
+    max-width: 600px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.arch-layer {
+    width: 100%;
+    padding: 24px;
+    border-radius: 12px;
+    border: 1px solid rgba(61, 61, 92, 0.4);
+    position: relative;
+    transition: border-color 0.25s;
+}
+
+.arch-layer:hover {
+    border-color: rgba(102, 153, 255, 0.4);
+}
+
+.arch-tag {
+    position: absolute;
+    top: -10px;
+    right: 16px;
+    padding: 2px 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-radius: 999px;
+}
+
+.arch--core {
+    background: linear-gradient(180deg, #1e2e1e 0%, #1a2a1a 100%);
+    border-color: rgba(136, 204, 136, 0.25);
+}
+
+.arch--core .arch-tag {
+    background: rgba(136, 204, 136, 0.15);
+    color: #88cc88;
+}
+
+.arch--ui {
+    background: linear-gradient(180deg, #1e1e2e 0%, #1a1a2a 100%);
+    border-color: rgba(102, 153, 255, 0.25);
+}
+
+.arch--ui .arch-tag {
+    background: rgba(102, 153, 255, 0.15);
+    color: #6699ff;
+}
+
+.arch--host {
+    background: linear-gradient(180deg, #2e1e2e 0%, #2a1a2a 100%);
+    border-color: rgba(199, 146, 234, 0.25);
+}
+
+.arch--host .arch-tag {
+    background: rgba(199, 146, 234, 0.15);
+    color: #c792ea;
+}
+
+.arch-layer h3 {
+    font-size: 1.1rem;
+    margin-bottom: 6px;
+}
+
+.arch-layer p {
+    font-size: 0.88rem;
+    color: rgba(224, 224, 240, 0.55);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.arch-arrow {
+    font-size: 1.2rem;
+    color: rgba(224, 224, 240, 0.2);
+    padding: 6px 0;
+}
+
+.cta-section {
+    background: linear-gradient(180deg, #121220 0%, #141428 100%);
+}
+
+@media (max-width: 768px) {
+    .hero-title { font-size: 2.2rem; }
+    .hero-subtitle { font-size: 1rem; }
+    .hero { padding: 80px 16px 48px; min-height: auto; }
+    .hero-actions { flex-direction: column; align-items: center; }
+}

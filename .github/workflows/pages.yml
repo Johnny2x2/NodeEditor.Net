@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'docs/site/**'
+      - 'NodeEditor.Docs/**'
   workflow_dispatch:
 
 permissions:
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy Site
+    name: Build & Deploy Site
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -27,13 +27,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish Blazor WASM
+        run: dotnet publish NodeEditor.Docs/NodeEditor.Docs.csproj -c Release -o release
+
+      - name: Rewrite base href for GitHub Pages
+        run: sed -i 's|<base href="/" />|<base href="/NodeEditor.Net/" />|g' release/wwwroot/index.html
+
+      - name: Add .nojekyll
+        run: touch release/wwwroot/.nojekyll
+
+      - name: Copy index.html to 404.html for SPA routing
+        run: cp release/wwwroot/index.html release/wwwroot/404.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'docs/site'
+          path: 'release/wwwroot'
 
       - name: Deploy to GitHub Pages
         id: deployment

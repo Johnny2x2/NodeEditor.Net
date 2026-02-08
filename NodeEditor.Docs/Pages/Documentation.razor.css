@@ -1,0 +1,15 @@
+.page-top {
+    padding-top: 100px;
+}
+
+.docs-group {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+}
+
+.docs-group h3 {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+}

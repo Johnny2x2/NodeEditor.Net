@@ -2,6 +2,7 @@
   <Project Path="NodeEditor.Blazor.WebHost/NodeEditor.Blazor.WebHost.csproj" />
   <Project Path="NodeEditor.Blazor/NodeEditor.Blazor.csproj" />
   <Project Path="NodeEditor.Blazor.Tests/NodeEditor.Blazor.Tests.csproj" />
+  <Project Path="NodeEditor.Docs/NodeEditor.Docs.csproj" />
   <Project Path="NodeEditor.Mcp/NodeEditor.Mcp.csproj" />
   <Project Path="NodeEditor.Net/NodeEditor.Net.csproj" />
   <Project Path="NodeEditor.Plugins.Template/NodeEditor.Plugins.Template.csproj" />
