@@ -33,7 +33,8 @@ Custom nodes allow you to extend the node editor with domain-specific functional
 ### Step 1: Create a Node Context Class
 
 ```csharp
-using NodeEditor.Blazor.Models;
+using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.Services.Execution;
 
 namespace MyApp.Nodes;
 
@@ -279,8 +280,8 @@ public void Clamp(double Value, double Min = 0, double Max = 1, out double Resul
 Use `[SocketEditor]` to select a built-in editor for an input socket. This keeps UIs consistent and avoids custom component code.
 
 ```csharp
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services.Execution;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services.Execution;
 
 [Node("Image Loader", category: "Media")]
 public void LoadImage(
@@ -308,7 +309,7 @@ Create custom UI for editing socket values when built-in editors aren't enough.
 ```csharp
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
-using NodeEditor.Blazor.Models;
+using NodeEditor.Net.Models;
 using NodeEditor.Blazor.Services.Editors;
 
 namespace MyApp.Editors;
@@ -467,9 +468,9 @@ Package your custom nodes as a reusable plugin.
 ### Step 2: Implement INodePlugin
 
 ```csharp
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services.Plugins;
-using NodeEditor.Blazor.Services.Registry;
+using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Plugins;
 
 namespace MyPlugin;
 
@@ -697,9 +698,9 @@ public async Task HeavyComputation(ExecutionPath Entry, int Iterations, out Exec
 ## Complete Example: String Processing Plugin
 
 ```csharp
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services.Plugins;
-using NodeEditor.Blazor.Services.Registry;
+using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Plugins;
 
 namespace StringPlugin;
 

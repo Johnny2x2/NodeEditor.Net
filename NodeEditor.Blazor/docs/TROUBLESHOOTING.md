@@ -1063,4 +1063,4 @@ If you encounter issues not covered in this guide:
 
 ---
 
-*Last updated: December 2024*
+*Last updated: February 2026*

@@ -4,7 +4,9 @@ A powerful, event-driven node editor component library for Blazor applications, 
 
 ## Overview
 
-NodeEditor.Blazor is a modern Blazor component library that provides a complete node-based editor solution. It enables users to create, connect, and execute nodes visually within a browser-based canvas. The library features an event-based architecture optimized for Blazor's reactive rendering model, plugin support for extensibility, and a robust execution engine for running node graphs.
+NodeEditor.Blazor is a Razor component library that provides a complete node-based editor UI for the browser. It builds on top of the `NodeEditor.Net` core library, adding Blazor-specific components, editors, and services. The library features an event-based architecture optimized for Blazor's reactive rendering model, a built-in plugin marketplace, and comprehensive socket editor support.
+
+> **Note:** Core types (models, ViewModels, services, execution engine, plugins, serialization) live in the `NodeEditor.Net` project with `NodeEditor.Net.*` namespaces. This project provides the Blazor UI layer and the `AddNodeEditor()` DI extension.
 
 ### Key Features
 
@@ -13,8 +15,12 @@ NodeEditor.Blazor is a modern Blazor component library that provides a complete 
 - **Node Execution Engine** - Execute node graphs with parallel or sequential execution modes
 - **Plugin System** - Dynamically load and register custom node types from external assemblies
 - **Serialization** - Save and load node graphs with version migration support
-- **Custom Editors** - Built-in socket value editors (text, numeric, boolean) with extensibility
+- **Plugin Marketplace** - Browse, install, and manage plugins from local or remote repositories
+- **Custom Editors** - 9 built-in socket value editors (text, numeric, boolean, dropdown, image, etc.) with extensibility
 - **Type System** - Type-safe socket connections with automatic type resolution
+- **Graph Variables & Events** - Graph-scoped variables and event-driven execution
+- **Overlays** - Visual organizer shapes for annotating and grouping nodes
+- **MCP Settings** - Configure Model Context Protocol integration for AI-assisted editing
 - **MVVM Pattern** - Clean separation between models, view models, and UI components
 - **Comprehensive Testing** - Unit tests covering core functionality
 
@@ -51,7 +57,7 @@ var app = builder.Build();
 ```razor
 @page "/editor"
 @using NodeEditor.Blazor.Components
-@using NodeEditor.Blazor.Services
+@using NodeEditor.Net.Services
 @inject NodeEditorState EditorState
 
 <NodeEditorCanvas State="@EditorState" />
@@ -60,6 +66,9 @@ var app = builder.Build();
 3. **Initialize nodes programmatically**:
 
 ```csharp
+@using NodeEditor.Net.Models
+@using NodeEditor.Net.ViewModels
+
 @code {
     protected override void OnInitialized()
     {
@@ -93,9 +102,10 @@ var app = builder.Build();
 
 ### Event-Based State Management
 
-NodeEditor.Blazor uses an event-driven architecture centered around `NodeEditorState`:
+NodeEditor.Blazor uses an event-driven architecture centered around `NodeEditorState` (in `NodeEditor.Net.Services`):
 
 ```csharp
+// NodeEditorState lives in NodeEditor.Net.Services namespace
 public sealed class NodeEditorState
 {
     // Events for reactive updates
@@ -139,22 +149,51 @@ public void Dispose()
 ```
 NodeEditorCanvas (Main canvas component)
 ├── ContextMenu (Right-click menu for adding nodes)
+│   ├── ContextMenuSearch (Node search filter)
+│   └── ContextMenuItem (Individual menu items)
+├── CanvasContextMenu (Canvas-specific context actions)
+├── SelectionRectangle (Box selection overlay)
 ├── ConnectionPath (SVG connections between nodes)
-└── NodeComponent (Individual node rendering)
-    ├── SocketComponent (Input/output sockets)
-    └── Custom Editors (Inline value editors)
+├── ConnectionDrawing (Pending connection while dragging)
+├── OrganizerOverlay (Visual organizer shapes)
+├── NodeComponent (Individual node rendering)
+│   ├── SocketComponent (Input/output sockets)
+│   └── Editors (Inline value editors)
+│       ├── TextEditor, NumericEditor, BoolEditor
+│       ├── DropdownEditor, NumberUpDownEditor
+│       ├── TextAreaEditor, ButtonEditor
+│       ├── ImageEditor, ListEditor
+│       └── Custom Editors (plugin-provided)
+├── NodePropertiesPanel (Property inspector)
+├── VariablesPanel (Graph variable management)
+├── EventsPanel (Graph event management)
+├── OutputTerminalPanel (Execution output)
+├── PluginManagerOverlay (Plugin management)
+│   └── Marketplace/ (Plugin marketplace UI)
+│       ├── PluginManagerDialog
+│       ├── PluginCard, PluginDetailsPanel
+│       ├── PluginSearchBar
+│       └── MarketplaceSettingsPanel
+└── McpSettingsPanel (MCP configuration)
 ```
 
 ### Core Services
 
-- **NodeEditorState** - Central state management with event notifications
-- **NodeExecutionService** - Executes node graphs with dependency resolution
-- **NodeRegistryService** - Manages available node definitions
-- **PluginLoader** - Loads and registers plugin assemblies
-- **GraphSerializer** - Serializes/deserializes node graphs to/from JSON
-- **ConnectionValidator** - Validates socket type compatibility
-- **SocketTypeResolver** - Resolves socket types for method invocation
-- **CoordinateConverter** - Converts between screen and graph coordinates
+All core services are defined in `NodeEditor.Net` and registered by `AddNodeEditor()`:
+
+- **NodeEditorState** (`NodeEditor.Net.Services`) — Central state management with event notifications
+- **NodeExecutionService** (`NodeEditor.Net.Services.Execution`) — Executes node graphs with dependency resolution
+- **NodeRegistryService** (`NodeEditor.Net.Services.Registry`) — Manages available node definitions
+- **PluginLoader** (`NodeEditor.Net.Services.Plugins`) — Loads and registers plugin assemblies
+- **GraphSerializer** (`NodeEditor.Net.Services.Serialization`) — Serializes/deserializes node graphs to/from JSON
+- **ConnectionValidator** (`NodeEditor.Net.Services.Infrastructure`) — Validates socket type compatibility
+- **SocketTypeResolver** (`NodeEditor.Net.Services`) — Resolves socket types for method invocation
+- **CoordinateConverter** (`NodeEditor.Net.Services.Infrastructure`) — Converts between screen and graph coordinates
+- **ViewportCuller** (`NodeEditor.Net.Services.Infrastructure`) — Performance optimization for large graphs
+- **HeadlessGraphRunner** (`NodeEditor.Net.Services.Execution`) — Runs graphs without UI
+- **INodeEditorLogger** (`NodeEditor.Net.Services.Logging`) — Channel-based structured logging
+- **IPluginEventBus** (`NodeEditor.Net.Services.Plugins`) — Plugin event subscriptions
+- **IPluginInstallationService** (`NodeEditor.Net.Services.Plugins.Marketplace`) — Plugin marketplace operations
 
 ## Core Concepts
 
@@ -464,57 +503,65 @@ Manages available node definitions.
 
 ```
 NodeEditor.Blazor/
-├── Adapters/              # Legacy adapter code
-│   └── NodeAdapter.cs
 ├── Components/            # Blazor UI components
-│   ├── ConnectionPath.razor
-│   ├── ContextMenu.razor
-│   ├── NodeComponent.razor
-│   ├── NodeEditorCanvas.razor
-│   ├── SocketComponent.razor
-│   └── Editors/           # Socket value editors
-│       ├── BoolEditor.razor
+│   ├── NodeEditorCanvas.razor    # Main editor canvas
+│   ├── NodeComponent.razor       # Individual node rendering
+│   ├── SocketComponent.razor     # Socket (input/output) rendering
+│   ├── ConnectionPath.razor      # Connection line drawing
+│   ├── ConnectionDrawing.razor   # Pending connection visualization
+│   ├── ContextMenu.razor         # Right-click context menu
+│   ├── ContextMenuSearch.razor   # Node search in context menu
+│   ├── ContextMenuItem.razor     # Individual menu item
+│   ├── CanvasContextMenu.razor   # Canvas-specific context menu
+│   ├── NodePropertiesPanel.razor # Node property inspector
+│   ├── VariablesPanel.razor      # Graph variables UI
+│   ├── EventsPanel.razor         # Graph events UI
+│   ├── OutputTerminalPanel.razor # Execution output display
+│   ├── SelectionRectangle.razor  # Multi-select box
+│   ├── OrganizerOverlay.razor    # Organizer shapes
+│   ├── PluginManagerOverlay.razor # Plugin management
+│   ├── McpSettingsPanel.razor    # MCP configuration
+│   ├── Marketplace/              # Plugin marketplace components
+│   │   ├── PluginManagerDialog.razor
+│   │   ├── PluginCard.razor
+│   │   ├── PluginDetailsPanel.razor
+│   │   ├── PluginSearchBar.razor
+│   │   └── MarketplaceSettingsPanel.razor
+│   └── Editors/                  # Socket value editors
+│       ├── TextEditor.razor
 │       ├── NumericEditor.razor
-│       └── TextEditor.razor
-├── Models/                # Data models
-│   ├── NodeData.cs
-│   ├── SocketData.cs
-│   ├── ConnectionData.cs
-│   ├── GraphDto.cs
-│   ├── Point2D.cs
-│   ├── Size2D.cs
-│   └── ...
-├── Services/              # Core services
-│   ├── NodeEditorState.cs
-│   ├── ConnectionValidator.cs
-│   ├── CoordinateConverter.cs
-│   ├── SocketTypeResolver.cs
+│       ├── NumberUpDownEditor.razor
+│       ├── BoolEditor.razor
+│       ├── DropdownEditor.razor
+│       ├── ListEditor.razor
+│       ├── ButtonEditor.razor
+│       ├── TextAreaEditor.razor
+│       └── ImageEditor.razor
+├── Services/              # Blazor-specific services
+│   ├── NodeEditorServiceExtensions.cs  # AddNodeEditor() DI setup
 │   ├── Editors/           # Custom editor system
 │   │   ├── INodeCustomEditor.cs
-│   │   └── NodeEditorCustomEditorRegistry.cs
-│   ├── Execution/         # Execution engine
-│   │   ├── NodeExecutionService.cs
-│   │   ├── ExecutionPlanner.cs
-│   │   ├── NodeMethodInvoker.cs
-│   │   └── ...
-│   ├── Plugins/           # Plugin system
-│   │   ├── PluginLoader.cs
-│   │   ├── INodePlugin.cs
-│   │   └── ...
-│   ├── Registry/          # Node registry
-│   │   ├── NodeRegistryService.cs
-│   │   ├── NodeDiscoveryService.cs
-│   │   └── ...
-│   └── Serialization/     # Graph serialization
-│       ├── GraphSerializer.cs
-│       └── GraphSchemaMigrator.cs
-├── ViewModels/            # MVVM view models
-│   ├── NodeViewModel.cs
-│   └── SocketViewModel.cs
-└── wwwroot/               # Static assets
-    ├── css/
-    └── exampleJsInterop.js
+│   │   ├── SocketEditorContext.cs
+│   │   ├── NodeEditorCustomEditorRegistry.cs
+│   │   └── *EditorDefinition.cs    # Editor implementations
+│   └── Infrastructure/    # Blazor interaction handlers
+│       ├── ICanvasInteractionHandler.cs
+│       └── CanvasInteractionHandler.cs
+├── docs/                  # Component library documentation
+│   ├── API.md
+│   ├── Architecture.md
+│   ├── CUSTOM-NODES.md
+│   ├── MIGRATION.md
+│   ├── Plugins.md
+│   ├── TROUBLESHOOTING.md
+│   ├── WiringAndEventFlow.md
+│   └── PluginExtensibilityRoadmap.md
+└── wwwroot/               # Static assets (CSS, JS)
+    └── css/
+        └── node-editor.css
 ```
+
+> **Note:** Core types (models, ViewModels, services, execution engine, plugins, serialization, logging) are in the separate `NodeEditor.Net` project with `NodeEditor.Net.*` namespaces.
 
 ## Testing
 

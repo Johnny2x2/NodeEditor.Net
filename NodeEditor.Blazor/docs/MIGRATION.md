@@ -186,7 +186,7 @@ var app = builder.Build();
 ```razor
 @page "/editor"
 @using NodeEditor.Blazor.Components
-@using NodeEditor.Blazor.Services
+@using NodeEditor.Net.Services
 @inject NodeEditorState EditorState
 
 <PageTitle>Node Editor</PageTitle>
@@ -226,7 +226,7 @@ public class MathContext : INodesContext
 
 **After (Blazor):**
 ```csharp
-using NodeEditor.Blazor.Models;
+using NodeEditor.Net.Services.Registry;
 
 public class MathContext : INodeContext
 {

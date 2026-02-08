@@ -9,7 +9,7 @@ Open the app, click "Plugins", and install any plugins you want.
 
 ## For Plugin Developers
 
-See the SDK guide: [docs/PLUGIN_SDK.md](../docs/PLUGIN_SDK.md)
+See the SDK guide: [docs/reference/PLUGIN_SDK.md](../docs/reference/PLUGIN_SDK.md)
 
 To publish your plugin to this repository:
 
