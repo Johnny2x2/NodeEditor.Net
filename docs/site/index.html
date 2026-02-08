@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="NodeEditor.Net — A powerful, event-driven visual node editor for .NET 10. Build interactive graph-based visual programming with execution engine, plugin marketplace, AI integration, and headless execution." />
+    <meta name="theme-color" content="#1e1e2e" />
+    <meta property="og:title" content="NodeEditor.Net — Visual Node Editor for .NET" />
+    <meta property="og:description" content="Build interactive graph-based visual programming with a full execution engine, plugin marketplace, AI integration, and headless execution." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="screenshots/editor-graph.png" />
+    <title>NodeEditor.Net — Visual Node Editor for .NET</title>
+    <link rel="icon" type="image/png" href="screenshots/logo.png" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ====== Navigation ====== -->
+<nav class="navbar" id="navbar">
+    <div class="nav-container">
+        <a href="#" class="nav-logo">
+            <img src="screenshots/logo.png" alt="NodeEditor.Net Logo" class="nav-logo-img" />
+            <span>NodeEditor<span class="accent">.Net</span></span>
+        </a>
+        <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+            <span></span><span></span><span></span>
+        </button>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="#features">Features</a></li>
+            <li><a href="#screenshots">Screenshots</a></li>
+            <li><a href="#quickstart">Quick Start</a></li>
+            <li><a href="#docs">Documentation</a></li>
+            <li><a href="#download">Download</a></li>
+            <li><a href="https://github.com/Johnny2x2/NodeEditor.Net" class="nav-github" target="_blank" rel="noopener">
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            </a></li>
+        </ul>
+    </div>
+</nav>
+
+<!-- ====== Hero Section ====== -->
+<section class="hero" id="hero">
+    <div class="hero-bg-grid"></div>
+    <div class="hero-glow"></div>
+    <div class="hero-content">
+        <div class="hero-badge">Open Source &middot; MIT License &middot; .NET 10</div>
+        <h1 class="hero-title">
+            Visual Node Editor<br />
+            <span class="hero-highlight">for .NET</span>
+        </h1>
+        <p class="hero-subtitle">
+            Build interactive, graph-based visual programming with a full execution engine,
+            plugin marketplace, AI integration, and headless execution support.
+        </p>
+        <div class="hero-actions">
+            <a href="#quickstart" class="btn btn-primary">Get Started</a>
+            <a href="https://github.com/Johnny2x2/NodeEditor.Net" class="btn btn-outline" target="_blank" rel="noopener">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" style="margin-right:6px;vertical-align:middle"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                View on GitHub
+            </a>
+        </div>
+        <div class="hero-screenshot">
+            <img src="screenshots/editor-graph.png" alt="NodeEditor.Net — Graph editor with connected nodes" />
+        </div>
+    </div>
+</section>
+
+<!-- ====== Features Section ====== -->
+<section class="features" id="features">
+    <div class="container">
+        <h2 class="section-title">Powerful Features</h2>
+        <p class="section-subtitle">Everything you need for visual programming in .NET</p>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🖱️</div>
+                <h3>Interactive Canvas</h3>
+                <p>Pan, zoom, drag nodes, box-select, and create connections with mouse or touch. Full multi-touch gesture support for mobile and tablet.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Execution Engine</h3>
+                <p>Run node graphs with parallel, sequential, or event-driven execution modes. Step-through debugging with pause and resume control.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔌</div>
+                <h3>Plugin System</h3>
+                <p>Dynamically load custom node types from external assemblies with full lifecycle management. Create plugins from the included template.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🏪</div>
+                <h3>Plugin Marketplace</h3>
+                <p>Browse, install, update, and manage plugins from local or remote repositories with cached metadata and version checking.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>AI Integration (MCP)</h3>
+                <p>Model Context Protocol server enables Claude, Cursor, and other AI assistants to programmatically build and execute node graphs.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🖥️</div>
+                <h3>Headless Execution</h3>
+                <p>Run node graphs programmatically without any UI — perfect for console apps, APIs, CI/CD pipelines, and automated workflows.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💾</div>
+                <h3>Serialization</h3>
+                <p>Save and load node graphs as JSON with version migration support. Export, import, and share graphs across projects.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <h3>Custom Editors</h3>
+                <p>9 built-in socket value editors (text, number, bool, dropdown, slider, image, etc.) plus extensibility for creating your own.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Variables &amp; Events</h3>
+                <p>Define graph-scoped variables with auto-generated Get/Set nodes. Create custom events with Trigger and Listener nodes.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Type System</h3>
+                <p>Type-safe socket connections with automatic type resolution and validation. Only compatible sockets can be connected.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h3>Viewport Culling</h3>
+                <p>Automatic performance optimization for large graphs. Only visible nodes are rendered, supporting 500+ nodes smoothly.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🧪</div>
+                <h3>Well Tested</h3>
+                <p>Comprehensive unit test coverage with bUnit + xUnit. 30+ test files covering state, execution, plugins, serialization, and components.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ====== Screenshots Section ====== -->
+<section class="screenshots" id="screenshots">
+    <div class="container">
+        <h2 class="section-title">See It in Action</h2>
+        <p class="section-subtitle">The WebHost UI provides a full-featured visual programming environment</p>
+        <div class="screenshots-grid">
+            <div class="screenshot-card">
+                <img src="screenshots/editor-graph.png" alt="Node graph with loops, lists, and string operations" loading="lazy" />
+                <div class="screenshot-caption">
+                    <h4>Graph Editor</h4>
+                    <p>Build complex graphs with loops, lists, strings, and parallel execution chains</p>
+                </div>
+            </div>
+            <div class="screenshot-card">
+                <img src="screenshots/editor-events.png" alt="Event-driven nodes with trigger and listener" loading="lazy" />
+                <div class="screenshot-caption">
+                    <h4>Event System</h4>
+                    <p>Create event-driven flows with custom Trigger and Listener nodes</p>
+                </div>
+            </div>
+            <div class="screenshot-card">
+                <img src="screenshots/editor-canvas.png" alt="Clean canvas with Start node and panels" loading="lazy" />
+                <div class="screenshot-caption">
+                    <h4>Clean Workspace</h4>
+                    <p>Variables, Events, and Properties panels alongside an intuitive canvas</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ====== Architecture Section ====== -->
+<section class="architecture" id="architecture">
+    <div class="container">
+        <h2 class="section-title">3-Tier Architecture</h2>
+        <p class="section-subtitle">Clean separation of concerns for maximum flexibility</p>
+        <div class="arch-diagram">
+            <div class="arch-layer arch-layer--core">
+                <div class="arch-layer-label">Core</div>
+                <h3>NodeEditor.Net</h3>
+                <p>Pure .NET 10 class library — execution engine, models, ViewModels, registry, plugins, serialization, logging, and headless execution. No Blazor dependency.</p>
+            </div>
+            <div class="arch-arrow">▲</div>
+            <div class="arch-layer arch-layer--ui">
+                <div class="arch-layer-label">UI</div>
+                <h3>NodeEditor.Blazor</h3>
+                <p>Razor component library — canvas, nodes, editors, marketplace UI, Blazor-specific services, and DI setup via <code>AddNodeEditor()</code>.</p>
+            </div>
+            <div class="arch-arrow">▲</div>
+            <div class="arch-layer arch-layer--host">
+                <div class="arch-layer-label">Host</div>
+                <h3>NodeEditor.Blazor.WebHost</h3>
+                <p>Blazor Server host application — the runnable demo with MCP integration, graph presets, and plugin marketplace.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ====== Quick Start Section ====== -->
+<section class="quickstart" id="quickstart">
+    <div class="container">
+        <h2 class="section-title">Quick Start</h2>
+        <p class="section-subtitle">Get up and running in three simple steps</p>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3>Register Services</h3>
+                    <pre><code><span class="kw">using</span> NodeEditor.Blazor.Services;
+
+<span class="kw">var</span> builder = WebApplication.CreateBuilder(args);
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+builder.Services.<span class="fn">AddNodeEditor</span>();
+
+<span class="kw">var</span> app = builder.Build();</code></pre>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3>Add the Canvas</h3>
+                    <pre><code><span class="kw">@page</span> "/editor"
+<span class="kw">@using</span> NodeEditor.Blazor.Components
+<span class="kw">@using</span> NodeEditor.Net.Services
+<span class="kw">@inject</span> NodeEditorState EditorState
+
+&lt;<span class="fn">NodeEditorCanvas</span> State="<span class="str">@EditorState</span>" /&gt;</code></pre>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h3>Define Custom Nodes</h3>
+                    <pre><code><span class="kw">public sealed class</span> <span class="fn">MathNodes</span> : INodeContext
+{
+    [<span class="fn">Node</span>(<span class="str">"Add"</span>, category: <span class="str">"Math"</span>,
+         description: <span class="str">"Adds two numbers"</span>)]
+    <span class="kw">public void</span> <span class="fn">Add</span>(<span class="kw">double</span> A, <span class="kw">double</span> B,
+                    <span class="kw">out double</span> Result)
+    {
+        Result = A + B;
+    }
+}</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ====== Built-in Nodes Section ====== -->
+<section class="nodes-section" id="nodes">
+    <div class="container">
+        <h2 class="section-title">Built-in Standard Nodes</h2>
+        <p class="section-subtitle">Ready-to-use nodes for common operations</p>
+        <div class="nodes-grid">
+            <div class="node-category">
+                <h4>🔢 Math</h4>
+                <ul><li>Add</li><li>Subtract</li><li>Multiply</li><li>Divide</li><li>Power</li></ul>
+            </div>
+            <div class="node-category">
+                <h4>📝 Strings</h4>
+                <ul><li>Concat</li><li>Split</li><li>Replace</li><li>Length</li><li>Contains</li></ul>
+            </div>
+            <div class="node-category">
+                <h4>📋 Lists</h4>
+                <ul><li>Map</li><li>Filter</li><li>Reduce</li><li>ForEach</li><li>Create / Add</li></ul>
+            </div>
+            <div class="node-category">
+                <h4>🔀 Conditions</h4>
+                <ul><li>If / Branch</li><li>Switch</li><li>Comparison</li><li>Equality</li></ul>
+            </div>
+            <div class="node-category">
+                <h4>🔄 Flow</h4>
+                <ul><li>For Loop</li><li>Parallel</li><li>Sequence</li><li>Delay</li></ul>
+            </div>
+            <div class="node-category">
+                <h4>🐛 Debug</h4>
+                <ul><li>Print</li><li>Consume</li><li>Marker</li></ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ====== Documentation Section ====== -->
+<section class="docs" id="docs">
+    <div class="container">
+        <h2 class="section-title">Documentation</h2>
+        <p class="section-subtitle">Comprehensive guides and references for every feature</p>
+        <div class="docs-grid">
+            <div class="docs-group">
+                <h3>📖 Guides</h3>
+                <ul>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/GETTING_STARTED.md" target="_blank" rel="noopener">Getting Started</a><span>Step-by-step setup and first graph tutorial</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/FEATURES.md" target="_blank" rel="noopener">Features Overview</a><span>Comprehensive guide to all features</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/FAQ.md" target="_blank" rel="noopener">FAQ</a><span>Frequently asked questions</span></li>
+                </ul>
+            </div>
+            <div class="docs-group">
+                <h3>📚 Core Reference</h3>
+                <ul>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/reference/EXECUTION_ENGINE.md" target="_blank" rel="noopener">Execution Engine</a><span>Graph execution, planning, and runtime</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/reference/EventBasedArchitecture.md" target="_blank" rel="noopener">Event-Based Architecture</a><span>State management patterns</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/reference/VARIABLES_AND_EVENTS.md" target="_blank" rel="noopener">Variables &amp; Events</a><span>Graph-scoped variables and events</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/reference/HEADLESS_EXECUTION.md" target="_blank" rel="noopener">Headless Execution</a><span>Running graphs without a UI</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/reference/LOGGING.md" target="_blank" rel="noopener">Logging</a><span>Channel-based structured logging</span></li>
+                </ul>
+            </div>
+            <div class="docs-group">
+                <h3>🔌 Plugins</h3>
+                <ul>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/reference/PLUGIN_SDK.md" target="_blank" rel="noopener">Plugin SDK</a><span>Create plugins from the template</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/reference/PLUGIN_CUSTOMIZATION.md" target="_blank" rel="noopener">Plugin Customization</a><span>Full plugin capabilities reference</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/reference/MARKETPLACE.md" target="_blank" rel="noopener">Marketplace</a><span>Browse, install, and publish plugins</span></li>
+                </ul>
+            </div>
+            <div class="docs-group">
+                <h3>🤖 AI &amp; Integration</h3>
+                <ul>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/NodeEditor.Mcp/README.md" target="_blank" rel="noopener">MCP Integration</a><span>Model Context Protocol server</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/reference/MCP_STATE_BRIDGE.md" target="_blank" rel="noopener">MCP State Bridge</a><span>Connecting MCP to the live editor</span></li>
+                </ul>
+            </div>
+            <div class="docs-group">
+                <h3>🎨 Blazor Components</h3>
+                <ul>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/NodeEditor.Blazor/docs/API.md" target="_blank" rel="noopener">API Reference</a><span>Complete component and service API</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/NodeEditor.Blazor/docs/CUSTOM-NODES.md" target="_blank" rel="noopener">Custom Nodes Tutorial</a><span>Creating custom nodes and editors</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/NodeEditor.Blazor/docs/WiringAndEventFlow.md" target="_blank" rel="noopener">Wiring &amp; Event Flow</a><span>Component communication patterns</span></li>
+                    <li><a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/NodeEditor.Blazor/docs/TROUBLESHOOTING.md" target="_blank" rel="noopener">Troubleshooting</a><span>Common issues and solutions</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ====== Download Section ====== -->
+<section class="download" id="download">
+    <div class="container">
+        <h2 class="section-title">Get NodeEditor.Net</h2>
+        <p class="section-subtitle">Clone the repository and start building visual programming experiences</p>
+        <div class="download-options">
+            <div class="download-card">
+                <h3>📦 Clone &amp; Build</h3>
+                <pre><code>git clone https://github.com/Johnny2x2/NodeEditor.Net.git
+cd NodeEditor.Net
+dotnet build NodeEditor.slnx
+dotnet run --project NodeEditor.Blazor.WebHost</code></pre>
+            </div>
+            <div class="download-card">
+                <h3>🧪 Run Tests</h3>
+                <pre><code>dotnet test NodeEditor.Blazor.Tests</code></pre>
+            </div>
+            <div class="download-card">
+                <h3>🤖 MCP Server</h3>
+                <pre><code>dotnet run --project NodeEditor.Mcp</code></pre>
+            </div>
+        </div>
+        <div class="download-cta">
+            <a href="https://github.com/Johnny2x2/NodeEditor.Net" class="btn btn-primary btn-lg" target="_blank" rel="noopener">
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style="margin-right:8px;vertical-align:middle"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                View on GitHub
+            </a>
+            <a href="https://github.com/Johnny2x2/NodeEditor.Net/releases" class="btn btn-outline btn-lg" target="_blank" rel="noopener">
+                Releases
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- ====== Footer ====== -->
+<footer class="footer">
+    <div class="container">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <img src="screenshots/logo.png" alt="NodeEditor.Net Logo" class="footer-logo" />
+                <span>NodeEditor.Net</span>
+            </div>
+            <p class="footer-text">Open source visual node editor for .NET &middot; MIT License</p>
+            <div class="footer-links">
+                <a href="https://github.com/Johnny2x2/NodeEditor.Net" target="_blank" rel="noopener">GitHub</a>
+                <a href="https://github.com/Johnny2x2/NodeEditor.Net/issues" target="_blank" rel="noopener">Issues</a>
+                <a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/LICENSE.txt" target="_blank" rel="noopener">License</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script>
+// Navbar scroll effect
+const navbar = document.getElementById('navbar');
+window.addEventListener('scroll', () => {
+    navbar.classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// Mobile nav toggle
+const navToggle = document.getElementById('navToggle');
+const navLinks = document.getElementById('navLinks');
+navToggle.addEventListener('click', () => {
+    navLinks.classList.toggle('open');
+    navToggle.classList.toggle('open');
+});
+
+// Close mobile nav on link click
+navLinks.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+        navLinks.classList.remove('open');
+        navToggle.classList.remove('open');
+    });
+});
+
+// Smooth scroll
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+});
+
+// Intersection Observer for fade-in animations
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+        }
+    });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.feature-card, .screenshot-card, .step, .docs-group, .download-card, .arch-layer, .node-category').forEach(el => {
+    el.classList.add('fade-in');
+    observer.observe(el);
+});
+</script>
+
+</body>
+</html>
