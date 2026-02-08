@@ -1,3 +1,4 @@
+![image](https://github.com/Johnny2x2/NodeEditor.Net/blob/main/Assets/Full-Logo.ico)
 # NodeEditor.Net
 
 [![CI](https://github.com/Johnny2x2/NodeEditor.Net/actions/workflows/ci.yml/badge.svg)](https://github.com/Johnny2x2/NodeEditor.Net/actions/workflows/ci.yml)
