@@ -1,6 +1,7 @@
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services;
-using NodeEditor.Blazor.ViewModels;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Infrastructure;
+using NodeEditor.Net.ViewModels;
 
 namespace NodeEditor.Blazor.Tests;
 

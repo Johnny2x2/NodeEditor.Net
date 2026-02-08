@@ -1,9 +1,9 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using NodeEditor.Blazor.Components;
-using NodeEditor.Blazor.Models;
+using NodeEditor.Net.Models;
 using NodeEditor.Blazor.Services.Editors;
-using NodeEditor.Blazor.ViewModels;
+using NodeEditor.Net.ViewModels;
 
 namespace NodeEditor.Blazor.Tests;
 

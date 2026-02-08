@@ -1,5 +1,5 @@
 using System.Text.Json;
-using NodeEditor.Blazor.Models;
+using NodeEditor.Net.Models;
 
 namespace NodeEditor.Blazor.Tests;
 

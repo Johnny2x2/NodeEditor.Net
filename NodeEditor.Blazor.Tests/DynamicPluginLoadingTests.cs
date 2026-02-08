@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services;
-using NodeEditor.Blazor.Services.Execution;
-using NodeEditor.Blazor.Services.Plugins;
-using NodeEditor.Blazor.Services.Registry;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Plugins;
+using NodeEditor.Net.Services.Registry;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -96,7 +96,7 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         foreach (var file in Directory.GetFiles(sourceDir))
         {
             var fileName = Path.GetFileName(file);
-            if (fileName.Equals("NodeEditor.Blazor.dll", StringComparison.OrdinalIgnoreCase))
+            if (fileName.Equals("NodeEditor.Net.dll", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -316,7 +316,7 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         object? actualContext = nodeContext;
         System.Reflection.MethodInfo? methodInfo = null;
         
-        if (nodeContext is NodeEditor.Blazor.Services.Execution.CompositeNodeContext composite)
+        if (nodeContext is NodeEditor.Net.Services.Execution.Context.CompositeNodeContext composite)
         {
             output.WriteLine($"NodeContext is CompositeNodeContext with {composite.Contexts.Count} contexts");
             

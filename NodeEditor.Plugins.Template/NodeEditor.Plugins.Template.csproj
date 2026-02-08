@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
+    <ProjectReference Include="..\NodeEditor.Net\NodeEditor.Net.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Components;
-using NodeEditor.Blazor.Models;
+using NodeEditor.Net.Models;
 using NodeEditor.Blazor.Services.Editors;
 using NodeEditor.Plugins.TestA.Components.Editors;
 

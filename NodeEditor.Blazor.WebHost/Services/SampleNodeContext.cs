@@ -1,5 +1,5 @@
-using NodeEditor.Blazor.Services.Execution;
-using NodeEditor.Blazor.Services.Registry;
+using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Blazor.WebHost.Services;
 

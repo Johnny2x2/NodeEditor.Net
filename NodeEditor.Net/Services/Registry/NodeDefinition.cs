@@ -1,0 +1,12 @@
+using NodeEditor.Net.Models;
+
+namespace NodeEditor.Net.Services.Registry;
+
+public sealed record class NodeDefinition(
+    string Id,
+    string Name,
+    string Category,
+    string Description,
+    IReadOnlyList<SocketData> Inputs,
+    IReadOnlyList<SocketData> Outputs,
+    Func<NodeData> Factory);

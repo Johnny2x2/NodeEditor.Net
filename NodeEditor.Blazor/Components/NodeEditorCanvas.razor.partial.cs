@@ -1,5 +1,5 @@
 using Microsoft.JSInterop;
-using NodeEditor.Blazor.Models;
+using NodeEditor.Net.Models;
 
 namespace NodeEditor.Blazor.Components;
 

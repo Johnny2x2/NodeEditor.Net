@@ -1,12 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NodeEditor.Blazor.Services;
-using NodeEditor.Blazor.Services.Execution;
-using NodeEditor.Blazor.Services.Logging;
-using NodeEditor.Blazor.Services.Plugins;
-using NodeEditor.Blazor.Services.Plugins.Marketplace;
-using NodeEditor.Blazor.Services.Registry;
-using NodeEditor.Blazor.Services.Serialization;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Logging;
+using NodeEditor.Net.Services.Plugins;
+using NodeEditor.Net.Services.Plugins.Marketplace;
+using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.Services.Serialization;
 using NodeEditor.Mcp.Abilities;
 using NodeEditor.Mcp.Tools;
 

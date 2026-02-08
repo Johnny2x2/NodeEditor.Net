@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Components.Web;
 using System;
 using NodeEditor.Blazor.Components;
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services.Registry;
-using NodeEditor.Blazor.ViewModels;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Infrastructure;
+using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.ViewModels;
 
 namespace NodeEditor.Blazor.Services;
 

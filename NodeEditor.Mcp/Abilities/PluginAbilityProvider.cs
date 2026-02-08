@@ -1,6 +1,6 @@
 using System.Text.Json;
-using NodeEditor.Blazor.Services.Plugins;
-using NodeEditor.Blazor.Services.Plugins.Marketplace;
+using NodeEditor.Net.Services.Plugins;
+using NodeEditor.Net.Services.Plugins.Marketplace;
 
 namespace NodeEditor.Mcp.Abilities;
 

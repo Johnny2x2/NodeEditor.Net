@@ -1,10 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
-using NodeEditor.Blazor.Adapters;
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services.Execution;
-using NodeEditor.Blazor.Services.Logging;
-using NodeEditor.Blazor.Services.Serialization;
-using NodeEditor.Blazor.Services.Plugins.Marketplace;
+using NodeEditor.Net.Adapters;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Infrastructure;
+using NodeEditor.Net.Services.Logging;
+using NodeEditor.Net.Services.Plugins;
+using NodeEditor.Net.Services.Plugins.Marketplace;
+using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.Services.Serialization;
 
 namespace NodeEditor.Blazor.Services;
 
@@ -52,9 +56,9 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<INodeEditorLogger, NodeEditorLogger>();
 
         // Plugin infrastructure
-        services.AddOptions<Plugins.PluginOptions>();
-        services.AddSingleton<Plugins.IPluginServiceRegistry, Plugins.PluginServiceRegistry>();
-        services.AddSingleton<Plugins.IPluginLoader, Plugins.PluginLoader>();
+        services.AddOptions<PluginOptions>();
+        services.AddSingleton<IPluginServiceRegistry, PluginServiceRegistry>();
+        services.AddSingleton<IPluginLoader, PluginLoader>();
 
         // Marketplace
         services.AddOptions<MarketplaceOptions>();
@@ -69,7 +73,7 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<IPluginInstallationService, PluginInstallationService>();
 
         // Event bus (bridges state events to plugins)
-        services.AddScoped<Plugins.IPluginEventBus, Plugins.PluginEventBus>();
+        services.AddScoped<IPluginEventBus, PluginEventBus>();
 
         // Coordinate converter (tied to state)
         services.AddScoped<ICoordinateConverter, CoordinateConverter>();
@@ -96,8 +100,8 @@ public static class NodeEditorServiceExtensions
         });
 
         // Node registry & discovery
-        services.AddSingleton<Registry.NodeDiscoveryService>();
-        services.AddSingleton<Registry.INodeRegistryService, Registry.NodeRegistryService>();
+        services.AddSingleton<NodeDiscoveryService>();
+        services.AddSingleton<INodeRegistryService, NodeRegistryService>();
 
         // Node context factory & registry
         services.AddSingleton<INodeContextFactory, NodeContextFactory>();
@@ -122,12 +126,12 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<ExecutionPlanner>();
         services.AddSingleton<BackgroundExecutionQueue>();
         services.AddScoped<BackgroundExecutionWorker>();
-        services.AddScoped<Execution.INodeExecutionService, Execution.NodeExecutionService>();
-        services.AddScoped<Execution.HeadlessGraphRunner>();
+        services.AddScoped<INodeExecutionService, NodeExecutionService>();
+        services.AddScoped<HeadlessGraphRunner>();
 
         // Serialization services
         services.AddSingleton<GraphSchemaMigrator>();
-        services.AddScoped<Serialization.IGraphSerializer, Serialization.GraphSerializer>();
+        services.AddScoped<IGraphSerializer, GraphSerializer>();
 
         // Variable node factory (bridges graph variables to node definitions)
         services.AddScoped<VariableNodeFactory>();

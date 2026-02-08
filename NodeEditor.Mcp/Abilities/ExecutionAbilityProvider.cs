@@ -1,7 +1,7 @@
 using System.Text.Json;
-using NodeEditor.Blazor.Services;
-using NodeEditor.Blazor.Services.Execution;
-using NodeEditor.Blazor.Services.Serialization;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Serialization;
 
 namespace NodeEditor.Mcp.Abilities;
 

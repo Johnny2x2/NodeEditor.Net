@@ -1,4 +1,4 @@
-using NodeEditor.Blazor.Services;
+using NodeEditor.Net.Services;
 
 namespace NodeEditor.Blazor.Tests;
 

@@ -4,13 +4,13 @@
 @rendermode InteractiveServer
 @using NodeEditor.Blazor.Components
 @using NodeEditor.Blazor.Components.Marketplace
-@using NodeEditor.Blazor.Models
+@using NodeEditor.Net.Models
 @using NodeEditor.Blazor.Services
-@using NodeEditor.Blazor.Services.Registry
-@using NodeEditor.Blazor.ViewModels
-@using NodeEditor.Blazor.Services.Execution
-@using NodeEditor.Blazor.Services.Logging
-@using NodeEditor.Blazor.Services.Serialization
+@using NodeEditor.Net.Services.Registry
+@using NodeEditor.Net.ViewModels
+@using NodeEditor.Net.Services.Execution
+@using NodeEditor.Net.Services.Logging
+@using NodeEditor.Net.Services.Serialization
 @inject INodeEditorState EditorState
 @inject INodeExecutionService ExecutionService
 @inject INodeRegistryService Registry
@@ -25,7 +25,7 @@
 @inject INodeEditorStateBridge StateBridge
 @inject NavigationManager Nav
 @using Microsoft.Extensions.Options
-@using NodeEditor.Blazor.Services.Mcp
+@using NodeEditor.Net.Services.Mcp
 @inject IOptions<McpOptions> McpOptionsAccessor
 
 <PageTitle>Node Editor</PageTitle>

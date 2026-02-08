@@ -1,6 +1,6 @@
 using System.Text.Json;
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
 
 namespace NodeEditor.Mcp.Abilities;
 

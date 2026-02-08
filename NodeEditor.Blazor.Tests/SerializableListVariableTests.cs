@@ -1,9 +1,10 @@
 using System.Text.Json;
 using System.Linq;
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Infrastructure;
 using NodeEditor.Blazor.Services.Editors;
-using NodeEditor.Blazor.Services.Execution;
+using NodeEditor.Net.Services.Execution;
 
 namespace NodeEditor.Blazor.Tests;
 
@@ -283,7 +284,7 @@ public sealed class SerializableListVariableTests
         });
 
         var socket = new SocketData("Items",
-            typeof(SerializableList).FullName ?? "NodeEditor.Blazor.Models.SerializableList",
+            typeof(SerializableList).FullName ?? "NodeEditor.Net.Models.SerializableList",
             true, false);
 
         var editor = registry.GetEditor(socket);
@@ -346,8 +347,8 @@ public sealed class SerializableListVariableTests
     public void VariableNodeFactory_RegistersGetAndSetForListVariable()
     {
         var state = new NodeEditorState();
-        var registry = new NodeEditor.Blazor.Services.Registry.NodeRegistryService(
-            new NodeEditor.Blazor.Services.Registry.NodeDiscoveryService());
+        var registry = new NodeEditor.Net.Services.Registry.NodeRegistryService(
+            new NodeEditor.Net.Services.Registry.NodeDiscoveryService());
         registry.EnsureInitialized(Array.Empty<System.Reflection.Assembly>());
 
         var factory = new VariableNodeFactory(registry, state);
@@ -382,8 +383,8 @@ public sealed class SerializableListVariableTests
     public void VariableNodeFactory_UpdatesDefinitionsOnTypeChange()
     {
         var state = new NodeEditorState();
-        var registry = new NodeEditor.Blazor.Services.Registry.NodeRegistryService(
-            new NodeEditor.Blazor.Services.Registry.NodeDiscoveryService());
+        var registry = new NodeEditor.Net.Services.Registry.NodeRegistryService(
+            new NodeEditor.Net.Services.Registry.NodeDiscoveryService());
         registry.EnsureInitialized(Array.Empty<System.Reflection.Assembly>());
 
         var factory = new VariableNodeFactory(registry, state);
@@ -527,7 +528,7 @@ public sealed class SerializableListVariableTests
     // ════════════════════════════════════════════════════════════════════
 
     [Theory]
-    [InlineData("NodeEditor.Blazor.Models.SerializableList", "List")]
+    [InlineData("NodeEditor.Net.Models.SerializableList", "List")]
     [InlineData("System.Double", "Num")]
     [InlineData("System.Int32", "Int")]
     [InlineData("System.String", "Str")]
@@ -540,7 +541,7 @@ public sealed class SerializableListVariableTests
     }
 
     [Theory]
-    [InlineData("NodeEditor.Blazor.Models.SerializableList", "list")]
+    [InlineData("NodeEditor.Net.Models.SerializableList", "list")]
     [InlineData("System.Double", "number")]
     [InlineData("System.Int32", "int")]
     [InlineData("System.String", "string")]
@@ -559,7 +560,7 @@ public sealed class SerializableListVariableTests
         "System.Int32" => "Int",
         "System.String" => "Str",
         "System.Boolean" => "Bool",
-        "NodeEditor.Blazor.Models.SerializableList" => "List",
+        "NodeEditor.Net.Models.SerializableList" => "List",
         "System.Object" => "Obj",
         _ => typeName.Split('.').Last()
     };
@@ -570,7 +571,7 @@ public sealed class SerializableListVariableTests
         "System.Int32" => "int",
         "System.String" => "string",
         "System.Boolean" => "bool",
-        "NodeEditor.Blazor.Models.SerializableList" => "list",
+        "NodeEditor.Net.Models.SerializableList" => "list",
         "System.Object" => "object",
         _ => "unknown"
     };
@@ -579,17 +580,17 @@ public sealed class SerializableListVariableTests
     //  Private helpers
     // ════════════════════════════════════════════════════════════════════
 
-    private static NodeEditor.Blazor.Services.Serialization.GraphSerializer CreateSerializer()
+    private static NodeEditor.Net.Services.Serialization.GraphSerializer CreateSerializer()
     {
-        var registry = new NodeEditor.Blazor.Services.Registry.NodeRegistryService(
-            new NodeEditor.Blazor.Services.Registry.NodeDiscoveryService());
+        var registry = new NodeEditor.Net.Services.Registry.NodeRegistryService(
+            new NodeEditor.Net.Services.Registry.NodeDiscoveryService());
         registry.EnsureInitialized(Array.Empty<System.Reflection.Assembly>());
 
         var resolver = new SocketTypeResolver();
         resolver.Register<SerializableList>();
         var validator = new ConnectionValidator(resolver);
-        var migrator = new NodeEditor.Blazor.Services.Serialization.GraphSchemaMigrator();
+        var migrator = new NodeEditor.Net.Services.Serialization.GraphSchemaMigrator();
 
-        return new NodeEditor.Blazor.Services.Serialization.GraphSerializer(registry, validator, migrator);
+        return new NodeEditor.Net.Services.Serialization.GraphSerializer(registry, validator, migrator);
     }
 }

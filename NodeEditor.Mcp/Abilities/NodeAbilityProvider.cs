@@ -1,8 +1,8 @@
 using System.Text.Json;
-using NodeEditor.Blazor.Models;
-using NodeEditor.Blazor.Services;
-using NodeEditor.Blazor.Services.Registry;
-using NodeEditor.Blazor.ViewModels;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.ViewModels;
 
 namespace NodeEditor.Mcp.Abilities;
 

@@ -1,4 +1,4 @@
-using NodeEditor.Blazor.Services.Mcp;
+using NodeEditor.Net.Services.Mcp;
 
 namespace NodeEditor.Blazor.Tests;
 
