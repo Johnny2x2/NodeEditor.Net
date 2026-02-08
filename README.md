@@ -1,9 +1,9 @@
-# NodeEditor.Blazor
+# NodeEditorMax
 
 [![CI](https://github.com/Johnny2x2/NodeEditorMax/actions/workflows/ci.yml/badge.svg)](https://github.com/Johnny2x2/NodeEditorMax/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.txt)
 
-A powerful, event-driven **node editor component library** for Blazor, supporting interactive graph-based visual programming with node execution, plugin extensibility, and serialization.
+A powerful, event-driven **node editor** for .NET, supporting interactive graph-based visual programming with node execution, plugin extensibility, and serialization.
 
 ## Features
 
@@ -65,9 +65,18 @@ public sealed class MathNodes : INodeContext
 
 ## Project Structure
 
+```
+NodeEditor.Net              (pure .NET 10 class library — no Blazor SDK)
+  ↑
+NodeEditor.Blazor           (Razor component library — reusable Blazor UI)
+  ↑
+NodeEditor.Blazor.WebHost   (Blazor Server host app — the runnable demo)
+```
+
 | Project | Description |
 |---------|-------------|
-| **NodeEditor.Blazor** | Core component library — models, ViewModels, services, and Razor components |
+| **NodeEditor.Net** | Pure .NET 10 core library — engine, models, registry, plugins, serialization. Use this to run node graphs in any .NET app (console, API, WPF, MAUI) without Blazor. |
+| **NodeEditor.Blazor** | Razor component library — Blazor UI components and Blazor-specific services |
 | **NodeEditor.Blazor.WebHost** | Blazor Server host application for running the editor |
 | **NodeEditor.Blazor.Tests** | Unit and integration tests (bUnit + xUnit) |
 | **NodeEditor.Mcp** | Model Context Protocol server for AI-assisted graph editing |
@@ -90,12 +99,11 @@ dotnet test NodeEditor.Blazor.Tests/NodeEditor.Blazor.Tests.csproj
 
 ## Architecture
 
-The library uses an **event-based MVVM** architecture optimized for Blazor's rendering model:
+The library uses a **3-tier, event-based MVVM** architecture:
 
-- **Models** (`NodeData`, `ConnectionData`, `SocketData`) — Immutable data records
-- **ViewModels** (`NodeViewModel`, `SocketViewModel`) — Bindable wrappers with change notifications
-- **Services** (`NodeEditorState`, `NodeExecutionService`, `GraphSerializer`) — Centralized state and logic
-- **Components** (`NodeEditorCanvas`, `NodeComponent`, `ConnectionPath`) — Razor UI layer
+- **NodeEditor.Net** (core) — Models, ViewModels, services (`NodeEditorState`, `NodeExecutionService`, `GraphSerializer`), plugin system, and registry. No Blazor dependency.
+- **NodeEditor.Blazor** (UI) — Razor components (`NodeEditorCanvas`, `NodeComponent`, `ConnectionPath`), Blazor-specific editors, and DI setup.
+- **NodeEditor.Blazor.WebHost** (host) — Blazor Server application that wires everything together.
 
 Nodes are discovered via `[Node]` attributes on `INodeContext` methods and registered through `NodeRegistryService`. Plugins implement `INodePlugin` and are loaded dynamically at runtime.
 

@@ -1,7 +1,7 @@
 # NodeEditorMax — Architecture Review & Improvement Plan
 
 > **Date:** February 6, 2026  
-> **Scope:** Full code review of `NodeEditor.Blazor` component library — strategy/swappability patterns, state–ViewModel coupling, headless execution path, and modernization roadmap.
+> **Scope:** Full code review of `NodeEditor.Net` core library + `NodeEditor.Blazor` component library — strategy/swappability patterns, state–ViewModel coupling, headless execution path, and modernization roadmap.
 
 ---
 
@@ -76,7 +76,13 @@
 
 ## 1. Project Overview
 
-NodeEditor.Blazor is a **Blazor component library** for building visual node-based editors. Key capabilities:
+NodeEditorMax is a **3-tier .NET architecture** for building visual node-based editors:
+
+- **NodeEditor.Net** — Pure .NET 10 core library (models, ViewModels, services, execution, plugins, serialization). No Blazor dependency.
+- **NodeEditor.Blazor** — Razor component library (Blazor UI components, Blazor-specific editors, DI setup).
+- **NodeEditor.Blazor.WebHost** — Blazor Server host application.
+
+Key capabilities:
 
 - **Node creation** — nodes discovered via `[Node]` attributes on `INodeContext` methods, registered through `NodeRegistryService`
 - **Execution pipelines** — sequential and parallel execution modes via `NodeExecutionService` + `ExecutionPlanner`
@@ -97,27 +103,27 @@ NodeEditor.Blazor is a **Blazor component library** for building visual node-bas
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│                     Razor Components                           │
+│              NodeEditor.Blazor — Razor Components              │
 │  NodeEditorCanvas, NodeComponent, ConnectionPath, SocketComponent│
 │  ContextMenu, NodePropertiesPanel, VariablesPanel              │
 │  (all inject concrete services directly)                       │
 └──────────────────────────┬────────────────────────────────────┘
                            │ @inject / [CascadingParameter]
 ┌──────────────────────────▼────────────────────────────────────┐
-│                     ViewModels                                 │
+│              NodeEditor.Net — ViewModels                       │
 │  NodeViewModel (wraps NodeData + Position/Size/Selection)      │
 │  SocketViewModel (wraps SocketData + mutable Value)            │
 │  ViewModelBase (INotifyPropertyChanged)                        │
 └──────────────────────────┬────────────────────────────────────┘
                            │ .Data property
 ┌──────────────────────────▼────────────────────────────────────┐
-│                     Models (Pure Records)                       │
+│              NodeEditor.Net — Models (Pure Records)            │
 │  NodeData, SocketData, ConnectionData, GraphVariable           │
 │  Point2D, Size2D, Rect2D, SocketValue, NodeDefinition          │
 └──────────────────────────┬────────────────────────────────────┘
                            │
 ┌──────────────────────────▼────────────────────────────────────┐
-│                     Services                                   │
+│              NodeEditor.Net — Services                         │
 │  NodeEditorState (central store, holds NodeViewModel[])        │
 │  NodeRegistryService, NodeDiscoveryService                     │
 │  SocketTypeResolver, ConnectionValidator                       │
@@ -159,7 +165,7 @@ NodeEditor.Blazor is a **Blazor component library** for building visual node-bas
 
 ### 4.1 DI Registration Audit
 
-File: `NodeEditor.Blazor/Services/NodeEditorServiceExtensions.cs` (~159 lines)
+File: `NodeEditor.Blazor/Services/NodeEditorServiceExtensions.cs` (~159 lines) — registers services from both `NodeEditor.Net` and `NodeEditor.Blazor`.
 
 Out of **~30 distinct service registrations**, only **~10 use interface-based registration**. The remaining ~20 are registered and resolved by concrete type. Additionally, the two `AddNodeEditor` overloads duplicate nearly identical registration blocks — any new service must be added in both places.
 
@@ -388,9 +394,9 @@ JSON → Deserialize to GraphData (pure model)
 A pure model representing a complete serializable graph, including layout data:
 
 ```csharp
-// NodeEditor.Blazor/Models/GraphData.cs
+// NodeEditor.Net/Models/GraphData.cs
 
-namespace NodeEditor.Blazor.Models;
+namespace NodeEditor.Net.Models;
 
 /// <summary>
 /// Pure data representation of a complete node graph.
@@ -481,9 +487,9 @@ public void LoadFromGraphData(GraphData graphData)
 A lightweight static or injectable helper that goes straight from `GraphData` → execution:
 
 ```csharp
-// NodeEditor.Blazor/Services/Execution/HeadlessGraphRunner.cs
+// NodeEditor.Net/Services/Execution/HeadlessGraphRunner.cs
 
-namespace NodeEditor.Blazor.Services.Execution;
+namespace NodeEditor.Net.Services.Execution;
 
 /// <summary>
 /// Executes a GraphData directly without any UI state, ViewModels, or Blazor DI.
@@ -565,7 +571,7 @@ public sealed class HeadlessGraphRunner
 Extract from `NodeEditorState` (~772 lines). Include all public events, properties, and methods:
 
 ```csharp
-// NodeEditor.Blazor/Services/INodeEditorState.cs
+// NodeEditor.Net/Services/Core/INodeEditorState.cs
 
 public interface INodeEditorState
 {
@@ -957,22 +963,29 @@ NodeEditorCanvas.razor (coordinator, ~200 lines)
 
 ## 7. File-by-File Reference
 
-### Services Layer
+> Files are listed by their project: **`NodeEditor.Net/`** for core library, **`NodeEditor.Blazor/`** for Blazor UI layer.
+
+### Services Layer (NodeEditor.Net)
+
+| File | Class | Sealed | Interface | Lines | Role |
+|------|-------|--------|-----------|-------|------|
+| `Services/Core/NodeEditorState.cs` | `NodeEditorState` | Sealed | `INodeEditorState` | ~772 | Central state store |
+| `Services/Core/SocketTypeResolver.cs` | `SocketTypeResolver` | Sealed | `ISocketTypeResolver` | ~31 | Type name → `Type` resolution |
+| `Services/Infrastructure/ConnectionValidator.cs` | `ConnectionValidator` | Sealed | `IConnectionValidator` | ~100 | Connection rule validation |
+| `Services/Infrastructure/CoordinateConverter.cs` | `CoordinateConverter` | Sealed | `ICoordinateConverter` | ~130 | Screen ↔ canvas coordinates |
+| `Services/Infrastructure/ViewportCuller.cs` | `ViewportCuller` | Sealed | `IViewportCuller` | ~80 | Visible node/connection filtering |
+| `Services/Infrastructure/TouchGestureHandler.cs` | `TouchGestureHandler` | No | `ITouchGestureHandler` | ~220 | Multi-touch gesture recognition |
+| `Services/Core/VariableNodeFactory.cs` | `VariableNodeFactory` | Sealed | **None** | ~130 | Creates Get/Set variable node definitions |
+| `Services/Core/SocketTypeDescriptor.cs` | `SocketTypeDescriptor` | Static | **None** | — | Socket type utility |
+| `Services/Core/PlatformGuard.cs` | `PlatformGuard` | Static | — | — | Platform checks |
+
+### Services Layer (NodeEditor.Blazor)
 
 | File | Class | Sealed | Interface | Lines | Role |
 |------|-------|--------|-----------|-------|------|
 | `Services/NodeEditorServiceExtensions.cs` | `NodeEditorServiceExtensions` | Static | — | ~159 | DI registration |
-| `Services/NodeEditorState.cs` | `NodeEditorState` | Sealed | **None** → `INodeEditorState` | ~772 | Central state store |
-| `Services/SocketTypeResolver.cs` | `SocketTypeResolver` | Sealed | **None** → `ISocketTypeResolver` | ~31 | Type name → `Type` resolution |
-| `Services/ConnectionValidator.cs` | `ConnectionValidator` | Sealed | **None** → `IConnectionValidator` | ~100 | Connection rule validation |
-| `Services/CoordinateConverter.cs` | `CoordinateConverter` | Sealed | **None** → `ICoordinateConverter` | ~130 | Screen ↔ canvas coordinates |
-| `Services/ViewportCuller.cs` | `ViewportCuller` | Sealed | **None** → `IViewportCuller` | ~80 | Visible node/connection filtering |
-| `Services/TouchGestureHandler.cs` | `TouchGestureHandler` | No | **None** → `ITouchGestureHandler` | ~220 | Multi-touch gesture recognition |
-| `Services/VariableNodeFactory.cs` | `VariableNodeFactory` | Sealed | **None** | ~130 | Creates Get/Set variable node definitions |
-| `Services/SocketTypeDescriptor.cs` | `SocketTypeDescriptor` | Static | **None** | — | Socket type utility |
-| `Services/PlatformGuard.cs` | `PlatformGuard` | Static | — | — | Platform checks |
 
-### Execution Layer
+### Execution Layer (NodeEditor.Net)
 
 | File | Class | Sealed | Interface | Lines | Role |
 |------|-------|--------|-----------|-------|------|
@@ -985,21 +998,21 @@ NodeEditorCanvas.razor (coordinator, ~200 lines)
 | `Services/Execution/StandardNodeExecutionContext.cs` | `StandardNodeExecutionContext` | Sealed | `INodeExecutionContext` | — | Dictionary-based implementation |
 | `Services/Execution/HeadlessGraphRunner.cs` | *(to create)* | — | — | — | **Phase 1: direct GraphData → execution** |
 
-### Serialization Layer
+### Serialization Layer (NodeEditor.Net)
 
 | File | Class | Sealed | Interface | Lines | Role |
 |------|-------|--------|-----------|-------|------|
 | `Services/Serialization/GraphSerializer.cs` | `GraphSerializer` | Sealed | **None** → `IGraphSerializer` | ~270 | JSON import/export |
 | `Services/Serialization/GraphSchemaMigrator.cs` | `GraphSchemaMigrator` | Sealed | **None** | ~39 | Schema version upgrades |
 
-### Registry Layer
+### Registry Layer (NodeEditor.Net)
 
 | File | Class | Sealed | Interface | Lines | Role |
 |------|-------|--------|-----------|-------|------|
 | `Services/Registry/NodeRegistryService.cs` | `NodeRegistryService` | Sealed | **None** → `INodeRegistryService` | ~155 | Node definition catalog |
 | `Services/Registry/NodeDiscoveryService.cs` | `NodeDiscoveryService` | Sealed | **None** | ~180 | Assembly scanning for `[Node]` methods |
 
-### Plugin Layer
+### Plugin Layer (NodeEditor.Net)
 
 | File | Class | Sealed | Interface | Lines | Role |
 |------|-------|--------|-----------|-------|------|
@@ -1008,7 +1021,7 @@ NodeEditorCanvas.razor (coordinator, ~200 lines)
 | `Services/Plugins/IPluginServiceRegistry.cs` | Interface | — | ✅ | ~12 | Per-plugin service isolation |
 | `Services/Plugins/PluginServiceRegistry.cs` | `PluginServiceRegistry` | Sealed | `IPluginServiceRegistry` ✅ | — | Implementation |
 
-### Editors Layer
+### Editors Layer (NodeEditor.Blazor)
 
 | File | Class | Interface | Lines | Role |
 |------|-------|-----------|-------|------|
@@ -1016,7 +1029,7 @@ NodeEditorCanvas.razor (coordinator, ~200 lines)
 | `Services/Editors/NodeEditorCustomEditorRegistry.cs` | `NodeEditorCustomEditorRegistry` | **None** | ~53 | Chain-of-responsibility resolver |
 | `Services/Editors/*.cs` (8 files) | Various | `INodeCustomEditor` ✅ | — | Bool, Text, Numeric, Dropdown, etc. |
 
-### Models
+### Models (NodeEditor.Net)
 
 | File | Class | Type | Lines | Role |
 |------|-------|------|-------|------|
@@ -1034,7 +1047,7 @@ NodeEditorCanvas.razor (coordinator, ~200 lines)
 | `Models/NodeCatalog.cs` | `NodeCatalog` | Sealed class | — | Hierarchical definition tree |
 | `Models/GraphDto.cs` | Multiple DTOs | Records | — | Serialization DTOs |
 
-### ViewModels
+### ViewModels (NodeEditor.Net)
 
 | File | Class | Lines | Role |
 |------|-------|-------|------|
@@ -1042,13 +1055,13 @@ NodeEditorCanvas.razor (coordinator, ~200 lines)
 | `ViewModels/SocketViewModel.cs` | `SocketViewModel` | ~37 | Wraps `SocketData` + mutable value |
 | `ViewModels/ViewModelBase.cs` | `ViewModelBase` | — | `INotifyPropertyChanged` base |
 
-### Adapters
+### Adapters (NodeEditor.Net)
 
 | File | Class | Static | Interface | Role |
 |------|-------|--------|-----------|------|
 | `Adapters/NodeAdapter.cs` | `NodeAdapter` | **Static** | **None** → `INodeAdapter` | Legacy format conversion |
 
-### Components
+### Components (NodeEditor.Blazor)
 
 | File | Concrete Injections | Role |
 |------|-------------------|------|
