@@ -96,8 +96,8 @@ public sealed class NodeDiscoveryService
 
 ## Acceptance criteria
 
-- [ ] `DiscoverFromAssemblies` finds `NodeBase` subclasses, ignores abstract types
-- [ ] `BuildDefinitionFromType` calls `Configure()` on temp instance and returns valid `NodeDefinition`
-- [ ] Types without parameterless constructor are skipped gracefully
-- [ ] Types that throw in `Configure()` are skipped gracefully
-- [ ] Solution builds with no references to old discovery logic
+- [x] `DiscoverFromAssemblies` finds `NodeBase` subclasses, ignores abstract types
+- [x] `BuildDefinitionFromType` calls `Configure()` on temp instance and returns valid `NodeDefinition`
+- [x] Types without parameterless constructor are skipped gracefully
+- [x] Types that throw in `Configure()` are skipped gracefully
+- [x] Solution builds with no references to old discovery logic

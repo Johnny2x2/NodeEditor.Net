@@ -56,7 +56,7 @@ public void EnsureInitialized(IEnumerable<Assembly> assemblies)
 
 ## Acceptance criteria
 
-- [ ] `RegisterFromAssembly` delegates to rewritten `NodeDiscoveryService`
-- [ ] `EnsureInitialized` also calls `StandardNodeRegistration.GetInlineDefinitions()`
-- [ ] All existing public API methods compile unchanged
-- [ ] `INodeRegistryService` interface has no breaking changes
+- [x] `RegisterFromAssembly` delegates to rewritten `NodeDiscoveryService`
+- [x] `EnsureInitialized` also calls `StandardNodeRegistration.GetInlineDefinitions()`
+- [x] All existing public API methods compile unchanged
+- [x] `INodeRegistryService` interface has no breaking changes

@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Threading;
 using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
 
@@ -8,10 +12,15 @@ public sealed class NodeDiscoveryService
 {
     public IReadOnlyList<NodeDefinition> DiscoverFromAssemblies(IEnumerable<Assembly> assemblies)
     {
-        var results = new List<NodeDefinition>();
+        var definitions = new List<NodeDefinition>();
 
-        foreach (var assembly in assemblies.Where(a => a is not null && !a.IsDynamic))
+        foreach (var assembly in assemblies)
         {
+            if (assembly is null || assembly.IsDynamic)
+            {
+                continue;
+            }
+
             foreach (var type in SafeGetTypes(assembly))
             {
                 if (type is null || type.IsAbstract || type.IsInterface)
@@ -19,26 +28,55 @@ public sealed class NodeDiscoveryService
                     continue;
                 }
 
-                if (!IsContextType(type))
+                if (type.IsSubclassOf(typeof(NodeBase)))
                 {
-                    continue;
-                }
-
-                foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-                {
-                    var attribute = method.GetCustomAttribute<NodeAttribute>();
-                    if (attribute is null)
+                    if (type.GetConstructor(Type.EmptyTypes) is null)
                     {
                         continue;
                     }
 
-                    var definition = BuildDefinition(type, method, attribute);
-                    results.Add(definition);
+                    try
+                    {
+                        var definition = BuildDefinitionFromType(type);
+                        if (definition is not null)
+                        {
+                            definitions.Add(definition);
+                        }
+                    }
+                    catch
+                    {
+                        // Skip types that cannot be instantiated or configured.
+                    }
+                }
+
+                if (IsContextType(type))
+                {
+                    definitions.AddRange(BuildDefinitionsFromContext(type));
                 }
             }
         }
 
-        return results;
+        return definitions;
+    }
+
+    public NodeDefinition? BuildDefinitionFromType(Type nodeType)
+    {
+        if (nodeType.IsAbstract || !nodeType.IsSubclassOf(typeof(NodeBase)))
+        {
+            return null;
+        }
+
+        var instance = (NodeBase)Activator.CreateInstance(nodeType)!;
+        try
+        {
+            var builder = NodeBuilder.CreateForType(nodeType);
+            instance.Configure(builder);
+            return builder.Build();
+        }
+        finally
+        {
+            instance.OnDisposed();
+        }
     }
 
     private static bool IsContextType(Type type)
@@ -47,17 +85,23 @@ public sealed class NodeDiscoveryService
                || typeof(INodeMethodContext).IsAssignableFrom(type);
     }
 
-    private static IEnumerable<Type> SafeGetTypes(Assembly assembly)
+    private static IEnumerable<NodeDefinition> BuildDefinitionsFromContext(Type contextType)
     {
-        try
+        var results = new List<NodeDefinition>();
+
+        foreach (var method in contextType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
         {
-            return assembly.GetTypes();
+            var attribute = method.GetCustomAttribute<NodeAttribute>();
+            if (attribute is null)
+            {
+                continue;
+            }
+
+            var definition = BuildDefinition(contextType, method, attribute);
+            results.Add(definition);
         }
-        catch (ReflectionTypeLoadException ex)
-        {
-            return ex.Types.Where(t => t is not null)!
-                .Cast<Type>();
-        }
+
+        return results;
     }
 
     private static NodeDefinition BuildDefinition(Type contextType, MethodInfo method, NodeAttribute attribute)
@@ -228,5 +272,18 @@ public sealed class NodeDiscoveryService
 
         var signature = string.Join(",", parameters);
         return $"{contextType.FullName}.{method.Name}({signature})";
+    }
+
+    private static IEnumerable<Type> SafeGetTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            return ex.Types.Where(t => t is not null)!
+                .Cast<Type>();
+        }
     }
 }
