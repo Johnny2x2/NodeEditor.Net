@@ -59,7 +59,7 @@ public static class EventNodeExecutor
     /// Executes a Custom Event listener node by signaling its Exit path.
     /// Called by the event bus handler when the event is triggered.
     /// </summary>
-    public static void ExecuteListener(NodeData node, INodeExecutionContext context)
+    public static void ExecuteListener(NodeData node, INodeRuntimeStorage context)
     {
         var exit = new ExecutionPath();
         exit.Signal();
@@ -73,7 +73,7 @@ public static class EventNodeExecutor
     /// </summary>
     public static async Task ExecuteTriggerAsync(
         NodeData node,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         CancellationToken token)
     {
         var eventId = GetEventId(node)

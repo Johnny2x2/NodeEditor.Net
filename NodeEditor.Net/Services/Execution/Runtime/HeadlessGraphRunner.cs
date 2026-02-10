@@ -25,9 +25,9 @@ public sealed class HeadlessGraphRunner
     /// <summary>
     /// Execute a graph from its pure model representation.
     /// </summary>
-    public async Task<INodeExecutionContext> ExecuteAsync(
+    public async Task<INodeRuntimeStorage> ExecuteAsync(
         GraphData graphData,
-        INodeExecutionContext? context = null,
+        INodeRuntimeStorage? context = null,
         object? nodeContext = null,
         NodeExecutionOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -58,9 +58,9 @@ public sealed class HeadlessGraphRunner
     /// <summary>
     /// Convenience: load from JSON and execute.
     /// </summary>
-    public Task<INodeExecutionContext> ExecuteFromJsonAsync(
+    public Task<INodeRuntimeStorage> ExecuteFromJsonAsync(
         string json,
-        INodeExecutionContext? context = null,
+        INodeRuntimeStorage? context = null,
         object? nodeContext = null,
         NodeExecutionOptions? options = null,
         CancellationToken cancellationToken = default)

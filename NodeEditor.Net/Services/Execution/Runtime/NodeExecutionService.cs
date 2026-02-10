@@ -31,7 +31,7 @@ public sealed class NodeExecutionService : INodeExecutionService
     public async Task ExecuteAsync(
         IReadOnlyList<NodeData> nodes,
         IReadOnlyList<ConnectionData> connections,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         object nodeContext,
         NodeExecutionOptions? options,
         CancellationToken token)
@@ -83,7 +83,7 @@ public sealed class NodeExecutionService : INodeExecutionService
     public async Task ExecutePlannedAsync(
         ExecutionPlan plan,
         IReadOnlyList<ConnectionData> connections,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         object nodeContext,
         NodeExecutionOptions options,
         CancellationToken token)
@@ -130,7 +130,7 @@ public sealed class NodeExecutionService : INodeExecutionService
 
     public async Task ExecuteGroupAsync(
         GroupNodeData group,
-        INodeExecutionContext parentContext,
+        INodeRuntimeStorage parentContext,
         object nodeContext,
         NodeExecutionOptions? options,
         CancellationToken token)
@@ -166,7 +166,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         IReadOnlyList<IExecutionStep> steps,
         IReadOnlyList<ConnectionData> connections,
         IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         NodeMethodInvoker invoker,
         INodeMethodContext? feedbackContext,
         NodeExecutionOptions options,
@@ -207,7 +207,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         LayerStep layer,
         IReadOnlyList<ConnectionData> connections,
         IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         NodeMethodInvoker invoker,
         INodeMethodContext? feedbackContext,
         NodeExecutionOptions options,
@@ -259,7 +259,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         LoopStep loop,
         IReadOnlyList<ConnectionData> connections,
         IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         NodeMethodInvoker invoker,
         INodeMethodContext? feedbackContext,
         NodeExecutionOptions options,
@@ -324,7 +324,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         ParallelSteps parallel,
         IReadOnlyList<ConnectionData> connections,
         IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         NodeMethodInvoker invoker,
         INodeMethodContext? feedbackContext,
         NodeExecutionOptions options,
@@ -353,7 +353,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         BranchStep branch,
         IReadOnlyList<ConnectionData> connections,
         IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         NodeMethodInvoker invoker,
         INodeMethodContext? feedbackContext,
         NodeExecutionOptions options,
@@ -385,7 +385,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         NodeData node,
         IReadOnlyList<ConnectionData> connections,
         IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         NodeMethodInvoker invoker,
         INodeMethodContext? feedbackContext,
         CancellationToken token)
@@ -484,7 +484,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         NodeData node,
         IReadOnlyList<ConnectionData> connections,
         IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         NodeMethodInvoker invoker,
         INodeMethodContext? feedbackContext,
         CancellationToken token)
@@ -554,7 +554,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         IReadOnlyList<NodeData> nodes,
         IReadOnlyList<ConnectionData> connections,
         IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         NodeMethodInvoker invoker,
         INodeMethodContext? feedbackContext,
         NodeExecutionOptions options,

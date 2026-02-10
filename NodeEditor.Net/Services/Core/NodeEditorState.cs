@@ -298,7 +298,7 @@ public class NodeEditorState : INodeEditorState
     /// Updates socket values from an execution context and raises <see cref="SocketValuesChanged"/>.
     /// </summary>
     public void ApplyExecutionContext(
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         bool includeInputs = true,
         bool includeOutputs = true,
         bool includeExecutionSockets = false)

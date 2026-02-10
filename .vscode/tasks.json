@@ -62,6 +62,45 @@
 				"$msCompile"
 			],
 			"group": "build"
+		},
+		{
+			"label": "dotnet build NodeEditor.slnx",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"c:\\Users\\johnl\\source\\repos\\Johnny2x2\\NodeEditor.Net\\NodeEditor.slnx"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
+			"label": "dotnet build NodeEditor.Blazor.Tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"c:\\Users\\johnl\\source\\repos\\Johnny2x2\\NodeEditor.Net\\NodeEditor.Blazor.Tests\\NodeEditor.Blazor.Tests.csproj"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
+			"label": "dotnet build NodeEditor.Blazor.Tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"c:\\Users\\johnl\\source\\repos\\Johnny2x2\\NodeEditor.Net\\NodeEditor.Blazor.Tests\\NodeEditor.Blazor.Tests.csproj"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
 		}
 	]
 }

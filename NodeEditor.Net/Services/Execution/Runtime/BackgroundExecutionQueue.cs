@@ -7,7 +7,7 @@ public sealed record ExecutionJob(
     Guid Id,
     ExecutionPlan Plan,
     IReadOnlyList<ConnectionData> Connections,
-    INodeExecutionContext Context,
+    INodeRuntimeStorage Context,
     object NodeContext,
     NodeExecutionOptions Options);
 

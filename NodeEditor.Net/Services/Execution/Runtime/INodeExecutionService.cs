@@ -25,7 +25,7 @@ public interface INodeExecutionService
     Task ExecuteAsync(
         IReadOnlyList<NodeData> nodes,
         IReadOnlyList<ConnectionData> connections,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         object nodeContext,
         NodeExecutionOptions? options,
         CancellationToken token);
@@ -33,14 +33,14 @@ public interface INodeExecutionService
     Task ExecutePlannedAsync(
         ExecutionPlan plan,
         IReadOnlyList<ConnectionData> connections,
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         object nodeContext,
         NodeExecutionOptions options,
         CancellationToken token);
 
     Task ExecuteGroupAsync(
         GroupNodeData group,
-        INodeExecutionContext parentContext,
+        INodeRuntimeStorage parentContext,
         object nodeContext,
         NodeExecutionOptions? options,
         CancellationToken token);

@@ -49,7 +49,7 @@ public interface INodeEditorState
 
     // Execution bridge
     IReadOnlyList<NodeData> BuildExecutionNodes();
-    void ApplyExecutionContext(INodeExecutionContext context, bool includeInputs = true, bool includeOutputs = true, bool includeExecutionSockets = false);
+    void ApplyExecutionContext(INodeRuntimeStorage context, bool includeInputs = true, bool includeOutputs = true, bool includeExecutionSockets = false);
     void SetNodeExecuting(string nodeId, bool isExecuting);
     void SetNodeError(string nodeId, bool isError);
     void ResetNodeExecutionState();

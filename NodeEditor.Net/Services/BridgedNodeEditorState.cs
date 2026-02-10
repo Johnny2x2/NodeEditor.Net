@@ -211,7 +211,7 @@ public sealed class BridgedNodeEditorState : INodeEditorState
 
     // ── Execution bridge ────────────────────────────────────────────────
     public IReadOnlyList<NodeData> BuildExecutionNodes() => State.BuildExecutionNodes();
-    public void ApplyExecutionContext(INodeExecutionContext context, bool includeInputs = true, bool includeOutputs = true, bool includeExecutionSockets = false)
+    public void ApplyExecutionContext(INodeRuntimeStorage context, bool includeInputs = true, bool includeOutputs = true, bool includeExecutionSockets = false)
         => Dispatch(() => State.ApplyExecutionContext(context, includeInputs, includeOutputs, includeExecutionSockets));
     public void SetNodeExecuting(string nodeId, bool isExecuting) => Dispatch(() => State.SetNodeExecuting(nodeId, isExecuting));
     public void SetNodeError(string nodeId, bool isError) => Dispatch(() => State.SetNodeError(nodeId, isError));

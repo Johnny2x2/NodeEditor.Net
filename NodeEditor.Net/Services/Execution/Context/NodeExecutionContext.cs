@@ -2,12 +2,11 @@ using System.Collections.Concurrent;
 
 namespace NodeEditor.Net.Services.Execution;
 
-public sealed class NodeExecutionContext : INodeExecutionContext
+public sealed class NodeExecutionContext : INodeRuntimeStorage
 {
     private readonly ConcurrentDictionary<string, object?> _socketValues;
     private readonly ConcurrentDictionary<string, bool> _executedNodes;
     private readonly ConcurrentDictionary<string, object?> _variables;
-    private readonly ConcurrentDictionary<string, object> _loopState;
     private readonly Stack<int> _generationStack = new();
     private int _currentGeneration;
 
@@ -18,7 +17,6 @@ public sealed class NodeExecutionContext : INodeExecutionContext
         _socketValues = new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
         _executedNodes = new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
         _variables = new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
-        _loopState = new ConcurrentDictionary<string, object>(StringComparer.Ordinal);
         EventBus = new ExecutionEventBus();
     }
 
@@ -26,13 +24,11 @@ public sealed class NodeExecutionContext : INodeExecutionContext
         ConcurrentDictionary<string, object?> socketValues,
         ConcurrentDictionary<string, bool> executedNodes,
         ConcurrentDictionary<string, object?> variables,
-        ConcurrentDictionary<string, object> loopState,
         ExecutionEventBus eventBus)
     {
         _socketValues = socketValues;
         _executedNodes = executedNodes;
         _variables = variables;
-        _loopState = loopState;
         EventBus = eventBus;
     }
 
@@ -78,29 +74,6 @@ public sealed class NodeExecutionContext : INodeExecutionContext
         _variables[key] = value;
     }
 
-    // ── Loop state management ──
-
-    public bool TryGetLoopState<T>(string key, out T value)
-    {
-        if (_loopState.TryGetValue(key, out var stored) && stored is T typed)
-        {
-            value = typed;
-            return true;
-        }
-        value = default!;
-        return false;
-    }
-
-    public void SetLoopState(string key, object value)
-    {
-        _loopState[key] = value;
-    }
-
-    public void ClearLoopState(string key)
-    {
-        _loopState.TryRemove(key, out _);
-    }
-
     // ── Iteration generation (for loop body scoping) ──
 
     public int CurrentGeneration => _currentGeneration;
@@ -123,16 +96,15 @@ public sealed class NodeExecutionContext : INodeExecutionContext
             _executedNodes.TryRemove(id, out _);
     }
 
-    public INodeExecutionContext CreateChild(string scopeName, bool inheritVariables = true)
+    public INodeRuntimeStorage CreateChild(string scopeName, bool inheritVariables = true)
     {
         var socketValues = new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
         var executedNodes = new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
         var variables = inheritVariables
             ? new ConcurrentDictionary<string, object?>(_variables, StringComparer.Ordinal)
             : new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
-        var loopState = new ConcurrentDictionary<string, object>(StringComparer.Ordinal);
 
-        return new NodeExecutionContext(socketValues, executedNodes, variables, loopState, EventBus);
+        return new NodeExecutionContext(socketValues, executedNodes, variables, EventBus);
     }
 
     private static string BuildSocketKey(string nodeId, string socketName)

@@ -43,7 +43,7 @@ public sealed class NodeMethodInvoker
         return null;
     }
 
-    public async Task InvokeAsync(NodeData node, NodeMethodBinding binding, INodeExecutionContext executionContext, CancellationToken token)
+    public async Task InvokeAsync(NodeData node, NodeMethodBinding binding, INodeRuntimeStorage executionContext, CancellationToken token)
     {
         if (binding is null)
         {
@@ -110,7 +110,7 @@ public sealed class NodeMethodInvoker
         executionContext.MarkNodeExecuted(node.Id);
     }
 
-    private object? GetInputValue(NodeData node, string socketName, Type targetType, INodeExecutionContext executionContext)
+    private object? GetInputValue(NodeData node, string socketName, Type targetType, INodeRuntimeStorage executionContext)
     {
         if (!string.IsNullOrWhiteSpace(socketName) && executionContext.TryGetSocketValue(node.Id, socketName, out var stored))
         {
