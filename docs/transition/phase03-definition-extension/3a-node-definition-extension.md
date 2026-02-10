@@ -52,7 +52,7 @@ public sealed record class NodeDefinition(
 
 ## Acceptance criteria
 
-- [ ] `NodeDefinition` record compiles with all 10 fields
-- [ ] Existing code creating `NodeDefinition` with 7 args still compiles unchanged
-- [ ] New fields accessible: `def.NodeType`, `def.InlineExecutor`, `def.StreamSockets`
-- [ ] Solution builds clean
+- [x] `NodeDefinition` record compiles with all 10 fields
+- [x] Existing code creating `NodeDefinition` with 7 args still compiles unchanged
+- [x] New fields accessible: `def.NodeType`, `def.InlineExecutor`, `def.StreamSockets`
+- [x] Solution builds clean

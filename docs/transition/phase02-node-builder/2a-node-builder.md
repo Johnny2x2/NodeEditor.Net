@@ -210,10 +210,10 @@ public sealed class NodeBuilder : INodeBuilder
 
 ## Acceptance criteria
 
-- [ ] `NodeBuilder.Create("Test").Input<int>("A").Output<int>("B").OnExecute(...).Build()` produces valid `NodeDefinition`
-- [ ] `NodeBuilder.CreateForType(typeof(SomeNodeBase))` works for discovery
-- [ ] `Callable()` adds Enter + Exit execution sockets
-- [ ] `ExecutionInitiator()` adds only Exit (no Enter)
-- [ ] `StreamOutput<T>(...)` adds item data socket + OnItem exec socket + Completed exec socket
-- [ ] `Build()` produces `NodeDefinition` with all new fields (`NodeType`, `InlineExecutor`, `StreamSockets`)
-- [ ] Depends on Phase 3 for `NodeDefinition` to be extended with optional params
+- [x] `NodeBuilder.Create("Test").Input<int>("A").Output<int>("B").OnExecute(...).Build()` produces valid `NodeDefinition`
+- [x] `NodeBuilder.CreateForType(typeof(SomeNodeBase))` works for discovery
+- [x] `Callable()` adds Enter + Exit execution sockets
+- [x] `ExecutionInitiator()` adds only Exit (no Enter)
+- [x] `StreamOutput<T>(...)` adds item data socket + OnItem exec socket + Completed exec socket
+- [x] `Build()` produces `NodeDefinition` with all new fields (`NodeType`, `InlineExecutor`, `StreamSockets`)
+- [x] Depends on Phase 3 for `NodeDefinition` to be extended with optional params

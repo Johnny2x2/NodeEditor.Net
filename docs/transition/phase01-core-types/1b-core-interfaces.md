@@ -172,8 +172,8 @@ public interface INodeRuntimeStorage
 
 ## Acceptance criteria
 
-- [ ] `NodeBase` compiles as abstract class with `Configure`, `ExecuteAsync`, `OnCreatedAsync`, `OnDisposed`
-- [ ] `INodeExecutionContext` compiles with all 15+ members
-- [ ] `INodeRuntimeStorage` compiles with all storage/lifecycle members
-- [ ] New `INodeExecutionContext` replaces the old one (old becomes `INodeRuntimeStorage`)
-- [ ] Solution builds (old implementation `NodeExecutionContext` still compiles against renamed interface)
+- [x] `NodeBase` compiles as abstract class with `Configure`, `ExecuteAsync`, `OnCreatedAsync`, `OnDisposed`
+- [x] `INodeExecutionContext` compiles with all 15+ members
+- [x] `INodeRuntimeStorage` compiles with all storage/lifecycle members
+- [x] New `INodeExecutionContext` replaces the old one (old becomes `INodeRuntimeStorage`)
+- [x] Solution builds (old implementation `NodeExecutionContext` still compiles against renamed interface)

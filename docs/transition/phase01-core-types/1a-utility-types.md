@@ -74,7 +74,7 @@ public sealed record StreamSocketInfo(
 
 ## Acceptance criteria
 
-- [ ] `ExecutionSocket.TypeName` returns `"NodeEditor.Net.Services.Execution.ExecutionSocket"`
-- [ ] `StreamMode` enum has `Sequential` and `FireAndForget` members
-- [ ] `StreamSocketInfo` record compiles and holds 3 fields
-- [ ] Solution builds clean with new files added
+- [x] `ExecutionSocket.TypeName` returns `"NodeEditor.Net.Services.Execution.ExecutionSocket"`
+- [x] `StreamMode` enum has `Sequential` and `FireAndForget` members
+- [x] `StreamSocketInfo` record compiles and holds 3 fields
+- [x] Solution builds clean with new files added
