@@ -29,124 +29,160 @@ Replace the **attribute + delegate + reflection** node system with a **class-bas
 
 ## Phase ordering
 
-| Phase | Scope | Files affected |
-|-------|-------|---------------|
-| [Phase 1](./01-phase1-core-abstractions.md) | `NodeBase`, `NodeBuilder`, new `INodeExecutionContext` | ~5 new files in `NodeEditor.Net/Services/Execution/Nodes/` and `Context/` |
-| [Phase 2](./02-phase2-discovery-registry.md) | Discovery rewrite, `NodeDefinition` extension, registry updates | ~3 files modified in `NodeEditor.Net/Services/Registry/` |
-| [Phase 3](./03-phase3-execution-engine.md) | Execution engine rewrite (coroutine model), planner simplification | ~4 files in `NodeEditor.Net/Services/Execution/Runtime/` and `Planning/` |
-| [Phase 4](./04-phase4-standard-nodes.md) | Migrate all ~40 standard nodes to `NodeBase` / `NodeBuilder` | ~20 new files, ~8 old files deleted in `StandardNodes/` |
-| [Phase 5](./05-phase5-remove-old-infra.md) | Remove `INodeContext`, `NodeAttribute`, `NodeMethodInvoker`, `ExecutionPath`, etc. | ~10 files deleted |
-| [Phase 6](./06-phase6-plugin-system.md) | Update plugin contracts, loader, templates | ~6 files across `Plugins/` and plugin projects |
-| [Phase 7](./07-phase7-blazor-integration.md) | DI registration updates, headless runner, serializer | ~4 files in `NodeEditor.Blazor/` and `NodeEditor.Net/` |
-| [Phase 8](./08-phase8-tests.md) | Rewrite execution tests, add streaming tests, update all affected tests | ~15 test files |
+All sub-tasks within a phase can be executed in parallel. Phases must be completed sequentially.
+
+| Phase | Scope | Sub-tasks | Files affected |
+|-------|-------|-----------|---------------|
+| [Phase 1 — Core Types](./phase01-core-types/) | `ExecutionSocket`, `StreamSocketInfo`, `NodeBase`, `INodeExecutionContext` | 1A, 1B | ~3 new files in `Execution/Nodes/` and `Context/` |
+| [Phase 2 — Node Builder](./phase02-node-builder/) | `INodeBuilder`, `NodeBuilder` fluent API | 2A | ~2 new files in `Execution/Nodes/` |
+| [Phase 3 — Definition Extension](./phase03-definition-extension/) | Extend `NodeDefinition` record with new fields | 3A | ~1 file modified in `Models/` |
+| [Phase 4 — Discovery & Registry](./phase04-discovery-registry/) | Rewrite discovery, update registry for `NodeBase` scanning | 4A, 4B | ~2 files in `Services/Registry/` |
+| [Phase 5 — Planner & Runtime](./phase05-planner-runtime/) | Simplify planner, implement `ExecutionRuntime` + `NodeExecutionContextImpl` | 5A, 5B | ~3 files in `Execution/Runtime/` and `Planning/` |
+| [Phase 6 — Execution Service](./phase06-execution-service/) | Rewrite `NodeExecutionService`, update utilities | 6A, 6B | ~3 files in `Execution/` |
+| [Phase 7 — Standard Nodes](./phase07-standard-nodes/) | Migrate all ~40 standard nodes to `NodeBase` / `NodeBuilder` | 7A–7G | ~20 new files in `StandardNodes/` |
+| [Phase 8 — Registration](./phase08-registration/) | `StandardNodeRegistration` aggregator | 8A | ~1 new file |
+| [Phase 9 — Remove Old Infra](./phase09-remove-old-infra/) | Delete `INodeContext`, `NodeAttribute`, `NodeMethodInvoker`, `ExecutionPath`, etc. | 9A–9C | ~10 files deleted |
+| [Phase 10 — Plugin System](./phase10-plugin-system/) | Update plugin loader, template, TestA, TestB | 10A–10D | ~6 files across plugin projects |
+| [Phase 11 — Blazor Integration](./phase11-blazor-integration/) | DI registration, DefinitionId migration, headless runner, state, resolver | 11A–11E | ~5 files in `NodeEditor.Blazor/` |
+| [Phase 12 — Independent Tests](./phase12-independent-tests/) | Test infrastructure, registry/plugin/serialization/minor tests | 12A–12E | ~10 test files |
+| [Phase 13 — Dependent Tests](./phase13-dependent-tests/) | Execution engine + streaming tests (depend on 12A infra) | 13A, 13B | ~5 test files |
 
 ---
 
 ## Parallel Execution Map
 
-Each phase is split into independently implementable/testable sub-tasks. Use the sub-task documents for assignment.
+Each phase contains only sub-tasks that can run fully in parallel. No sub-task within a phase depends on another sub-task in the same phase.
 
-### Phase 1 — Core Abstractions
-
-| Sub-task | Document | Depends on | Parallel with |
-|----------|----------|------------|---------------|
-| **1A** Utility types | [1a](./phase1-core-abstractions/1a-utility-types.md) | — | 1B |
-| **1B** Core interfaces | [1b](./phase1-core-abstractions/1b-core-interfaces.md) | — | 1A |
-| **1C** Node builder | [1c](./phase1-core-abstractions/1c-node-builder.md) | 1A, 1B | — |
-
-### Phase 2 — Discovery & Registry
+### Phase 1 — Core Types
 
 | Sub-task | Document | Depends on | Parallel with |
 |----------|----------|------------|---------------|
-| **2A** NodeDefinition extension | [2a](./phase2-discovery-registry/2a-node-definition-extension.md) | Phase 1 | — |
-| **2B** Discovery service | [2b](./phase2-discovery-registry/2b-discovery-service.md) | 2A | 2C |
-| **2C** Registry service | [2c](./phase2-discovery-registry/2c-registry-service.md) | 2A | 2B |
+| **1A** Utility types | [1a](./phase01-core-types/1a-utility-types.md) | — | 1B |
+| **1B** Core interfaces | [1b](./phase01-core-types/1b-core-interfaces.md) | — | 1A |
 
-### Phase 3 — Execution Engine
-
-| Sub-task | Document | Depends on | Parallel with |
-|----------|----------|------------|---------------|
-| **3A** Planner simplification | [3a](./phase3-execution-engine/3a-planner-simplification.md) | — | 3B |
-| **3B** Runtime & context | [3b](./phase3-execution-engine/3b-runtime-and-context.md) | Phase 1 | 3A |
-| **3C** Execution service | [3c](./phase3-execution-engine/3c-execution-service.md) | 3B | 3D |
-| **3D** Utility updates | [3d](./phase3-execution-engine/3d-utility-updates.md) | 3B | 3C |
-
-### Phase 4 — Standard Nodes
+### Phase 2 — Node Builder
 
 | Sub-task | Document | Depends on | Parallel with |
 |----------|----------|------------|---------------|
-| **4A** Control flow | [4a](./phase4-standard-nodes/4a-control-flow-nodes.md) | Phase 1 | 4B–4G |
-| **4B** Loops | [4b](./phase4-standard-nodes/4b-loop-nodes.md) | Phase 1 | 4A, 4C–4G |
-| **4C** Helpers | [4c](./phase4-standard-nodes/4c-helper-nodes.md) | Phase 1 | 4A–4B, 4D–4G |
-| **4D** Debug | [4d](./phase4-standard-nodes/4d-debug-nodes.md) | Phase 1 | 4A–4C, 4E–4G |
-| **4E** Numbers | [4e](./phase4-standard-nodes/4e-number-nodes.md) | Phase 1 | 4A–4D, 4F–4G |
-| **4F** Strings | [4f](./phase4-standard-nodes/4f-string-nodes.md) | Phase 1 | 4A–4E, 4G |
-| **4G** Lists | [4g](./phase4-standard-nodes/4g-list-nodes.md) | Phase 1 | 4A–4F |
-| **4H** Registration | [4h](./phase4-standard-nodes/4h-registration.md) | 4A–4G | — |
+| **2A** Node builder | [2a](./phase02-node-builder/2a-node-builder.md) | Phase 1 | — |
 
-### Phase 5 — Remove Old Infrastructure
+### Phase 3 — Definition Extension
 
 | Sub-task | Document | Depends on | Parallel with |
 |----------|----------|------------|---------------|
-| **5A** Delete old files | [5a](./phase5-remove-old-infra/5a-delete-old-files.md) | Phases 1–4 | 5B, 5C |
-| **5B** Update factories | [5b](./phase5-remove-old-infra/5b-update-factories.md) | Phases 1–4 | 5A, 5C |
-| **5C** Reference cleanup | [5c](./phase5-remove-old-infra/5c-reference-cleanup.md) | Phases 1–4 | 5A, 5B |
+| **3A** NodeDefinition extension | [3a](./phase03-definition-extension/3a-node-definition-extension.md) | Phase 2 | — |
 
-### Phase 6 — Plugin System
+### Phase 4 — Discovery & Registry
 
 | Sub-task | Document | Depends on | Parallel with |
 |----------|----------|------------|---------------|
-| **6A** Plugin loader | [6a](./phase6-plugin-system/6a-plugin-loader.md) | Phase 5 | 6B, 6C, 6D |
-| **6B** Template plugin | [6b](./phase6-plugin-system/6b-template-plugin.md) | Phase 1 | 6A, 6C, 6D |
-| **6C** TestA plugin | [6c](./phase6-plugin-system/6c-testa-plugin.md) | Phase 1 | 6A, 6B, 6D |
-| **6D** TestB plugin | [6d](./phase6-plugin-system/6d-testb-plugin.md) | Phase 1 | 6A, 6B, 6C |
+| **4A** Discovery service | [4a](./phase04-discovery-registry/4a-discovery-service.md) | Phase 3 | 4B |
+| **4B** Registry service | [4b](./phase04-discovery-registry/4b-registry-service.md) | Phase 3 | 4A |
 
-### Phase 7 — Blazor Integration
+### Phase 5 — Planner & Runtime
 
 | Sub-task | Document | Depends on | Parallel with |
 |----------|----------|------------|---------------|
-| **7A** DI registration | [7a](./phase7-blazor-integration/7a-di-registration.md) | Phase 5 | 7B–7E |
-| **7B** DefinitionId migration | [7b](./phase7-blazor-integration/7b-definition-id-migration.md) | Phase 4 | 7A, 7C–7E |
-| **7C** Headless runner | [7c](./phase7-blazor-integration/7c-headless-runner.md) | Phase 3 | 7A–7B, 7D–7E |
-| **7D** State update | [7d](./phase7-blazor-integration/7d-state-update.md) | Phase 1 | 7A–7C, 7E |
-| **7E** Socket type resolver | [7e](./phase7-blazor-integration/7e-socket-type-resolver.md) | Phase 5 | 7A–7D |
+| **5A** Planner simplification | [5a](./phase05-planner-runtime/5a-planner-simplification.md) | Phase 4 | 5B |
+| **5B** Runtime & context | [5b](./phase05-planner-runtime/5b-runtime-and-context.md) | Phase 4 | 5A |
 
-### Phase 8 — Tests
+### Phase 6 — Execution Service
 
 | Sub-task | Document | Depends on | Parallel with |
 |----------|----------|------------|---------------|
-| **8A** Test infrastructure | [8a](./phase8-tests/8a-test-infrastructure.md) | Phase 1 | 8D–8G |
-| **8B** Execution engine tests | [8b](./phase8-tests/8b-execution-engine-tests.md) | 8A, Phases 1–7 | 8C–8G |
-| **8C** Streaming tests | [8c](./phase8-tests/8c-streaming-tests.md) | 8A, Phases 1–7 | 8B, 8D–8G |
-| **8D** Registry tests | [8d](./phase8-tests/8d-registry-tests.md) | Phases 1–2 | 8A–8C, 8E–8G |
-| **8E** Plugin tests | [8e](./phase8-tests/8e-plugin-tests.md) | Phase 6 | 8A–8D, 8F–8G |
-| **8F** Serialization tests | [8f](./phase8-tests/8f-serialization-tests.md) | 7B | 8A–8E, 8G |
-| **8G** Minor test updates | [8g](./phase8-tests/8g-minor-test-updates.md) | Phases 1, 5 | 8A–8F |
+| **6A** Execution service | [6a](./phase06-execution-service/6a-execution-service.md) | Phase 5 | 6B |
+| **6B** Utility updates | [6b](./phase06-execution-service/6b-utility-updates.md) | Phase 5 | 6A |
+
+### Phase 7 — Standard Nodes
+
+| Sub-task | Document | Depends on | Parallel with |
+|----------|----------|------------|---------------|
+| **7A** Control flow | [7a](./phase07-standard-nodes/7a-control-flow-nodes.md) | Phase 6 | 7B–7G |
+| **7B** Loops | [7b](./phase07-standard-nodes/7b-loop-nodes.md) | Phase 6 | 7A, 7C–7G |
+| **7C** Helpers | [7c](./phase07-standard-nodes/7c-helper-nodes.md) | Phase 6 | 7A–7B, 7D–7G |
+| **7D** Debug | [7d](./phase07-standard-nodes/7d-debug-nodes.md) | Phase 6 | 7A–7C, 7E–7G |
+| **7E** Numbers | [7e](./phase07-standard-nodes/7e-number-nodes.md) | Phase 6 | 7A–7D, 7F–7G |
+| **7F** Strings | [7f](./phase07-standard-nodes/7f-string-nodes.md) | Phase 6 | 7A–7E, 7G |
+| **7G** Lists | [7g](./phase07-standard-nodes/7g-list-nodes.md) | Phase 6 | 7A–7F |
+
+### Phase 8 — Registration
+
+| Sub-task | Document | Depends on | Parallel with |
+|----------|----------|------------|---------------|
+| **8A** Registration aggregator | [8a](./phase08-registration/8a-registration.md) | 7E, 7F, 7G | — |
+
+### Phase 9 — Remove Old Infrastructure
+
+| Sub-task | Document | Depends on | Parallel with |
+|----------|----------|------------|---------------|
+| **9A** Delete old files | [9a](./phase09-remove-old-infra/9a-delete-old-files.md) | Phase 8 | 9B, 9C |
+| **9B** Update factories | [9b](./phase09-remove-old-infra/9b-update-factories.md) | Phase 8 | 9A, 9C |
+| **9C** Reference cleanup | [9c](./phase09-remove-old-infra/9c-reference-cleanup.md) | Phase 8 | 9A, 9B |
+
+### Phase 10 — Plugin System
+
+| Sub-task | Document | Depends on | Parallel with |
+|----------|----------|------------|---------------|
+| **10A** Plugin loader | [10a](./phase10-plugin-system/10a-plugin-loader.md) | Phase 9 | 10B–10D |
+| **10B** Template plugin | [10b](./phase10-plugin-system/10b-template-plugin.md) | Phase 9 | 10A, 10C–10D |
+| **10C** TestA plugin | [10c](./phase10-plugin-system/10c-testa-plugin.md) | Phase 9 | 10A–10B, 10D |
+| **10D** TestB plugin | [10d](./phase10-plugin-system/10d-testb-plugin.md) | Phase 9 | 10A–10C |
+
+### Phase 11 — Blazor Integration
+
+| Sub-task | Document | Depends on | Parallel with |
+|----------|----------|------------|---------------|
+| **11A** DI registration | [11a](./phase11-blazor-integration/11a-di-registration.md) | Phase 9 | 11B–11E |
+| **11B** DefinitionId migration | [11b](./phase11-blazor-integration/11b-definition-id-migration.md) | Phase 8 | 11A, 11C–11E |
+| **11C** Headless runner | [11c](./phase11-blazor-integration/11c-headless-runner.md) | Phase 6 | 11A–11B, 11D–11E |
+| **11D** State update | [11d](./phase11-blazor-integration/11d-state-update.md) | Phase 9 | 11A–11C, 11E |
+| **11E** Socket type resolver | [11e](./phase11-blazor-integration/11e-socket-type-resolver.md) | Phase 9 | 11A–11D |
+
+### Phase 12 — Independent Tests
+
+| Sub-task | Document | Depends on | Parallel with |
+|----------|----------|------------|---------------|
+| **12A** Test infrastructure | [12a](./phase12-independent-tests/12a-test-infrastructure.md) | Phase 1 | 12B–12E |
+| **12B** Registry tests | [12b](./phase12-independent-tests/12b-registry-tests.md) | Phase 4 | 12A, 12C–12E |
+| **12C** Plugin tests | [12c](./phase12-independent-tests/12c-plugin-tests.md) | Phase 10 | 12A–12B, 12D–12E |
+| **12D** Serialization tests | [12d](./phase12-independent-tests/12d-serialization-tests.md) | 11B | 12A–12C, 12E |
+| **12E** Minor test updates | [12e](./phase12-independent-tests/12e-minor-test-updates.md) | Phase 9 | 12A–12D |
+
+### Phase 13 — Dependent Tests
+
+| Sub-task | Document | Depends on | Parallel with |
+|----------|----------|------------|---------------|
+| **13A** Execution engine tests | [13a](./phase13-dependent-tests/13a-execution-engine-tests.md) | 12A | 13B |
+| **13B** Streaming tests | [13b](./phase13-dependent-tests/13b-streaming-tests.md) | 12A | 13A |
 
 ### Critical path
 
 ```
-1A ─┐           ┌─ 4A ─┐
-    ├─ 1C ─ 2A ─┤      │
-1B ─┘     ╲     ├─ 4B ─┤          ┌─ 6B
-           ╲    ├─ ... ─┼─ 4H ─── 5A ──┤
-            ╲   └─ 4G ─┘     ‖    ├─ 6C ── 8E
-             ╲                ‖    └─ 6D
-              ╲          5B ──┼─── 6A
-               ╲         ‖   │         ┌─ 8B
-         3A ────╲── 3C ──┼───┼── 7A    │
-                 ╲   ‖   │   │         │
-          3B ──── 3D─┘   │   ├── 7E    │
-                          │   │         │
-                          ├── 7B ── 8F  │
-                          │             │
-                     5C ──┘    8A ──────┤
-                                        └─ 8C
+1A ─┐                    ┌─ 7A ─┐
+    ├─ 2A ─ 3A ─ 4A/4B ─┤      │
+1B ─┘       │            ├─ 7B ─┤
+            │            ├─ ... ─┼─ 8A ─ 9A/9B/9C ─┬─ 10A ─┐
+            │            └─ 7G ─┘                   ├─ 10B  │
+            │                                       ├─ 10C  │
+            │                                       └─ 10D  │
+            │                                               │
+            └── 5A/5B ── 6A/6B ── 11C                      │
+                                                            │
+                              9A/9B/9C ── 11A/11D/11E       │
+                                                            │
+                                    8A ── 11B               │
+                                                            │
+                              12A ──┬── 13A                 │
+                                    └── 13B                 │
+                                                            │
+                                    10 ── 12C               │
+                                    11B ── 12D              │
+                                    9 ── 12E                │
 ```
 
-The **critical path** runs through: `1A+1B → 1C → 2A → 4x nodes → 4H → 5A → 6A/7A → 8B`.
+The **critical path** runs through: `1A+1B → 2A → 3A → 4A/4B → 5A/5B → 6A/6B → 7x nodes → 8A → 9A → 10A/11A → 12C/12E → 13A`.
 
-Maximum parallelism is in **Phase 4** (7 independent node groups) and **Phase 8** (5 independent test groups).
+Maximum parallelism is in **Phase 7** (7 independent node groups), **Phase 11** (5 sub-tasks), and **Phase 12** (5 independent test groups).
 
 ---
 
