@@ -196,6 +196,15 @@ internal sealed class ExecutionRuntime
 
     internal T DeserializeSocketValue<T>(SocketValue socketValue)
     {
+        if (typeof(T) == typeof(object) && socketValue.TypeName is not null && socketValue.Json is not null)
+        {
+            var type = Type.GetType(socketValue.TypeName);
+            if (type is not null)
+            {
+                return (T)System.Text.Json.JsonSerializer.Deserialize(socketValue.Json.Value.GetRawText(), type)!;
+            }
+        }
+
         return socketValue.ToObject<T>()!;
     }
 

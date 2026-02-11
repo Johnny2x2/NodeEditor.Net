@@ -76,8 +76,18 @@ public sealed class HeadlessGraphRunner
 
 ## Acceptance criteria
 
-- [ ] `ExecutionGate.WaitAsync` still works (called from `TriggerAsync` now)
-- [ ] `HeadlessGraphRunner` constructor no longer requires `INodeContextFactory`
-- [ ] `HeadlessGraphRunner.ExecuteAsync` works without `CompositeNodeContext`
-- [ ] `BackgroundExecutionQueue/Worker` compile without changes (or minimal updates)
-- [ ] Solution builds clean
+- [x] `ExecutionGate.WaitAsync` still works (called from `TriggerAsync` now)
+- [x] `HeadlessGraphRunner` constructor no longer requires `INodeContextFactory`
+- [ ] `HeadlessGraphRunner.ExecuteAsync` works without `CompositeNodeContext` — **FAIL**: still creates `NodeContextFactory().CreateCompositeFromLoadedAssemblies()` internally; `nodeContext` param not yet removed
+- [x] `BackgroundExecutionQueue/Worker` compile without changes (or minimal updates)
+- [x] Solution builds clean
+
+### Review notes (2026-02-11)
+
+**Status: MOSTLY COMPLETE — 1 item remaining**
+
+`HeadlessGraphRunner` constructor DI dependency on `INodeContextFactory` is removed, but the
+`ExecuteAsync` method still internally instantiates `NodeContextFactory` and creates a
+`CompositeNodeContext` as a fallback. Once the `[Node]` method → `InlineExecutor` gap is
+fixed in Phase 4's `NodeDiscoveryService`, the `nodeContext` parameter and
+`CompositeNodeContext` usage can be fully removed from `HeadlessGraphRunner`.

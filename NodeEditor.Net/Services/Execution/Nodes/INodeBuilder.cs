@@ -37,4 +37,7 @@ public interface INodeBuilder
 
     // ── Inline execution ──
     INodeBuilder OnExecute(Func<INodeExecutionContext, CancellationToken, Task> executor);
+
+    // ── Build ──
+    NodeDefinition Build();
 }

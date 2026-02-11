@@ -60,3 +60,15 @@ public void EnsureInitialized(IEnumerable<Assembly> assemblies)
 - [x] `EnsureInitialized` also calls `StandardNodeRegistration.GetInlineDefinitions()`
 - [x] All existing public API methods compile unchanged
 - [x] `INodeRegistryService` interface has no breaking changes
+
+### Review notes (2026-02-11)
+
+**Status: COMPLETE ✅ — all criteria pass**
+
+- `EnsureInitialized` correctly delegates discovery, then calls `StandardNodeRegistration.GetInlineDefinitions()` ✅
+- `RegisterFromAssembly`, `RegisterPluginAssembly`, `RemoveDefinitions`, `RemoveDefinitionsFromAssembly` all work ✅
+- `MergeDefinitions` deduplicates by `Id` with case-sensitive comparison ✅
+- `GetCatalog` search filters by Name, Category, Description (case-insensitive) ✅
+- `RegistryChanged` event fires on additions and removals ✅
+- Thread safety via `lock (_lock)` on all mutation paths ✅
+- `StandardNodeRegistration.GetInlineDefinitions()` currently returns empty — populated in Phase 8 ✅

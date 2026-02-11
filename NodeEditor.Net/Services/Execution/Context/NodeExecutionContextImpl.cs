@@ -112,6 +112,7 @@ internal sealed class NodeExecutionContextImpl : INodeExecutionContext
     {
         if (value is T typed) return typed;
         if (value is null) return default!;
+        if (value is System.Text.Json.JsonElement json) return System.Text.Json.JsonSerializer.Deserialize<T>(json.GetRawText())!;
         return (T)Convert.ChangeType(value, typeof(T));
     }
 }

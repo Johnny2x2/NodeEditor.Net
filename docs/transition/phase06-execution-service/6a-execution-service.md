@@ -78,11 +78,24 @@ public async Task ExecuteAsync(/* params */)
 
 ## Acceptance criteria
 
-- [ ] `ExecuteAsync` public signature unchanged
-- [ ] Creates `ExecutionRuntime` and delegates to it
-- [ ] Initiator nodes discovered by `ExecInit` flag
-- [ ] Parallel initiator support via `MaxDegreeOfParallelism`
-- [ ] Variable seeding still works
-- [ ] Event subscriptions still fire (NodeStarted, NodeCompleted, etc.)
-- [ ] No references to `NodeMethodInvoker`, `CompositeNodeContext`, `ExecutionPath`
-- [ ] `OnDisposed()` called on all node instances after execution
+- [x] `ExecuteAsync` public signature unchanged
+- [x] Creates `ExecutionRuntime` and delegates to it
+- [x] Initiator nodes discovered by `ExecInit` flag
+- [x] Parallel initiator support via `MaxDegreeOfParallelism`
+- [ ] Variable seeding still works — **PARTIAL**: `VariableNodeExecutor.SeedVariables` not called in `ExecuteGraphAsync` (only in `HeadlessGraphRunner`)
+- [x] Event subscriptions still fire (NodeStarted, NodeCompleted, etc.)
+- [x] No references to `NodeMethodInvoker`, `CompositeNodeContext`, `ExecutionPath`
+- [x] `OnDisposed()` called on all node instances after execution
+
+### Review notes (2026-02-11)
+
+**Status: MOSTLY COMPLETE — 1 critical gap blocks tests**
+
+The `NodeExecutionService` rewrite is structurally complete. The `nodeContext` parameter is accepted
+but ignored — the old `NodeMethodInvoker` bridge that turned `[Node]` methods into executable
+delegates was removed, but `NodeDiscoveryService.BuildDefinitionsFromContext()` does not yet
+generate `InlineExecutor` delegates for discovered `[Node]` methods. As a result, **all 12
+`ExecutionEngineTests` fail** with `No node implementation available for 'Start'`.
+
+This is a Phase 4 discovery gap (should create `InlineExecutor` from `[Node]` methods) that
+surfaced here. Fixing it in `NodeDiscoveryService` will unblock all Phase 6 tests.

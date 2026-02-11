@@ -1,6 +1,4 @@
-using System.Reflection;
 using NodeEditor.Net.Models;
-using NodeEditor.Net.Services;
 using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Registry;
 
@@ -8,328 +6,684 @@ namespace NodeEditor.Blazor.Tests;
 
 public sealed class NodeSuiteTests
 {
-    [Fact]
-    public async Task StringNodes_ConcatAndLength_PipelineWorks()
-    {
-        var nodes = new List<NodeData>
-        {
-            TestNodeFactory.Start("start"),
-            TestNodeFactory.StringConcat("concat", "Hello ", "World"),
-            TestNodeFactory.StringLength("length"),
-            TestNodeFactory.SinkInt("sink")
-        };
-
-        var connections = new List<ConnectionData>
-        {
-            TestConnections.Exec("start", "Exit", "sink", "Enter"),
-            TestConnections.Data("concat", "Result", "length", "Input"),
-            TestConnections.Data("length", "Length", "sink", "Value")
-        };
-
-        var context = new NodeExecutionContext();
-        var service = TestNodeFactory.CreateExecutor();
-        var testContext = new NodeSuiteTestContext();
-
-        await service.ExecuteAsync(nodes, connections, context, testContext, NodeExecutionOptions.Default, CancellationToken.None);
-
-        Assert.Equal(11, context.GetSocketValue("sink", "Observed"));
-    }
-
-    [Fact]
-    public async Task NumberNodes_Clamp_Works()
-    {
-        var nodes = new List<NodeData>
-        {
-            TestNodeFactory.Start("start"),
-            TestNodeFactory.Clamp("clamp", value: 42, min: 0, max: 10),
-            TestNodeFactory.SinkInt("sink")
-        };
-
-        var connections = new List<ConnectionData>
-        {
-            TestConnections.Exec("start", "Exit", "sink", "Enter"),
-            TestConnections.Data("clamp", "Result", "sink", "Value")
-        };
-
-        var context = new NodeExecutionContext();
-        var service = TestNodeFactory.CreateExecutor();
-        var testContext = new NodeSuiteTestContext();
-
-        await service.ExecuteAsync(nodes, connections, context, testContext, NodeExecutionOptions.Default, CancellationToken.None);
-
-        Assert.Equal(10, context.GetSocketValue("sink", "Observed"));
-    }
-
-    [Fact]
-    public async Task ListNodes_Slice_Works()
-    {
-        var nodes = new List<NodeData>
-        {
-            TestNodeFactory.Start("start"),
-            TestNodeFactory.ListCreate("list", "A", "B", "C", "D"),
-            TestNodeFactory.ListSlice("slice", start: 1, count: 2),
-            TestNodeFactory.ListCount("count"),
-            TestNodeFactory.SinkInt("sink")
-        };
-
-        var connections = new List<ConnectionData>
-        {
-            TestConnections.Exec("start", "Exit", "sink", "Enter"),
-            TestConnections.Data("list", "List", "slice", "List"),
-            TestConnections.Data("slice", "Result", "count", "List"),
-            TestConnections.Data("count", "Count", "sink", "Value")
-        };
-
-        var context = new NodeExecutionContext();
-        var service = TestNodeFactory.CreateExecutor();
-        var testContext = new NodeSuiteTestContext();
-
-        await service.ExecuteAsync(nodes, connections, context, testContext, NodeExecutionOptions.Default, CancellationToken.None);
-
-        Assert.Equal(2, context.GetSocketValue("sink", "Observed"));
-    }
-
-    [Fact]
-    public async Task LoopNodes_ForLoopStep_IteratesAndExits()
-    {
-        var nodes = new List<NodeData>
-        {
-            TestNodeFactory.Start("start"),
-            TestNodeFactory.ForLoopStep("loop", start: 0, end: 2, step: 1),
-            TestNodeFactory.Marker("end")
-        };
-
-        var connections = new List<ConnectionData>
-        {
-            TestConnections.Exec("start", "Exit", "loop", "Enter"),
-            TestConnections.Exec("loop", "LoopPath", "loop", "Enter"),
-            TestConnections.Exec("loop", "Exit", "end", "Enter")
-        };
-
-        var context = new NodeExecutionContext();
-        var service = TestNodeFactory.CreateExecutor();
-        var testContext = new NodeSuiteTestContext();
-
-        await service.ExecuteAsync(nodes, connections, context, testContext, NodeExecutionOptions.Default, CancellationToken.None);
-
-        Assert.Equal(4, testContext.ForLoopCalls);
-        Assert.True(context.IsNodeExecuted("end"));
-    }
-}
-
-internal static class TestNodeFactory
-{
-    public static NodeExecutionService CreateExecutor()
+    private static NodeRegistryService CreateRegistry()
     {
         var registry = new NodeRegistryService(new NodeDiscoveryService());
         registry.EnsureInitialized();
-        var services = new MinimalServiceProvider();
-        return new NodeExecutionService(new ExecutionPlanner(), registry, services);
+        return registry;
     }
 
-    public static NodeData Start(string id)
-        => new(id, "Start", true, true,
-            Inputs: Array.Empty<SocketData>(),
-            Outputs: new[] { ExecOutput("Exit") });
+    private static NodeExecutionService CreateService(NodeRegistryService registry)
+        => new(new ExecutionPlanner(), registry, new MinimalServiceProvider());
 
-    public static NodeData StringConcat(string id, string a, string b)
-        => new(id, "String Concat", false, false,
-            Inputs: new[]
-            {
-                DataInput("A", typeof(string).FullName ?? "System.String", SocketValue.FromObject(a)),
-                DataInput("B", typeof(string).FullName ?? "System.String", SocketValue.FromObject(b))
-            },
-            Outputs: new[] { DataOutput("Result", typeof(string).FullName ?? "System.String") });
-
-    public static NodeData StringLength(string id)
-        => new(id, "String Length", false, false,
-            Inputs: new[] { DataInput("Input", typeof(string).FullName ?? "System.String") },
-            Outputs: new[] { DataOutput("Length", typeof(int).FullName ?? "System.Int32") });
-
-    public static NodeData Clamp(string id, int value, int min, int max)
-        => new(id, "Clamp", false, false,
-            Inputs: new[]
-            {
-                DataInput("Value", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(value)),
-                DataInput("Min", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(min)),
-                DataInput("Max", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(max))
-            },
-            Outputs: new[] { DataOutput("Result", typeof(int).FullName ?? "System.Int32") });
-
-    public static NodeData ListCreate(string id, string a, string b, string c, string d)
-        => new(id, "List Create", false, false,
-            Inputs: new[]
-            {
-                DataInput("A", typeof(string).FullName ?? "System.String", SocketValue.FromObject(a)),
-                DataInput("B", typeof(string).FullName ?? "System.String", SocketValue.FromObject(b)),
-                DataInput("C", typeof(string).FullName ?? "System.String", SocketValue.FromObject(c)),
-                DataInput("D", typeof(string).FullName ?? "System.String", SocketValue.FromObject(d))
-            },
-            Outputs: new[] { DataOutput("List", typeof(List<string>).FullName ?? "System.Collections.Generic.List`1") });
-
-    public static NodeData ListSlice(string id, int start, int count)
-        => new(id, "List Slice", false, false,
-            Inputs: new[]
-            {
-                DataInput("List", typeof(List<string>).FullName ?? "System.Collections.Generic.List`1"),
-                DataInput("Start", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(start)),
-                DataInput("Count", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(count))
-            },
-            Outputs: new[] { DataOutput("Result", typeof(List<string>).FullName ?? "System.Collections.Generic.List`1") });
-
-    public static NodeData ListCount(string id)
-        => new(id, "List Count", false, false,
-            Inputs: new[] { DataInput("List", typeof(List<string>).FullName ?? "System.Collections.Generic.List`1") },
-            Outputs: new[] { DataOutput("Count", typeof(int).FullName ?? "System.Int32") });
-
-    public static NodeData ForLoopStep(string id, int start, int end, int step)
-        => new(id, "For Loop Step", true, false,
-            Inputs: new[]
-            {
-                ExecInput("Enter"),
-                DataInput("Start", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(start)),
-                DataInput("End", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(end)),
-                DataInput("Step", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(step))
-            },
-            Outputs: new[] { ExecOutput("Exit"), ExecOutput("LoopPath"), DataOutput("Index", typeof(int).FullName ?? "System.Int32") });
-
-    public static NodeData SinkInt(string id)
-        => new(id, "Sink", true, false,
-            Inputs: new[] { ExecInput("Enter"), DataInput("Value", typeof(int).FullName ?? "System.Int32") },
-            Outputs: new[] { DataOutput("Observed", typeof(int).FullName ?? "System.Int32"), ExecOutput("Exit") });
-
-    public static NodeData Marker(string id)
-        => new(id, "Marker", true, false,
-            Inputs: new[] { ExecInput("Enter") },
-            Outputs: new[] { ExecOutput("Exit") });
-
-    private static SocketData ExecInput(string name)
-        => new(name, typeof(ExecutionPath).FullName ?? nameof(ExecutionPath), true, true);
-
-    private static SocketData ExecOutput(string name)
-        => new(name, typeof(ExecutionPath).FullName ?? nameof(ExecutionPath), false, true);
-
-    private static SocketData DataInput(string name, string typeName, SocketValue? value = null)
-        => new(name, typeName, true, false, value);
-
-    private static SocketData DataOutput(string name, string typeName, SocketValue? value = null)
-        => new(name, typeName, false, false, value);
-}
-
-internal sealed class NodeSuiteTestContext : INodeMethodContext
-{
-    private readonly Dictionary<string, double> _loopState = new(StringComparer.Ordinal);
-
-    public NodeData? CurrentProcessingNode { get; set; }
-
-#pragma warning disable CS0067 // Event is never used
-    public event Action<string, NodeData, ExecutionFeedbackType, object?, bool>? FeedbackInfo;
-#pragma warning restore CS0067
-
-    public int ForLoopCalls { get; private set; }
-
-    [Node("Start", isCallable: true, isExecutionInitiator: true)]
-    public void Start(out ExecutionPath Exit)
+    private static NodeData FromDef(NodeRegistryService reg, string name, string id, params (string socket, object value)[] overrides)
     {
-        Exit = new ExecutionPath();
-        Exit.Signal();
-    }
-
-    [Node("String Concat", isCallable: false)]
-    public void StringConcat(string A, string B, out string Result)
-    {
-        Result = string.Concat(A ?? string.Empty, B ?? string.Empty);
-    }
-
-    [Node("String Length", isCallable: false)]
-    public void StringLength(string Input, out int Length)
-    {
-        Length = (Input ?? string.Empty).Length;
-    }
-
-    [Node("Clamp", isCallable: false)]
-    public void Clamp(int Value, int Min, int Max, out int Result)
-    {
-        var minVal = Math.Min(Min, Max);
-        var maxVal = Math.Max(Min, Max);
-        Result = Math.Min(Math.Max(Value, minVal), maxVal);
-    }
-
-    [Node("List Create", isCallable: false)]
-    public void ListCreate(string A, string B, string C, string D, out List<string> List)
-    {
-        List = new List<string> { A ?? string.Empty, B ?? string.Empty, C ?? string.Empty, D ?? string.Empty };
-    }
-
-    [Node("List Slice", isCallable: false)]
-    public void ListSlice(List<string> List, int Start, int Count, out List<string> Result)
-    {
-        var startIndex = Math.Max(0, Start);
-        var length = Math.Max(0, Count);
-
-        if (startIndex >= List.Count)
+        var def = reg.Definitions.First(d => d.Name == name && (d.NodeType is not null || d.InlineExecutor is not null));
+        var node = def.Factory() with { Id = id };
+        if (overrides.Length == 0) return node;
+        var inputs = node.Inputs.Select(s =>
         {
-            Result = new List<string>();
-            return;
-        }
-
-        var end = Math.Min(List.Count, startIndex + length);
-        Result = List.GetRange(startIndex, end - startIndex);
+            var o = overrides.FirstOrDefault(x => x.socket == s.Name);
+            return o != default ? s with { Value = SocketValue.FromObject(o.value) } : s;
+        }).ToArray();
+        return node with { Inputs = inputs };
     }
 
-    [Node("List Count", isCallable: false)]
-    public void ListCount(List<string> List, out int Count)
+    /// <summary>Execute a pure data pipeline: start → consume (pulling from data chain)</summary>
+    private static async Task<NodeExecutionContext> ExecuteDataPipeline(
+        NodeRegistryService registry, List<NodeData> nodes, List<ConnectionData> connections)
     {
-        Count = List.Count;
+        var service = CreateService(registry);
+        var context = new NodeExecutionContext();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+        return context;
     }
 
-    [Node("For Loop Step", isCallable: true)]
-    public void ForLoopStep(int Start, int End, int Step, out ExecutionPath Exit, out ExecutionPath LoopPath, out int Index)
+    // ── Number Nodes ──
+
+    [Fact]
+    public async Task Abs_NegativeReturnsPositive()
     {
-        ForLoopCalls++;
-        Exit = new ExecutionPath();
-        LoopPath = new ExecutionPath();
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var abs = FromDef(reg, "Abs", "abs", ("Value", -7.0));
+        var consume = FromDef(reg, "Consume", "consume");
 
-        if (Step == 0)
-        {
-            Index = Start;
-            Exit.Signal();
-            return;
-        }
+        var ctx = await ExecuteDataPipeline(reg, new() { start, abs, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("abs", "Result", "consume", "Value") });
 
-        var key = CurrentProcessingNode?.Id ?? "loop";
-        if (!_loopState.TryGetValue(key, out var current))
-        {
-            current = Start;
-        }
-
-        var shouldExit = Step > 0 ? current > End : current < End;
-        if (shouldExit)
-        {
-            Index = (int)(current - Step);
-            _loopState.Remove(key);
-            Exit.Signal();
-            return;
-        }
-
-        Index = (int)current;
-        current += Step;
-        _loopState[key] = current;
-        LoopPath.Signal();
+        Assert.Equal(7.0, ctx.GetSocketValue("abs", "Result"));
     }
 
-    [Node("Sink", isCallable: true)]
-    public void Sink(ExecutionPath Enter, int Value, out int Observed, out ExecutionPath Exit)
+    [Fact]
+    public async Task Min_ReturnsSmallerValue()
     {
-        Observed = Value;
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var min = FromDef(reg, "Min", "min", ("A", 3.0), ("B", 7.0));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, min, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("min", "Result", "consume", "Value") });
+
+        Assert.Equal(3.0, ctx.GetSocketValue("min", "Result"));
     }
 
-    [Node("Marker", isCallable: true)]
-    public void Marker(ExecutionPath Enter, out ExecutionPath Exit)
+    [Fact]
+    public async Task Max_ReturnsLargerValue()
     {
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var max = FromDef(reg, "Max", "max", ("A", 3.0), ("B", 7.0));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, max, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("max", "Result", "consume", "Value") });
+
+        Assert.Equal(7.0, ctx.GetSocketValue("max", "Result"));
+    }
+
+    [Fact]
+    public async Task Mod_ReturnsRemainder()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var mod = FromDef(reg, "Mod", "mod", ("A", 7.0), ("B", 3.0));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, mod, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("mod", "Result", "consume", "Value") });
+
+        Assert.Equal(1.0, ctx.GetSocketValue("mod", "Result"));
+    }
+
+    [Fact]
+    public async Task Round_RoundsToNearest()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var round = FromDef(reg, "Round", "round", ("Value", 3.6));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, round, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("round", "Result", "consume", "Value") });
+
+        Assert.Equal(4.0, ctx.GetSocketValue("round", "Result"));
+    }
+
+    [Fact]
+    public async Task Floor_RoundsDown()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var floor = FromDef(reg, "Floor", "floor", ("Value", 3.9));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, floor, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("floor", "Result", "consume", "Value") });
+
+        Assert.Equal(3.0, ctx.GetSocketValue("floor", "Result"));
+    }
+
+    [Fact]
+    public async Task Ceiling_RoundsUp()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var ceil = FromDef(reg, "Ceiling", "ceil", ("Value", 3.1));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, ceil, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("ceil", "Result", "consume", "Value") });
+
+        Assert.Equal(4.0, ctx.GetSocketValue("ceil", "Result"));
+    }
+
+    [Fact]
+    public async Task Clamp_ClampsToRange()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var clamp = FromDef(reg, "Clamp", "clamp", ("Value", 15.0), ("Min", 0.0), ("Max", 10.0));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, clamp, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("clamp", "Result", "consume", "Value") });
+
+        Assert.Equal(10.0, ctx.GetSocketValue("clamp", "Result"));
+    }
+
+    [Fact]
+    public async Task Sign_ReturnsNegativeOne()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var sign = FromDef(reg, "Sign", "sign", ("Value", -5.0));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, sign, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("sign", "Result", "consume", "Value") });
+
+        Assert.Equal(-1, ctx.GetSocketValue("sign", "Result"));
+    }
+
+    [Fact]
+    public async Task RandomRange_ProducesValueInRange()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var rand = FromDef(reg, "Random Range", "rand", ("Min", 10), ("Max", 20));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, rand, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("rand", "Result", "consume", "Value") });
+
+        var result = (int)ctx.GetSocketValue("rand", "Result")!;
+        Assert.InRange(result, 10, 19);
+    }
+
+    // ── String Nodes ──
+
+    [Fact]
+    public async Task StringConcat_ConcatenatesTwoStrings()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var concat = FromDef(reg, "String Concat", "concat", ("A", "Hello "), ("B", "World"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, concat, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("concat", "Result", "consume", "Value") });
+
+        Assert.Equal("Hello World", ctx.GetSocketValue("concat", "Result"));
+    }
+
+    [Fact]
+    public async Task StringLength_ReturnsCorrectLength()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var len = FromDef(reg, "String Length", "len", ("Value", "abc"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, len, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("len", "Result", "consume", "Value") });
+
+        Assert.Equal(3, ctx.GetSocketValue("len", "Result"));
+    }
+
+    [Fact]
+    public async Task StringConcat_PipeToLength()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var concat = FromDef(reg, "String Concat", "concat", ("A", "Hello "), ("B", "World"));
+        var len = FromDef(reg, "String Length", "len");
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, concat, len, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("concat", "Result", "len", "Value"),
+                TestConnections.Data("len", "Result", "consume", "Value")
+            });
+
+        Assert.Equal(11, ctx.GetSocketValue("len", "Result"));
+    }
+
+    [Fact]
+    public async Task ToUpper_ConvertsToUppercase()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var upper = FromDef(reg, "To Upper", "upper", ("Value", "hello"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, upper, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("upper", "Result", "consume", "Value") });
+
+        Assert.Equal("HELLO", ctx.GetSocketValue("upper", "Result"));
+    }
+
+    [Fact]
+    public async Task ToLower_ConvertsToLowercase()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var lower = FromDef(reg, "To Lower", "lower", ("Value", "HELLO"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, lower, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("lower", "Result", "consume", "Value") });
+
+        Assert.Equal("hello", ctx.GetSocketValue("lower", "Result"));
+    }
+
+    [Fact]
+    public async Task Trim_RemovesWhitespace()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var trim = FromDef(reg, "Trim", "trim", ("Value", "  hello  "));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, trim, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("trim", "Result", "consume", "Value") });
+
+        Assert.Equal("hello", ctx.GetSocketValue("trim", "Result"));
+    }
+
+    [Fact]
+    public async Task Contains_FindsSubstring()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var contains = FromDef(reg, "Contains", "contains", ("Value", "hello world"), ("Search", "world"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, contains, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("contains", "Result", "consume", "Value") });
+
+        Assert.Equal(true, ctx.GetSocketValue("contains", "Result"));
+    }
+
+    [Fact]
+    public async Task Replace_ReplacesSubstring()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var repl = FromDef(reg, "Replace", "repl", ("Value", "hello world"), ("Old", "world"), ("New", "earth"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, repl, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("repl", "Result", "consume", "Value") });
+
+        Assert.Equal("hello earth", ctx.GetSocketValue("repl", "Result"));
+    }
+
+    [Fact]
+    public async Task Substring_ExtractsCorrectly()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var sub = FromDef(reg, "Substring", "sub", ("Value", "hello world"), ("Start", 6), ("Length", 5));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, sub, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("sub", "Result", "consume", "Value") });
+
+        Assert.Equal("world", ctx.GetSocketValue("sub", "Result"));
+    }
+
+    [Fact]
+    public async Task StartsWith_ChecksPrefix()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var sw = FromDef(reg, "Starts With", "sw", ("Value", "hello"), ("Prefix", "hel"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, sw, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("sw", "Result", "consume", "Value") });
+
+        Assert.Equal(true, ctx.GetSocketValue("sw", "Result"));
+    }
+
+    [Fact]
+    public async Task EndsWith_ChecksSuffix()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var ew = FromDef(reg, "Ends With", "ew", ("Value", "hello"), ("Suffix", "llo"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, ew, consume },
+            new() { TestConnections.Exec("start", "Exit", "consume", "Enter"), TestConnections.Data("ew", "Result", "consume", "Value") });
+
+        Assert.Equal(true, ctx.GetSocketValue("ew", "Result"));
+    }
+
+    [Fact]
+    public async Task SplitAndJoin_Roundtrip()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var split = FromDef(reg, "Split", "split", ("Value", "a,b,c"), ("Delimiter", ","));
+        var join = FromDef(reg, "Join", "join", ("Separator", "-"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, split, join, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("split", "Result", "join", "List"),
+                TestConnections.Data("join", "Result", "consume", "Value")
+            });
+
+        Assert.Equal("a-b-c", ctx.GetSocketValue("join", "Result"));
+    }
+
+    // ── List Nodes ──
+
+    [Fact]
+    public async Task ListCreate_ReturnsEmptyList()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var create = FromDef(reg, "List Create", "create");
+        var count = FromDef(reg, "List Count", "count");
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, create, count, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("create", "Result", "count", "List"),
+                TestConnections.Data("count", "Result", "consume", "Value")
+            });
+
+        Assert.Equal(0, ctx.GetSocketValue("count", "Result"));
+    }
+
+    [Fact]
+    public async Task ListAdd_IncreasesCount()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var create = FromDef(reg, "List Create", "create");
+        var add = FromDef(reg, "List Add", "add", ("Item", (object)"hello"));
+        var count = FromDef(reg, "List Count", "count");
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, create, add, count, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("create", "Result", "add", "List"),
+                TestConnections.Data("add", "Result", "count", "List"),
+                TestConnections.Data("count", "Result", "consume", "Value")
+            });
+
+        Assert.Equal(1, ctx.GetSocketValue("count", "Result"));
+    }
+
+    [Fact]
+    public async Task ListGetAndSet_WorkCorrectly()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var create = FromDef(reg, "List Create", "create");
+        var add1 = FromDef(reg, "List Add", "add1", ("Item", (object)"A"));
+        var add2 = FromDef(reg, "List Add", "add2", ("Item", (object)"B"));
+        var set = FromDef(reg, "List Set", "set", ("Index", 0), ("Value", (object)"X"));
+        var get = FromDef(reg, "List Get", "get", ("Index", 0));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, create, add1, add2, set, get, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("create", "Result", "add1", "List"),
+                TestConnections.Data("add1", "Result", "add2", "List"),
+                TestConnections.Data("add2", "Result", "set", "List"),
+                TestConnections.Data("set", "Result", "get", "List"),
+                TestConnections.Data("get", "Result", "consume", "Value")
+            });
+
+        Assert.Equal("X", ctx.GetSocketValue("get", "Result"));
+    }
+
+    [Fact]
+    public async Task ListContains_FindsItem()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var create = FromDef(reg, "List Create", "create");
+        var add = FromDef(reg, "List Add", "add", ("Item", (object)"needle"));
+        var contains = FromDef(reg, "List Contains", "contains", ("Value", (object)"needle"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, create, add, contains, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("create", "Result", "add", "List"),
+                TestConnections.Data("add", "Result", "contains", "List"),
+                TestConnections.Data("contains", "Result", "consume", "Value")
+            });
+
+        Assert.Equal(true, ctx.GetSocketValue("contains", "Result"));
+    }
+
+    [Fact]
+    public async Task ListSlice_ReturnsSubList()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var create = FromDef(reg, "List Create", "create");
+        var add1 = FromDef(reg, "List Add", "add1", ("Item", (object)"A"));
+        var add2 = FromDef(reg, "List Add", "add2", ("Item", (object)"B"));
+        var add3 = FromDef(reg, "List Add", "add3", ("Item", (object)"C"));
+        var add4 = FromDef(reg, "List Add", "add4", ("Item", (object)"D"));
+        var slice = FromDef(reg, "List Slice", "slice", ("Start", 1), ("Count", 2));
+        var count = FromDef(reg, "List Count", "count");
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, create, add1, add2, add3, add4, slice, count, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("create", "Result", "add1", "List"),
+                TestConnections.Data("add1", "Result", "add2", "List"),
+                TestConnections.Data("add2", "Result", "add3", "List"),
+                TestConnections.Data("add3", "Result", "add4", "List"),
+                TestConnections.Data("add4", "Result", "slice", "List"),
+                TestConnections.Data("slice", "Result", "count", "List"),
+                TestConnections.Data("count", "Result", "consume", "Value")
+            });
+
+        Assert.Equal(2, ctx.GetSocketValue("count", "Result"));
+    }
+
+    [Fact]
+    public async Task ListIndexOf_ReturnsCorrectIndex()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var create = FromDef(reg, "List Create", "create");
+        var add1 = FromDef(reg, "List Add", "add1", ("Item", (object)"A"));
+        var add2 = FromDef(reg, "List Add", "add2", ("Item", (object)"B"));
+        var indexOf = FromDef(reg, "List Index Of", "indexOf", ("Value", (object)"B"));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, create, add1, add2, indexOf, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("create", "Result", "add1", "List"),
+                TestConnections.Data("add1", "Result", "add2", "List"),
+                TestConnections.Data("add2", "Result", "indexOf", "List"),
+                TestConnections.Data("indexOf", "Result", "consume", "Value")
+            });
+
+        Assert.Equal(1, ctx.GetSocketValue("indexOf", "Result"));
+    }
+
+    [Fact]
+    public async Task ListRemoveAt_RemovesCorrectItem()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var create = FromDef(reg, "List Create", "create");
+        var add1 = FromDef(reg, "List Add", "add1", ("Item", (object)"A"));
+        var add2 = FromDef(reg, "List Add", "add2", ("Item", (object)"B"));
+        var add3 = FromDef(reg, "List Add", "add3", ("Item", (object)"C"));
+        var removeAt = FromDef(reg, "List Remove At", "removeAt", ("Index", 1));
+        var count = FromDef(reg, "List Count", "count");
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, create, add1, add2, add3, removeAt, count, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("create", "Result", "add1", "List"),
+                TestConnections.Data("add1", "Result", "add2", "List"),
+                TestConnections.Data("add2", "Result", "add3", "List"),
+                TestConnections.Data("add3", "Result", "removeAt", "List"),
+                TestConnections.Data("removeAt", "Result", "count", "List"),
+                TestConnections.Data("count", "Result", "consume", "Value")
+            });
+
+        Assert.Equal(2, ctx.GetSocketValue("count", "Result"));
+    }
+
+    [Fact]
+    public async Task ListClear_ReturnsEmptyList()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var create = FromDef(reg, "List Create", "create");
+        var add = FromDef(reg, "List Add", "add", ("Item", (object)"X"));
+        var clear = FromDef(reg, "List Clear", "clear");
+        var count = FromDef(reg, "List Count", "count");
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, create, add, clear, count, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("create", "Result", "add", "List"),
+                TestConnections.Data("add", "Result", "clear", "List"),
+                TestConnections.Data("clear", "Result", "count", "List"),
+                TestConnections.Data("count", "Result", "consume", "Value")
+            });
+
+        Assert.Equal(0, ctx.GetSocketValue("count", "Result"));
+    }
+
+    [Fact]
+    public async Task ListInsert_InsertsAtCorrectPosition()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var create = FromDef(reg, "List Create", "create");
+        var add1 = FromDef(reg, "List Add", "add1", ("Item", (object)"A"));
+        var add2 = FromDef(reg, "List Add", "add2", ("Item", (object)"C"));
+        var insert = FromDef(reg, "List Insert", "insert", ("Index", 1), ("Item", (object)"B"));
+        var get = FromDef(reg, "List Get", "get", ("Index", 1));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, create, add1, add2, insert, get, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("create", "Result", "add1", "List"),
+                TestConnections.Data("add1", "Result", "add2", "List"),
+                TestConnections.Data("add2", "Result", "insert", "List"),
+                TestConnections.Data("insert", "Result", "get", "List"),
+                TestConnections.Data("get", "Result", "consume", "Value")
+            });
+
+        Assert.Equal("B", ctx.GetSocketValue("get", "Result"));
+    }
+
+    // ── PrintValue (data-only debug) ──
+
+    [Fact]
+    public async Task PrintValue_PassesThroughValue()
+    {
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var abs = FromDef(reg, "Abs", "abs", ("Value", -42.0));
+        var print = FromDef(reg, "Print Value", "print");
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, abs, print, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("abs", "Result", "print", "Value"),
+                TestConnections.Data("print", "PassThrough", "consume", "Value")
+            });
+
+        Assert.Equal(42.0, ctx.GetSocketValue("print", "PassThrough"));
+    }
+
+    // ── Cross-category pipeline ──
+
+    [Fact]
+    public async Task CrossCategory_NumberToStringPipeline()
+    {
+        // Abs(-42) → value is 42.0 (double), then consume it
+        var reg = CreateRegistry();
+        var start = FromDef(reg, "Start", "start");
+        var abs = FromDef(reg, "Abs", "abs", ("Value", -42.0));
+        var consume = FromDef(reg, "Consume", "consume");
+
+        var ctx = await ExecuteDataPipeline(reg, new() { start, abs, consume },
+            new()
+            {
+                TestConnections.Exec("start", "Exit", "consume", "Enter"),
+                TestConnections.Data("abs", "Result", "consume", "Value")
+            });
+
+        Assert.Equal(42.0, ctx.GetSocketValue("abs", "Result"));
+    }
+
+    // ── Discovery/Registration ──
+
+    [Fact]
+    public void Registry_ContainsAllInlineNumberNodes()
+    {
+        var reg = CreateRegistry();
+        var names = new[] { "Abs", "Min", "Max", "Mod", "Round", "Floor", "Ceiling", "Clamp", "Random Range", "Sign" };
+        foreach (var name in names)
+            Assert.Contains(reg.Definitions, d => d.Name == name);
+    }
+
+    [Fact]
+    public void Registry_ContainsAllInlineStringNodes()
+    {
+        var reg = CreateRegistry();
+        var names = new[] { "String Concat", "String Length", "Substring", "Replace", "To Upper", "To Lower", "Trim", "Contains", "Starts With", "Ends With", "Split", "Join" };
+        foreach (var name in names)
+            Assert.Contains(reg.Definitions, d => d.Name == name);
+    }
+
+    [Fact]
+    public void Registry_ContainsAllInlineListNodes()
+    {
+        var reg = CreateRegistry();
+        var names = new[] { "List Create", "List Add", "List Insert", "List Remove At", "List Remove Value", "List Clear", "List Contains", "List Index Of", "List Count", "List Get", "List Set", "List Slice" };
+        foreach (var name in names)
+            Assert.Contains(reg.Definitions, d => d.Name == name);
+    }
+
+    [Fact]
+    public void Registry_ContainsAllNodeBaseNodes()
+    {
+        var reg = CreateRegistry();
+        var names = new[] { "Start", "Branch", "Marker", "Consume", "Delay", "For Loop", "For Loop Step", "ForEach Loop", "While Loop", "Do While Loop", "Repeat Until", "Debug Print", "Print Value", "Debug Warning", "Debug Error" };
+        foreach (var name in names)
+            Assert.Contains(reg.Definitions, d => d.Name == name);
+    }
+
+    [Fact]
+    public void InlineDefinitions_HaveInlineExecutor()
+    {
+        var reg = CreateRegistry();
+        var absDef = reg.Definitions.First(d => d.Name == "Abs" && d.InlineExecutor is not null);
+        Assert.NotNull(absDef.InlineExecutor);
+        Assert.Null(absDef.NodeType);
+    }
+
+    [Fact]
+    public void NodeBaseDefinitions_HaveNodeType()
+    {
+        var reg = CreateRegistry();
+        var startDef = reg.Definitions.First(d => d.Name == "Start" && d.NodeType is not null);
+        Assert.NotNull(startDef.NodeType);
+        Assert.Null(startDef.InlineExecutor);
     }
 }

@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using System.Linq;
 using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Net.Services.Execution.StandardNodes;
@@ -12,6 +12,8 @@ public static class StandardNodeRegistration
 {
     public static IEnumerable<NodeDefinition> GetInlineDefinitions()
     {
-        return Array.Empty<NodeDefinition>();
+        return StandardNumberNodes.GetDefinitions()
+            .Concat(StandardStringNodes.GetDefinitions())
+            .Concat(StandardListNodes.GetDefinitions());
     }
 }

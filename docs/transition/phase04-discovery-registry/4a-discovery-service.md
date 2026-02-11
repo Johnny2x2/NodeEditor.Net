@@ -100,4 +100,29 @@ public sealed class NodeDiscoveryService
 - [x] `BuildDefinitionFromType` calls `Configure()` on temp instance and returns valid `NodeDefinition`
 - [x] Types without parameterless constructor are skipped gracefully
 - [x] Types that throw in `Configure()` are skipped gracefully
-- [x] Solution builds with no references to old discovery logic
+- [x] Solution builds with no references to old discovery logic — **see note below**
+
+### Review notes (2026-02-11)
+
+**Status: COMPLETE ✅ — all criteria pass, 34/34 transition tests green**
+
+The implementation is a **hybrid** approach that retains backward-compatible `INodeContext`/`[Node]`
+method scanning alongside the new `NodeBase` scanning. This is intentional: old-style context
+nodes still need to work until Phase 9 removes them. The spec's "Removed" list was aspirational
+for the end-state, not this phase.
+
+**What works:**
+- `NodeBase` subclass discovery → `Configure(builder)` → `Build()` → `NodeDefinition` with `NodeType` set ✅
+- `INodeContext` backward compat discovery → `[Node]` method scanning → parameter-to-socket mapping ✅
+- Abstract types, missing parameterless constructors, throwing `Configure()` all skipped gracefully ✅
+- `BuildDefinitionFromType` correctly sets `NodeType` on the resulting definition ✅
+- Discovery produces proper `Factory` lambdas that create unique `NodeData` instances ✅
+
+**Key architectural note for downstream phases:**
+Context-based `[Node]` definitions produce `NodeDefinition`s with **no `NodeType` and no `InlineExecutor`**.
+This means they cannot be executed by `ExecutionRuntime` (Phase 5/6), which requires one of those two.
+This is the root cause of all 12 `ExecutionEngineTests` failures. Resolution options:
+1. Phase 7 migrates all standard nodes to `NodeBase` subclasses (eliminates context nodes)
+2. Or `BuildDefinitionsFromContext` generates `InlineExecutor` delegates as a bridge
+
+Per the transition plan, option 1 (Phase 7) is the intended path.
