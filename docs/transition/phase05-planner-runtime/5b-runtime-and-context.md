@@ -188,11 +188,11 @@ internal sealed class ExecutionRuntime
 
 ## Acceptance criteria
 
-- [ ] `NodeExecutionContextImpl` implements all `INodeExecutionContext` members
-- [ ] `TriggerAsync` follows execution connections and calls `ExecuteNodeByIdAsync`
-- [ ] `EmitAsync` supports both `Sequential` and `FireAndForget` modes
-- [ ] `GetInput<T>` resolves from: cached value → upstream connection (lazy) → socket default
-- [ ] `ExecutionRuntime` builds connection maps from `ConnectionData`
-- [ ] `ExecutionRuntime.ExecuteNodeByIdAsync` handles both class-based and inline-executor nodes
-- [ ] Lazy data input resolution triggers upstream execution
-- [ ] Unit tests: basic trigger chain, data resolution, streaming emit
+- [x] `NodeExecutionContextImpl` implements all `INodeExecutionContext` members
+- [x] `TriggerAsync` follows execution connections and calls `ExecuteNodeByIdAsync`
+- [x] `EmitAsync` supports both `Sequential` and `FireAndForget` modes
+- [x] `GetInput<T>` resolves from: cached value → upstream connection (lazy) → socket default
+- [x] `ExecutionRuntime` builds connection maps from `ConnectionData`
+- [x] `ExecutionRuntime.ExecuteNodeByIdAsync` handles both class-based and inline-executor nodes
+- [x] Lazy data input resolution triggers upstream execution
+- [x] Unit tests: basic trigger chain, data resolution, streaming emit

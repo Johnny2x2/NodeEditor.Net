@@ -17,7 +17,8 @@ public sealed class BackgroundExecutionWorker
     {
         await foreach (var job in _queue.DequeueAllAsync(token))
         {
-            await _executor.ExecutePlannedAsync(job.Plan, job.Connections, job.Context, job.NodeContext, job.Options, token).ConfigureAwait(false);
+            await _executor.ExecuteAsync(job.Nodes, job.Connections, job.RuntimeStorage, job.NodeContext, job.Options, token)
+                .ConfigureAwait(false);
         }
     }
 }

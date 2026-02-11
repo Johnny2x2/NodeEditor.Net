@@ -1,18 +1,20 @@
-using NodeEditor.Net.Models;
+﻿using NodeEditor.Net.Models;
 using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Net.Services.Execution;
 
 public sealed class NodeExecutionService : INodeExecutionService
 {
     private readonly ExecutionPlanner _planner;
-    private readonly ISocketTypeResolver _typeResolver;
-    private const int MaxLoopIterations = 10_000;
+    private readonly INodeRegistryService _registry;
+    private readonly IServiceProvider _services;
 
-    public NodeExecutionService(ExecutionPlanner planner, ISocketTypeResolver typeResolver)
+    public NodeExecutionService(ExecutionPlanner planner, INodeRegistryService registry, IServiceProvider services)
     {
         _planner = planner;
-        _typeResolver = typeResolver;
+        _registry = registry;
+        _services = services;
     }
 
     public event EventHandler<NodeExecutionEventArgs>? NodeStarted;
@@ -26,7 +28,7 @@ public sealed class NodeExecutionService : INodeExecutionService
 
     public ExecutionGate Gate { get; } = new();
 
-    // ────────────────────────── Public entry points ──────────────────────────
+    //  Public entry points 
 
     public async Task ExecuteAsync(
         IReadOnlyList<NodeData> nodes,
@@ -37,95 +39,8 @@ public sealed class NodeExecutionService : INodeExecutionService
         CancellationToken token)
     {
         var effectiveOptions = options ?? NodeExecutionOptions.Default;
-        var plan = _planner.BuildHierarchicalPlan(nodes, connections);
-
-        var nodeMap = nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
-        var invoker = new NodeMethodInvoker(nodeContext, _typeResolver);
-        var feedbackContext = nodeContext as INodeMethodContext;
-        var breakExecution = false;
-
-        // Register Custom Event (listener) node handlers on the event bus.
-        // When a Trigger Event node fires, the listener's downstream path executes.
-        RegisterEventListeners(nodes, connections, nodeMap, context, invoker, feedbackContext, effectiveOptions, token);
-
-        void FeedbackHandler(string message, NodeData node, ExecutionFeedbackType type, object? tag, bool breakFlag)
-        {
-            if (breakFlag) breakExecution = true;
-            FeedbackReceived?.Invoke(this, new FeedbackMessageEventArgs(message, node, type, tag));
-        }
-
-        if (feedbackContext is not null)
-            feedbackContext.FeedbackInfo += FeedbackHandler;
-
-        try
-        {
-            await ExecuteStepsAsync(
-                plan.Steps, connections, nodeMap, context, invoker, feedbackContext,
-                effectiveOptions, () => breakExecution, token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            ExecutionCanceled?.Invoke(this, EventArgs.Empty);
-            throw;
-        }
-        catch (Exception ex)
-        {
-            ExecutionFailed?.Invoke(this, ex);
-            throw;
-        }
-        finally
-        {
-            if (feedbackContext is not null)
-                feedbackContext.FeedbackInfo -= FeedbackHandler;
-        }
-    }
-
-    public async Task ExecutePlannedAsync(
-        ExecutionPlan plan,
-        IReadOnlyList<ConnectionData> connections,
-        INodeRuntimeStorage context,
-        object nodeContext,
-        NodeExecutionOptions options,
-        CancellationToken token)
-    {
-        var invoker = new NodeMethodInvoker(nodeContext, _typeResolver);
-        var nodeMap = plan.Layers.SelectMany(l => l.Nodes).ToDictionary(n => n.Id, StringComparer.Ordinal);
-        var feedbackContext = nodeContext as INodeMethodContext;
-        var breakExecution = false;
-
-        void FeedbackHandler(string message, NodeData node, ExecutionFeedbackType type, object? tag, bool breakFlag)
-        {
-            if (breakFlag) breakExecution = true;
-            FeedbackReceived?.Invoke(this, new FeedbackMessageEventArgs(message, node, type, tag));
-        }
-
-        if (feedbackContext is not null)
-            feedbackContext.FeedbackInfo += FeedbackHandler;
-
-        try
-        {
-            // Convert legacy plan to steps
-            var steps = plan.Layers.Select(l => (IExecutionStep)new LayerStep(l.Nodes)).ToList();
-
-            await ExecuteStepsAsync(
-                steps, connections, nodeMap, context, invoker, feedbackContext,
-                options, () => breakExecution, token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            ExecutionCanceled?.Invoke(this, EventArgs.Empty);
-            throw;
-        }
-        catch (Exception ex)
-        {
-            ExecutionFailed?.Invoke(this, ex);
-            throw;
-        }
-        finally
-        {
-            if (feedbackContext is not null)
-                feedbackContext.FeedbackInfo -= FeedbackHandler;
-        }
+        await ExecuteGraphAsync(nodes, connections, context, effectiveOptions, token)
+            .ConfigureAwait(false);
     }
 
     public async Task ExecuteGroupAsync(
@@ -143,15 +58,10 @@ public sealed class NodeExecutionService : INodeExecutionService
             childContext.SetSocketValue(mapping.NodeId, mapping.SocketName, value);
         }
 
-        var plan = _planner.BuildHierarchicalPlan(group.Nodes, group.Connections);
-        var nodeMap = group.Nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
-        var invoker = new NodeMethodInvoker(nodeContext, _typeResolver);
-        var feedbackContext = nodeContext as INodeMethodContext;
         var effectiveOptions = options ?? NodeExecutionOptions.Default;
 
-        await ExecuteStepsAsync(
-            plan.Steps, group.Connections, nodeMap, childContext, invoker, feedbackContext,
-            effectiveOptions, () => false, token).ConfigureAwait(false);
+        await ExecuteGraphAsync(group.Nodes, group.Connections, childContext, effectiveOptions, token)
+            .ConfigureAwait(false);
 
         foreach (var mapping in group.OutputMappings)
         {
@@ -160,405 +70,92 @@ public sealed class NodeExecutionService : INodeExecutionService
         }
     }
 
-    // ────────────────────────── Unified step executor ──────────────────────────
+    //  Graph execution 
 
-    private async Task ExecuteStepsAsync(
-        IReadOnlyList<IExecutionStep> steps,
+    private async Task ExecuteGraphAsync(
+        IReadOnlyList<NodeData> nodes,
         IReadOnlyList<ConnectionData> connections,
-        IReadOnlyDictionary<string, NodeData> nodeMap,
         INodeRuntimeStorage context,
-        NodeMethodInvoker invoker,
-        INodeMethodContext? feedbackContext,
         NodeExecutionOptions options,
-        Func<bool> shouldBreak,
         CancellationToken token)
     {
-        foreach (var step in steps)
+        var validation = _planner.ValidateGraph(nodes, connections);
+        if (validation.HasErrors)
         {
-            token.ThrowIfCancellationRequested();
-            if (shouldBreak()) break;
-
-            switch (step)
-            {
-                case LayerStep layer:
-                    await ExecuteLayerAsync(layer, connections, nodeMap, context, invoker, feedbackContext, options, shouldBreak, token)
-                        .ConfigureAwait(false);
-                    break;
-
-                case LoopStep loop:
-                    await ExecuteLoopAsync(loop, connections, nodeMap, context, invoker, feedbackContext, options, shouldBreak, token)
-                        .ConfigureAwait(false);
-                    break;
-
-                case BranchStep branch:
-                    await ExecuteBranchAsync(branch, connections, nodeMap, context, invoker, feedbackContext, options, shouldBreak, token)
-                        .ConfigureAwait(false);
-                    break;
-
-                case ParallelSteps parallel:
-                    await ExecuteParallelStepsAsync(parallel, connections, nodeMap, context, invoker, feedbackContext, options, shouldBreak, token)
-                        .ConfigureAwait(false);
-                    break;
-            }
-        }
-    }
-
-    private async Task ExecuteLayerAsync(
-        LayerStep layer,
-        IReadOnlyList<ConnectionData> connections,
-        IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeRuntimeStorage context,
-        NodeMethodInvoker invoker,
-        INodeMethodContext? feedbackContext,
-        NodeExecutionOptions options,
-        Func<bool> shouldBreak,
-        CancellationToken token)
-    {
-        var layerEvent = new ExecutionLayer(layer.Nodes);
-        LayerStarted?.Invoke(this, new ExecutionLayerEventArgs(layerEvent));
-
-        if (layer.Nodes.Count == 1 || options.MaxDegreeOfParallelism <= 1)
-        {
-            // Sequential within layer
-            foreach (var node in layer.Nodes)
-            {
-                token.ThrowIfCancellationRequested();
-                if (shouldBreak()) break;
-
-                await Gate.WaitAsync(token).ConfigureAwait(false);
-                await ExecuteNodeAsync(node, connections, nodeMap, context, invoker, feedbackContext, token)
-                    .ConfigureAwait(false);
-            }
-        }
-        else
-        {
-            // Parallel within layer
-            using var throttler = new SemaphoreSlim(Math.Max(1, options.MaxDegreeOfParallelism));
-            var tasks = layer.Nodes.Select(async node =>
-            {
-                await throttler.WaitAsync(token).ConfigureAwait(false);
-                try
-                {
-                    await Gate.WaitAsync(token).ConfigureAwait(false);
-                    await ExecuteNodeAsync(node, connections, nodeMap, context, invoker, feedbackContext, token)
-                        .ConfigureAwait(false);
-                }
-                finally
-                {
-                    throttler.Release();
-                }
-            });
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            var details = string.Join(" ", validation.Messages
+                .Where(m => m.Severity == ValidationSeverity.Error)
+                .Select(m => m.Message));
+            throw new InvalidOperationException(details.Length == 0
+                ? "Graph validation failed."
+                : details);
         }
 
-        LayerCompleted?.Invoke(this, new ExecutionLayerEventArgs(layerEvent));
-    }
+        // 1. Build runtime
+        var runtime = new ExecutionRuntime(nodes, connections, context,
+            _services, _registry, Gate, token);
 
-    private async Task ExecuteLoopAsync(
-        LoopStep loop,
-        IReadOnlyList<ConnectionData> connections,
-        IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeRuntimeStorage context,
-        NodeMethodInvoker invoker,
-        INodeMethodContext? feedbackContext,
-        NodeExecutionOptions options,
-        Func<bool> shouldBreak,
-        CancellationToken token)
-    {
-        var bodyNodeIds = loop.BodyNodes.Select(n => n.Id).ToList();
-        var iteration = 0;
+        // Forward runtime events to service events
+        runtime.NodeStarted += (s, e) => NodeStarted?.Invoke(this, e);
+        runtime.NodeCompleted += (s, e) => NodeCompleted?.Invoke(this, e);
+        runtime.NodeFailed += (s, e) => NodeFailed?.Invoke(this, e);
+        runtime.FeedbackReceived += (s, e) => FeedbackReceived?.Invoke(this, e);
 
-        while (iteration < MaxLoopIterations)
+        // 2. Register event listeners (Custom Event nodes)
+        RegisterEventListeners(runtime, nodes, context);
+
+        // 3. Create all node instances (for DI setup)
+        foreach (var node in nodes)
         {
-            token.ThrowIfCancellationRequested();
-            if (shouldBreak()) break;
-
-            // Execute the loop header node
-            await Gate.WaitAsync(token).ConfigureAwait(false);
-            await ExecuteNodeAsync(loop.Header, connections, nodeMap, context, invoker, feedbackContext, token)
-                .ConfigureAwait(false);
-
-            // Check which path was signaled
-            var loopPath = context.GetSocketValue(loop.Header.Id, loop.LoopPathSocket) as ExecutionPath;
-            var exitPath = context.GetSocketValue(loop.Header.Id, loop.ExitPathSocket) as ExecutionPath;
-
-            if (exitPath?.IsSignaled == true)
-            {
-                // Loop complete — follow exit path
-                break;
-            }
-
-            if (loopPath?.IsSignaled != true)
-            {
-                // Neither signaled — shouldn't happen, but break to be safe
-                break;
-            }
-
-            // Execute the loop body
-            if (loop.Body.Count > 0)
-            {
-                // Push a new generation so body data nodes re-execute each iteration
-                context.PushGeneration();
-                context.ClearExecutedForNodes(bodyNodeIds);
-
-                await ExecuteStepsAsync(
-                    loop.Body, connections, nodeMap, context, invoker, feedbackContext,
-                    options, shouldBreak, token).ConfigureAwait(false);
-
-                context.PopGeneration();
-            }
-
-            iteration++;
+            var instance = runtime.GetOrCreateInstance(node.Id);
+            if (instance is not null)
+                await instance.OnCreatedAsync(_services).ConfigureAwait(false);
         }
 
-        if (iteration >= MaxLoopIterations)
-        {
-            throw new InvalidOperationException(
-                $"Loop '{loop.Header.Name}' exceeded maximum iteration limit ({MaxLoopIterations}). " +
-                "This may indicate an infinite loop.");
-        }
-    }
-
-    private async Task ExecuteParallelStepsAsync(
-        ParallelSteps parallel,
-        IReadOnlyList<ConnectionData> connections,
-        IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeRuntimeStorage context,
-        NodeMethodInvoker invoker,
-        INodeMethodContext? feedbackContext,
-        NodeExecutionOptions options,
-        Func<bool> shouldBreak,
-        CancellationToken token)
-    {
-        if (parallel.Steps.Count == 0) return;
-
-        if (parallel.Steps.Count == 1 || options.MaxDegreeOfParallelism <= 1)
-        {
-            // Fall back to sequential if only one step or parallelism disabled
-            await ExecuteStepsAsync(parallel.Steps, connections, nodeMap, context, invoker, feedbackContext, options, shouldBreak, token)
-                .ConfigureAwait(false);
-            return;
-        }
-
-        var tasks = parallel.Steps.Select(step =>
-            ExecuteStepsAsync(
-                new[] { step }, connections, nodeMap, context, invoker, feedbackContext,
-                options, shouldBreak, token));
-
-        await Task.WhenAll(tasks).ConfigureAwait(false);
-    }
-
-    private async Task ExecuteBranchAsync(
-        BranchStep branch,
-        IReadOnlyList<ConnectionData> connections,
-        IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeRuntimeStorage context,
-        NodeMethodInvoker invoker,
-        INodeMethodContext? feedbackContext,
-        NodeExecutionOptions options,
-        Func<bool> shouldBreak,
-        CancellationToken token)
-    {
-        // Execute the condition node
-        await Gate.WaitAsync(token).ConfigureAwait(false);
-        await ExecuteNodeAsync(branch.ConditionNode, connections, nodeMap, context, invoker, feedbackContext, token)
-            .ConfigureAwait(false);
-
-        // Find which branch was signaled
-        foreach (var (socketName, branchSteps) in branch.Branches)
-        {
-            var path = context.GetSocketValue(branch.ConditionNode.Id, socketName) as ExecutionPath;
-            if (path?.IsSignaled == true)
-            {
-                await ExecuteStepsAsync(
-                    branchSteps, connections, nodeMap, context, invoker, feedbackContext,
-                    options, shouldBreak, token).ConfigureAwait(false);
-                break;
-            }
-        }
-    }
-
-    // ────────────────────────── Node execution ──────────────────────────
-
-    private async Task ExecuteNodeAsync(
-        NodeData node,
-        IReadOnlyList<ConnectionData> connections,
-        IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeRuntimeStorage context,
-        NodeMethodInvoker invoker,
-        INodeMethodContext? feedbackContext,
-        CancellationToken token)
-    {
-        // Skip callable nodes whose exec-input was not signaled by any upstream node.
-        // This ensures branch targets that weren't chosen don't execute.
-        if (node.Callable && !node.ExecInit)
-        {
-            var execInputs = node.Inputs.Where(s => s.IsExecution).ToList();
-            if (execInputs.Count > 0)
-            {
-                var hasSignaledInput = false;
-                foreach (var execInput in execInputs)
-                {
-                    // Find the upstream connection that feeds this exec input
-                    var upstream = connections.FirstOrDefault(c =>
-                        c.InputNodeId == node.Id &&
-                        c.InputSocketName == execInput.Name &&
-                        c.IsExecution);
-
-                    if (upstream is not null)
-                    {
-                        var upstreamPath = context.GetSocketValue(upstream.OutputNodeId, upstream.OutputSocketName) as ExecutionPath;
-                        if (upstreamPath?.IsSignaled == true)
-                        {
-                            hasSignaledInput = true;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        // No upstream connection — treat as unconditionally reachable
-                        hasSignaledInput = true;
-                        break;
-                    }
-                }
-
-                if (!hasSignaledInput)
-                {
-                    // Skip this node — its exec path was not activated
-                    return;
-                }
-            }
-        }
-
-        NodeStarted?.Invoke(this, new NodeExecutionEventArgs(node));
+        // 4. Find initiator nodes and execute them
+        var initiators = nodes.Where(n => n.ExecInit).ToList();
 
         try
         {
-            if (feedbackContext is not null)
-                feedbackContext.CurrentProcessingNode = node;
-
-            await ResolveInputsAsync(node, connections, nodeMap, context, invoker, feedbackContext, token)
-                .ConfigureAwait(false);
-
-            if (VariableNodeExecutor.IsVariableNode(node))
+            if (options.MaxDegreeOfParallelism > 1 && initiators.Count > 1)
             {
-                VariableNodeExecutor.Execute(node, context);
-                NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
-                return;
+                await Task.WhenAll(initiators.Select(n => runtime.ExecuteNodeByIdAsync(n.Id)))
+                    .ConfigureAwait(false);
             }
-
-            if (EventNodeExecutor.IsEventNode(node))
+            else
             {
-                if (EventNodeExecutor.IsTriggerNode(node))
-                {
-                    await EventNodeExecutor.ExecuteTriggerAsync(node, context, token).ConfigureAwait(false);
-                }
-                else
-                {
-                    // Listener nodes are handled by the event bus; just mark executed
-                    EventNodeExecutor.ExecuteListener(node, context);
-                }
-                NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
-                return;
+                foreach (var initiator in initiators)
+                    await runtime.ExecuteNodeByIdAsync(initiator.Id).ConfigureAwait(false);
             }
-
-            var binding = invoker.Resolve(node);
-            if (binding is null)
-            {
-                throw new InvalidOperationException($"No method binding found for node '{node.Name}'.");
-            }
-
-            await invoker.InvokeAsync(node, binding, context, token).ConfigureAwait(false);
-
-            NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
+        }
+        catch (OperationCanceledException)
+        {
+            ExecutionCanceled?.Invoke(this, EventArgs.Empty);
+            throw;
         }
         catch (Exception ex)
         {
-            NodeFailed?.Invoke(this, new NodeExecutionFailedEventArgs(node, ex));
+            ExecutionFailed?.Invoke(this, ex);
             throw;
         }
-    }
-
-    private async Task ResolveInputsAsync(
-        NodeData node,
-        IReadOnlyList<ConnectionData> connections,
-        IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeRuntimeStorage context,
-        NodeMethodInvoker invoker,
-        INodeMethodContext? feedbackContext,
-        CancellationToken token)
-    {
-        var connectionsByInput = connections
-            .Where(c => !c.IsExecution)
-            .GroupBy(c => (c.InputNodeId, c.InputSocketName))
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        var stack = new HashSet<string>(StringComparer.Ordinal);
-        var path = new Stack<string>();
-
-        async Task ResolveNodeAsync(NodeData target)
+        finally
         {
-            if (!stack.Add(target.Id))
-            {
-                var cyclePath = path.Reverse().SkipWhile(id => id != target.Id).Concat(new[] { target.Id });
-                var cycleDescription = string.Join(" -> ", cyclePath.Select(id =>
-                    nodeMap.TryGetValue(id, out var n) ? $"{n.Name} ({id})" : id));
-                throw new InvalidOperationException(
-                    $"Circular dependency detected in graph: {cycleDescription}. " +
-                    "Data-flow nodes cannot have circular dependencies.");
-            }
-
-            path.Push(target.Id);
-
-            foreach (var input in target.Inputs.Where(i => !i.IsExecution))
-            {
-                token.ThrowIfCancellationRequested();
-
-                if (!connectionsByInput.TryGetValue((target.Id, input.Name), out var inbound))
-                    continue;
-
-                foreach (var connection in inbound)
-                {
-                    if (!nodeMap.TryGetValue(connection.OutputNodeId, out var sourceNode))
-                        continue;
-
-                    await ResolveNodeAsync(sourceNode).ConfigureAwait(false);
-
-                    if (!sourceNode.Callable && !context.IsNodeExecuted(sourceNode.Id))
-                    {
-                        await ExecuteNodeAsync(sourceNode, connections, nodeMap, context, invoker, feedbackContext, token)
-                            .ConfigureAwait(false);
-                    }
-
-                    var outputValue = context.GetSocketValue(sourceNode.Id, connection.OutputSocketName);
-                    context.SetSocketValue(target.Id, input.Name, outputValue);
-                }
-            }
-
-            stack.Remove(target.Id);
-            path.Pop();
+            // 5. Cleanup
+            foreach (var (_, instance) in runtime.NodeInstances)
+                instance?.OnDisposed();
         }
-
-        await ResolveNodeAsync(node).ConfigureAwait(false);
     }
 
-    // ────────────────────────── Event listener registration ──────────────────────────
+    //  Event listener registration 
 
     /// <summary>
     /// Scans the graph for Custom Event (listener) nodes and registers handlers on the event bus.
     /// When a Trigger Event fires, the corresponding listener handlers execute the listener's
-    /// downstream execution path.
+    /// downstream execution path via the runtime.
     /// </summary>
-    private void RegisterEventListeners(
+    private static void RegisterEventListeners(
+        ExecutionRuntime runtime,
         IReadOnlyList<NodeData> nodes,
-        IReadOnlyList<ConnectionData> connections,
-        IReadOnlyDictionary<string, NodeData> nodeMap,
-        INodeRuntimeStorage context,
-        NodeMethodInvoker invoker,
-        INodeMethodContext? feedbackContext,
-        NodeExecutionOptions options,
-        CancellationToken token)
+        INodeRuntimeStorage context)
     {
         var listenerNodes = nodes.Where(EventNodeExecutor.IsListenerNode).ToList();
         if (listenerNodes.Count == 0) return;
@@ -576,18 +173,11 @@ public sealed class NodeExecutionService : INodeExecutionService
                 // Signal the listener's Exit path
                 EventNodeExecutor.ExecuteListener(capturedListener, context);
 
-                // Find the downstream nodes connected to Exit and execute them
-                var exitConnections = connections
-                    .Where(c => c.OutputNodeId == capturedListener.Id && c.OutputSocketName == "Exit" && c.IsExecution)
-                    .ToList();
-
-                foreach (var exitConn in exitConnections)
+                // Find downstream nodes connected to Exit and execute them via runtime
+                var exitTargets = runtime.GetExecutionTargets(capturedListener.Id, "Exit");
+                foreach (var (targetNodeId, _) in exitTargets)
                 {
-                    if (nodeMap.TryGetValue(exitConn.InputNodeId, out var downstreamNode))
-                    {
-                        await ExecuteNodeAsync(downstreamNode, connections, nodeMap, context, invoker, feedbackContext, token)
-                            .ConfigureAwait(false);
-                    }
+                    await runtime.ExecuteNodeByIdAsync(targetNodeId).ConfigureAwait(false);
                 }
             });
         }

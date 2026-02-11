@@ -30,14 +30,6 @@ public interface INodeExecutionService
         NodeExecutionOptions? options,
         CancellationToken token);
 
-    Task ExecutePlannedAsync(
-        ExecutionPlan plan,
-        IReadOnlyList<ConnectionData> connections,
-        INodeRuntimeStorage context,
-        object nodeContext,
-        NodeExecutionOptions options,
-        CancellationToken token);
-
     Task ExecuteGroupAsync(
         GroupNodeData group,
         INodeRuntimeStorage parentContext,

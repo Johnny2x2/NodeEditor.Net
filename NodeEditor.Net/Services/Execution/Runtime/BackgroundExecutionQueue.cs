@@ -5,11 +5,11 @@ namespace NodeEditor.Net.Services.Execution;
 
 public sealed record ExecutionJob(
     Guid Id,
-    ExecutionPlan Plan,
+    IReadOnlyList<NodeData> Nodes,
     IReadOnlyList<ConnectionData> Connections,
-    INodeRuntimeStorage Context,
+    INodeRuntimeStorage RuntimeStorage,
     object NodeContext,
-    NodeExecutionOptions Options);
+    NodeExecutionOptions? Options);
 
 public sealed class BackgroundExecutionQueue
 {

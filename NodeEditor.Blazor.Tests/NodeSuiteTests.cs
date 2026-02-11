@@ -1,6 +1,8 @@
+using System.Reflection;
 using NodeEditor.Net.Models;
 using NodeEditor.Net.Services;
 using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Blazor.Tests;
 
@@ -100,6 +102,7 @@ public sealed class NodeSuiteTests
         var connections = new List<ConnectionData>
         {
             TestConnections.Exec("start", "Exit", "loop", "Enter"),
+            TestConnections.Exec("loop", "LoopPath", "loop", "Enter"),
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
@@ -117,7 +120,12 @@ public sealed class NodeSuiteTests
 internal static class TestNodeFactory
 {
     public static NodeExecutionService CreateExecutor()
-        => new(new ExecutionPlanner(), new SocketTypeResolver());
+    {
+        var registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+        var services = new MinimalServiceProvider();
+        return new NodeExecutionService(new ExecutionPlanner(), registry, services);
+    }
 
     public static NodeData Start(string id)
         => new(id, "Start", true, true,

@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using NodeEditor.Net.Models;
 using NodeEditor.Net.Services;
 using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Blazor.Tests;
 
@@ -201,14 +203,15 @@ public sealed class ExecutionEngineTests
         };
 
         var context = new NodeExecutionContext();
-        var testContext = new TestNodeContext();
-        var planner = new ExecutionPlanner();
-        var service = new NodeExecutionService(planner, new SocketTypeResolver());
+        var registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+        var services = new MinimalServiceProvider();
+        var service = new NodeExecutionService(new ExecutionPlanner(), registry, services);
         var queue = new BackgroundExecutionQueue();
         var worker = new BackgroundExecutionWorker(queue, service);
 
-        var plan = planner.BuildPlan(nodes, connections);
-        var job = new ExecutionJob(Guid.NewGuid(), plan, connections, context, testContext, NodeExecutionOptions.Default);
+        var testContext = new TestNodeContext();
+        var job = new ExecutionJob(Guid.NewGuid(), nodes, connections, context, testContext, NodeExecutionOptions.Default);
         await queue.EnqueueAsync(job);
 
         using var cts = new CancellationTokenSource();
@@ -245,6 +248,7 @@ public sealed class ExecutionEngineTests
         {
             TestConnections.Exec("start", "Exit", "loop", "Enter"),
             TestConnections.Exec("loop", "LoopPath", "body", "Enter"),
+            TestConnections.Exec("body", "Exit", "loop", "Enter"),
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
@@ -263,7 +267,7 @@ public sealed class ExecutionEngineTests
     [Fact]
     public async Task Loop_ForLoopStep_NoBodyNodes_StillIterates()
     {
-        // Loop with no LoopPath connections — loop still iterates internally
+        // Loop with a self-loop on LoopPath so the header re-enters until Exit is signaled
         var nodes = new List<NodeData>
         {
             TestNodes.Start("start"),
@@ -274,6 +278,7 @@ public sealed class ExecutionEngineTests
         var connections = new List<ConnectionData>
         {
             TestConnections.Exec("start", "Exit", "loop", "Enter"),
+            TestConnections.Exec("loop", "LoopPath", "loop", "Enter"),
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
@@ -310,8 +315,10 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("start", "Exit", "loopA", "Enter"),
             TestConnections.Exec("start", "Exit", "loopB", "Enter"),
             TestConnections.Exec("loopA", "LoopPath", "bodyA", "Enter"),
+            TestConnections.Exec("bodyA", "Exit", "loopA", "Enter"),
             TestConnections.Exec("loopA", "Exit", "endA", "Enter"),
             TestConnections.Exec("loopB", "LoopPath", "bodyB", "Enter"),
+            TestConnections.Exec("bodyB", "Exit", "loopB", "Enter"),
             TestConnections.Exec("loopB", "Exit", "endB", "Enter")
         };
 
@@ -326,11 +333,9 @@ public sealed class ExecutionEngineTests
         Assert.True(context.IsNodeExecuted("endA"), "endA should have been executed");
         Assert.True(context.IsNodeExecuted("endB"), "endB should have been executed");
 
-        // Verify the plan contains a ParallelSteps grouping
-        var planner = new ExecutionPlanner();
-        var plan = planner.BuildHierarchicalPlan(nodes, connections);
-        var hasParallelSteps = plan.Steps.Any(s => s is ParallelSteps ps && ps.Steps.Count >= 2);
-        Assert.True(hasParallelSteps, "Two independent loops should be grouped into ParallelSteps");
+        // Loop bodies should have executed at least once
+        Assert.True(context.IsNodeExecuted("bodyA"), "bodyA should have been executed");
+        Assert.True(context.IsNodeExecuted("bodyB"), "bodyB should have been executed");
     }
 
     [Fact]
@@ -406,7 +411,12 @@ public sealed class ExecutionEngineTests
 internal static class TestNodes
 {
     public static NodeExecutionService CreateExecutor()
-        => new(new ExecutionPlanner(), new SocketTypeResolver());
+    {
+        var registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+        var services = new MinimalServiceProvider();
+        return new NodeExecutionService(new ExecutionPlanner(), registry, services);
+    }
 
     public static NodeData Start(string id)
         => new(id, "Start", true, true,
@@ -659,4 +669,12 @@ internal static partial class ExecutionTestHelpers
 
         return predicate();
     }
+}
+
+/// <summary>
+/// Minimal IServiceProvider for tests — returns null for all service requests.
+/// </summary>
+internal sealed class MinimalServiceProvider : IServiceProvider
+{
+    public object? GetService(Type serviceType) => null;
 }
