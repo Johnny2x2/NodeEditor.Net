@@ -206,13 +206,18 @@ public sealed class GraphSerializer : IGraphSerializer
 
     private GraphNodeData CreateGraphNodeData(NodeDto dto, List<string> warnings)
     {
-        if (!string.IsNullOrWhiteSpace(dto.TypeId))
+        // Migrate old method-signature-based DefinitionIds to new class-name-based IDs
+        var typeId = !string.IsNullOrWhiteSpace(dto.TypeId)
+            ? DefinitionIdMigration.Migrate(dto.TypeId)
+            : dto.TypeId;
+
+        if (!string.IsNullOrWhiteSpace(typeId))
         {
             var exists = _registry.Definitions.Any(definition =>
-                definition.Id.Equals(dto.TypeId, StringComparison.Ordinal));
+                definition.Id.Equals(typeId, StringComparison.Ordinal));
             if (!exists)
             {
-                warnings.Add($"Node type '{dto.TypeId}' not found. Using persisted socket snapshot for node '{dto.Id}'.");
+                warnings.Add($"Node type '{typeId}' not found. Using persisted socket snapshot for node '{dto.Id}'.");
             }
         }
 
@@ -226,7 +231,7 @@ public sealed class GraphSerializer : IGraphSerializer
             dto.ExecInit,
             inputs,
             outputs,
-            dto.TypeId);
+            typeId);
 
         return new GraphNodeData(
             nodeData,

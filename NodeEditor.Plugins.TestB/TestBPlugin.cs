@@ -17,17 +17,37 @@ public sealed class TestBPlugin : INodePlugin
     }
 }
 
-public sealed class TestBPluginContext : INodeContext
+public sealed class AddIntsNode : NodeBase
 {
-    [Node("Add Ints", category: "Test", description: "Add two integers", isCallable: false)]
-    public void Add(int A, int B, out int Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add Ints").Category("Test")
+            .Description("Add two integers")
+            .Input<int>("A", 0)
+            .Input<int>("B", 0)
+            .Output<int>("Result");
     }
 
-    [Node("To Upper", category: "Test", description: "Convert string to upper-case", isCallable: false)]
-    public void ToUpper(string Input, out string Output)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Output = Input.ToUpperInvariant();
+        context.SetOutput("Result", context.GetInput<int>("A") + context.GetInput<int>("B"));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class ToUpperNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("To Upper").Category("Test")
+            .Description("Convert string to upper-case")
+            .Input<string>("Input", "")
+            .Output<string>("Output");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Output", context.GetInput<string>("Input").ToUpperInvariant());
+        return Task.CompletedTask;
     }
 }
