@@ -92,7 +92,7 @@ public sealed class NodeExecutionService : INodeExecutionService
 
         // 1. Build runtime
         var runtime = new ExecutionRuntime(nodes, connections, context,
-            _services, _registry, Gate, token);
+            _services, _registry, Gate, options, token);
 
         // Forward runtime events to service events
         runtime.NodeStarted += (s, e) => NodeStarted?.Invoke(this, e);

@@ -30,11 +30,11 @@ public sealed class NodeSuiteTests
     }
 
     /// <summary>Execute a pure data pipeline: start → consume (pulling from data chain)</summary>
-    private static async Task<NodeExecutionContext> ExecuteDataPipeline(
+    private static async Task<NodeRuntimeStorage> ExecuteDataPipeline(
         NodeRegistryService registry, List<NodeData> nodes, List<ConnectionData> connections)
     {
         var service = CreateService(registry);
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
         return context;
     }

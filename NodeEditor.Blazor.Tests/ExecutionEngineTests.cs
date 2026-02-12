@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Registry;
@@ -44,7 +44,7 @@ public sealed class ExecutionEngineTests
         return node with { Inputs = newInputs };
     }
 
-    // ── Sequential Execution ──
+    // â”€â”€ Sequential Execution â”€â”€
 
     [Fact]
     public async Task SequentialExecution_StartTriggersDownstream()
@@ -59,7 +59,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("start", "Exit", "marker", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.True(context.IsNodeExecuted("start"));
@@ -83,7 +83,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("branch", "False", "falseMarker", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.True(context.IsNodeExecuted("trueMarker"), "True branch should execute");
@@ -107,14 +107,14 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("branch", "False", "falseMarker", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.False(context.IsNodeExecuted("trueMarker"), "True branch should NOT execute");
         Assert.True(context.IsNodeExecuted("falseMarker"), "False branch should execute");
     }
 
-    // ── Data Resolution ──
+    // â”€â”€ Data Resolution â”€â”€
 
     [Fact]
     public async Task DataNode_ResolvesUpstreamLazily()
@@ -131,7 +131,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Data("abs", "Result", "consume", "Value")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.True(context.IsNodeExecuted("abs"), "Data node should have been lazily evaluated");
@@ -155,14 +155,14 @@ public sealed class ExecutionEngineTests
             TestConnections.Data("clamp", "Result", "consume", "Value")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.Equal(15.0, context.GetSocketValue("abs", "Result"));
         Assert.Equal(10.0, context.GetSocketValue("clamp", "Result"));
     }
 
-    // ── Loops ──
+    // â”€â”€ Loops â”€â”€
 
     [Fact]
     public async Task ForLoop_IteratesCorrectTimes()
@@ -181,7 +181,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.True(context.IsNodeExecuted("body"), "Loop body should have executed");
@@ -205,11 +205,11 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.True(context.IsNodeExecuted("end"), "Exit should have been reached");
-        // Iterates: 0, 2, 4 → last Index = 4
+        // Iterates: 0, 2, 4 â†’ last Index = 4
         Assert.Equal(4, context.GetSocketValue("loop", "Index"));
     }
 
@@ -230,7 +230,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.False(context.IsNodeExecuted("body"), "Body should NOT execute when condition is false");
@@ -254,14 +254,14 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.True(context.IsNodeExecuted("body"), "Body should execute at least once in do-while");
         Assert.True(context.IsNodeExecuted("end"), "Exit should be reached");
     }
 
-    // ── Cancellation ──
+    // â”€â”€ Cancellation â”€â”€
 
     [Fact]
     public async Task Cancellation_StopsExecutionWithinTimeout()
@@ -276,14 +276,14 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("start", "Exit", "delay", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         using var cts = new CancellationTokenSource(100);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, cts.Token));
     }
 
-    // ── Debug/Feedback ──
+    // â”€â”€ Debug/Feedback â”€â”€
 
     [Fact]
     public async Task DebugPrint_EmitsFeedbackEvent()
@@ -298,7 +298,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("start", "Exit", "debug", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         string? receivedMessage = null;
         service.FeedbackReceived += (_, args) => receivedMessage = args.Message;
 
@@ -322,7 +322,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("start", "Exit", "warn", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         ExecutionFeedbackType? feedbackType = null;
         service.FeedbackReceived += (_, args) => feedbackType = args.Type;
 
@@ -331,7 +331,7 @@ public sealed class ExecutionEngineTests
         Assert.Equal(ExecutionFeedbackType.Continue, feedbackType);
     }
 
-    // ── Step Mode ──
+    // â”€â”€ Step Mode â”€â”€
 
     [Fact]
     public async Task StepMode_GatePausesAndResumes()
@@ -348,7 +348,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("a", "Exit", "b", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         service.Gate.StartPaused();
 
         var execTask = Task.Run(async () =>
@@ -368,14 +368,14 @@ public sealed class ExecutionEngineTests
         Assert.True(context.IsNodeExecuted("b"));
     }
 
-    // ── Group Execution ──
+    // â”€â”€ Group Execution â”€â”€
 
     [Fact]
     public async Task GroupExecution_ReturnsOutputsToParentContext()
     {
         var service = CreateService(out var registry);
 
-        // Inner group: Start → Consume, with Abs(-42) lazily pulled by Consume
+        // Inner group: Start â†’ Consume, with Abs(-42) lazily pulled by Consume
         var innerStart = NodeFromDef(registry, "Start", "innerStart");
         var innerAbs = NodeFromDef(registry, "Abs", "innerAbs", ("Value", -42.0));
         var innerConsume = NodeFromDef(registry, "Consume", "innerConsume");
@@ -396,21 +396,21 @@ public sealed class ExecutionEngineTests
             InputMappings: Array.Empty<GroupSocketMapping>(),
             OutputMappings: new[] { new GroupSocketMapping("Value", "innerAbs", "Result") });
 
-        var parentContext = new NodeExecutionContext();
+        var parentContext = new NodeRuntimeStorage();
 
         await service.ExecuteGroupAsync(group, parentContext, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.Equal(42.0, parentContext.GetSocketValue("group", "Value"));
     }
 
-    // ── Parallel Execution ──
+    // â”€â”€ Parallel Execution â”€â”€
 
     [Fact]
     public async Task ParallelInitiators_BothExecute()
     {
         var service = CreateService(out var registry);
 
-        // Two independent Start → Marker chains
+        // Two independent Start â†’ Marker chains
         var start1 = NodeFromDef(registry, "Start", "start1");
         var marker1 = NodeFromDef(registry, "Marker", "marker1");
         var start2 = NodeFromDef(registry, "Start", "start2");
@@ -423,7 +423,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("start2", "Exit", "marker2", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         var options = new NodeExecutionOptions(ExecutionMode.Parallel, AllowBackground: false, MaxDegreeOfParallelism: 4);
         await service.ExecuteAsync(nodes, connections, context, null!, options, CancellationToken.None);
 
@@ -431,7 +431,7 @@ public sealed class ExecutionEngineTests
         Assert.True(context.IsNodeExecuted("marker2"));
     }
 
-    // ── Background Queue ──
+    // â”€â”€ Background Queue â”€â”€
 
     [Fact]
     public async Task BackgroundQueue_ExecutesPlannedJobs()
@@ -450,7 +450,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("start", "Exit", "marker", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         var queue = new BackgroundExecutionQueue();
         var worker = new BackgroundExecutionWorker(queue, service);
 
@@ -468,7 +468,7 @@ public sealed class ExecutionEngineTests
         Assert.True(executed);
     }
 
-    // ── Event Nodes ──
+    // â”€â”€ Event Nodes â”€â”€
 
     [Fact]
     public async Task StartNode_IsDiscoverableAsExecutionInitiator()
@@ -499,7 +499,7 @@ public sealed class ExecutionEngineTests
         Assert.Contains(nodeData.Outputs, o => o.Name == "False" && o.IsExecution);
     }
 
-    // ── Complex Chains ──
+    // â”€â”€ Complex Chains â”€â”€
 
     [Fact]
     public async Task ComplexChain_StartBranchLoopMarker()
@@ -518,7 +518,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.True(context.IsNodeExecuted("loop"));
@@ -541,7 +541,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("delay", "Exit", "marker", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         var sw = System.Diagnostics.Stopwatch.StartNew();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
         sw.Stop();
@@ -565,7 +565,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Data("abs", "Result", "consume", "Value")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.True(context.IsNodeExecuted("abs"), "Abs should have been evaluated");
@@ -577,7 +577,7 @@ public sealed class ExecutionEngineTests
     {
         var service = CreateService(out var registry);
         var start = NodeFromDef(registry, "Start", "start");
-        // Condition starts true → repeat-until (repeats until condition is true) should execute body once then exit
+        // Condition starts true â†’ repeat-until (repeats until condition is true) should execute body once then exit
         var loop = NodeFromDef(registry, "Repeat Until", "loop", ("Condition", true));
         var body = NodeFromDef(registry, "Marker", "body");
         var end = NodeFromDef(registry, "Marker", "end");
@@ -590,7 +590,7 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.True(context.IsNodeExecuted("body"), "Body should execute at least once");
@@ -608,7 +608,7 @@ public sealed class ExecutionEngineTests
         var forEach = NodeFromDef(registry, "ForEach Loop", "loop");
         var end = NodeFromDef(registry, "Marker", "end");
 
-        // Build chain: list → add1 → add2 → forEach
+        // Build chain: list â†’ add1 â†’ add2 â†’ forEach
         var nodes = new List<NodeData> { start, listCreate, listAdd1, listAdd2, forEach, end };
         var connections = new List<ConnectionData>
         {
@@ -619,14 +619,154 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
         Assert.True(context.IsNodeExecuted("end"), "ForEach should complete and trigger Exit");
     }
+
+    //  Phase 13A spec-named tests (using TestGraphBuilder) 
+
+    [Fact]
+    public async Task ForLoopStepNode_HandlesNegativeStep()
+    {
+        var service = CreateService(out var registry);
+        EnsureIncrementNodeRegistered(registry);
+
+        var (nodes, connections) = new TestGraphBuilder()
+            .AddNodeFromDefinition(registry, "Start", "start")
+            .AddNodeFromDefinition(registry, "For Loop Step", "loop",
+                ("StartValue", 6), ("EndValue", 0), ("Step", -2))
+            .AddNodeFromDefinition(registry, "Increment", "inc", ("Key", "count"))
+            .AddNodeFromDefinition(registry, "Marker", "end")
+            .ConnectExecution("start", "Exit", "loop", "Enter")
+            .ConnectExecution("loop", "LoopPath", "inc", "Enter")
+            .ConnectExecution("loop", "Exit", "end", "Enter")
+            .Build();
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("end"), "Exit should have been reached");
+        Assert.Equal(2, context.GetSocketValue("loop", "Index"));
+        Assert.Equal(3, context.GetVariable("count"));
+    }
+
+    [Fact]
+    public async Task NestedForLoops_ExecuteCorrectly()
+    {
+        var service = CreateService(out var registry);
+        EnsureIncrementNodeRegistered(registry);
+
+        var (nodes, connections) = new TestGraphBuilder()
+            .AddNodeFromDefinition(registry, "Start", "start")
+            .AddNodeFromDefinition(registry, "For Loop", "outer", ("LoopTimes", 3))
+            .AddNodeFromDefinition(registry, "For Loop", "inner", ("LoopTimes", 2))
+            .AddNodeFromDefinition(registry, "Increment", "inc", ("Key", "count"))
+            .AddNodeFromDefinition(registry, "Marker", "end")
+            .ConnectExecution("start", "Exit", "outer", "Enter")
+            .ConnectExecution("outer", "LoopPath", "inner", "Enter")
+            .ConnectExecution("inner", "LoopPath", "inc", "Enter")
+            .ConnectExecution("outer", "Exit", "end", "Enter")
+            .Build();
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("end"));
+        Assert.Equal(6, context.GetVariable("count"));
+    }
+
+    [Fact]
+    public async Task VariableSetAndGet_SharesValue()
+    {
+        var service = CreateService(out var registry);
+
+        var setNode = CreateSetVariableNode(nodeId: "set", variableId: "v1", value: 123);
+        var getNode = CreateGetVariableNode(nodeId: "get", variableId: "v1");
+
+        var (nodes, connections) = new TestGraphBuilder()
+            .AddNodeFromDefinition(registry, "Start", "start")
+            .AddNodeData(setNode)
+            .AddNodeData(getNode)
+            .AddNodeFromDefinition(registry, "Consume", "consume")
+            .ConnectExecution("start", "Exit", "set", "Enter")
+            .ConnectExecution("set", "Exit", "consume", "Enter")
+            .ConnectData("get", "Value", "consume", "Value")
+            .Build();
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("set"), "Set Variable node should execute");
+        Assert.True(context.IsNodeExecuted("get"), "Get Variable node should be lazily executed");
+        Assert.Equal(123, context.GetSocketValue("consume", "Value"));
+    }
+
+    private static void EnsureIncrementNodeRegistered(NodeRegistryService registry)
+    {
+        // Stable ID = "Increment" (NodeBuilder.BuildDefinitionId uses name when NodeType is null)
+        var incrementDefinition = NodeBuilder.Create("Increment")
+            .Category("Test")
+            .Callable()
+            .Input<string>("Key", "count")
+            .OnExecute(async (ctx, ct) =>
+            {
+                var key = ctx.GetInput<string>("Key");
+                var current = ctx.GetVariable(key);
+                var next = current is int i ? i + 1 : 1;
+                ctx.SetVariable(key, next);
+                await ctx.TriggerAsync("Exit");
+            })
+            .Build();
+
+        registry.RegisterDefinitions(new[] { incrementDefinition });
+    }
+
+    private static NodeData CreateSetVariableNode(string nodeId, string variableId, object value)
+    {
+        var defId = GraphVariable.SetDefinitionPrefix + variableId;
+        var inputs = new[]
+        {
+            new SocketData("Enter", ExecutionSocket.TypeName, IsInput: true, IsExecution: true),
+            new SocketData("Value", value.GetType().FullName ?? typeof(object).FullName!, IsInput: true, IsExecution: false, SocketValue.FromObject(value))
+        };
+        var outputs = new[]
+        {
+            new SocketData("Exit", ExecutionSocket.TypeName, IsInput: false, IsExecution: true),
+            new SocketData("Value", value.GetType().FullName ?? typeof(object).FullName!, IsInput: false, IsExecution: false)
+        };
+
+        return new NodeData(
+            Id: nodeId,
+            Name: "Set Variable",
+            Callable: true,
+            ExecInit: false,
+            Inputs: inputs,
+            Outputs: outputs,
+            DefinitionId: defId);
+    }
+
+    private static NodeData CreateGetVariableNode(string nodeId, string variableId)
+    {
+        var defId = GraphVariable.GetDefinitionPrefix + variableId;
+        var outputs = new[]
+        {
+            new SocketData("Value", typeof(object).FullName!, IsInput: false, IsExecution: false)
+        };
+
+        return new NodeData(
+            Id: nodeId,
+            Name: "Get Variable",
+            Callable: false,
+            ExecInit: false,
+            Inputs: Array.Empty<SocketData>(),
+            Outputs: outputs,
+            DefinitionId: defId);
+    }
 }
 
-// ── Shared helpers ──
+// â”€â”€ Shared helpers â”€â”€
 
 internal static class TestConnections
 {

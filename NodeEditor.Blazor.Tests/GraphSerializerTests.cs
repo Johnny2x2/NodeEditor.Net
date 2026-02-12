@@ -1,6 +1,7 @@
 using System.Reflection;
 using NodeEditor.Net.Models;
 using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Infrastructure;
 using NodeEditor.Net.Services.Registry;
 using NodeEditor.Net.Services.Serialization;
@@ -202,6 +203,63 @@ public sealed class GraphSerializerTests
         Assert.Equal(new Size2D(110, 60), node.Size);
         Assert.Equal(3, node.Data.Inputs[0].Value?.ToObject<int>());
         Assert.Equal(7, node.Data.Outputs[0].Value?.ToObject<int>());
+    }
+
+    // ── DefinitionIdMigration Tests ──
+
+    [Fact]
+    public void DefinitionIdMigration_MapsOldToNew()
+    {
+        var oldId = "NodeEditor.Net.Services.Execution.StandardNodeContext.Start(NodeEditor.Net.Services.Execution.ExecutionPath)";
+        var newId = DefinitionIdMigration.Migrate(oldId);
+        Assert.Equal("NodeEditor.Net.Services.Execution.StandardNodes.StartNode", newId);
+    }
+
+    [Fact]
+    public void DefinitionIdMigration_PassesThroughUnknown()
+    {
+        var unknownId = "SomePlugin.CustomNode";
+        Assert.Equal(unknownId, DefinitionIdMigration.Migrate(unknownId));
+    }
+
+    [Fact]
+    public void Deserialize_OldGraph_MigratesDefinitionIds()
+    {
+        // Build a serializer that knows about the new StartNode definition
+        var registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+
+        var resolver = new SocketTypeResolver();
+        var validator = new ConnectionValidator(resolver);
+        var migrator = new GraphSchemaMigrator();
+        var serializer = new GraphSerializer(registry, validator, migrator);
+
+        // Create a DTO with an old-format DefinitionId
+        var oldDefId = "NodeEditor.Net.Services.Execution.StandardNodeContext.Start(NodeEditor.Net.Services.Execution.ExecutionPath)";
+        var nodeDto = new NodeDto(
+            "node-1",
+            oldDefId,
+            "Start",
+            true,
+            true,
+            10, 20, 120, 80,
+            new List<SocketData>(),
+            new List<SocketData> { new("Exit", ExecutionSocket.TypeName, false, true) });
+
+        var dto = new GraphDto(
+            GraphSerializer.CurrentVersion,
+            new List<NodeDto> { nodeDto },
+            new List<ConnectionDto>(),
+            new ViewportDto(0, 0, 0, 0, 1),
+            new List<string>());
+
+        var state = new NodeEditorState();
+        var result = serializer.Import(state, dto);
+
+        // The node should be imported — the migrator converts the old ID to the new one
+        Assert.Single(state.Nodes);
+        var importedNode = state.Nodes[0];
+        Assert.Equal("Start", importedNode.Data.Name);
     }
 
     private static GraphSerializer CreateSerializer()

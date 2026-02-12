@@ -150,9 +150,9 @@ public sealed class TransitionPhase1to4Tests
     }
 
     [Fact]
-    public void Phase1B_NodeExecutionContext_ImplementsINodeRuntimeStorage()
+    public void Phase1B_NodeRuntimeStorage_ImplementsINodeRuntimeStorage()
     {
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         Assert.IsAssignableFrom<INodeRuntimeStorage>(context);
     }
 
@@ -416,14 +416,15 @@ public sealed class TransitionPhase1to4Tests
     }
 
     [Fact]
-    public void Phase4A_DiscoveryService_StillFindsOldINodeContextTypes()
+    public void Phase4A_Discovery_SkipsOldINodeContextTypes()
     {
-        // The hybrid discovery service should still discover old-style INodeContext nodes
-        // so existing functionality is preserved during transition
+        // After the transition, discovery only finds NodeBase subclasses.
+        // Old-style INodeContext types are no longer discovered.
         var discovery = new NodeDiscoveryService();
-        var definitions = discovery.DiscoverFromAssemblies(new[] { typeof(OldStyleTestContext).Assembly });
+        var definitions = discovery.DiscoverFromAssemblies(new[] { typeof(SampleTestNode).Assembly });
 
-        Assert.Contains(definitions, d => d.Name == "OldStyleNode");
+        Assert.DoesNotContain(definitions, d => d.Name == "OldStyleNode");
+        Assert.Contains(definitions, d => d.Name == "SampleTest");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -611,13 +612,4 @@ public sealed class TransitionPhase1to4Tests
             => Task.CompletedTask;
     }
 
-    /// <summary>Old-style INodeContext for verifying hybrid discovery still works.</summary>
-    private sealed class OldStyleTestContext : INodeContext
-    {
-        [Node("OldStyleNode", category: "Legacy", description: "Tests backward compat")]
-        public void OldStyleNode(out int Value)
-        {
-            Value = 42;
-        }
-    }
 }

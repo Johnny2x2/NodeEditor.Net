@@ -67,6 +67,14 @@ internal sealed class NodeExecutionContextImpl : INodeExecutionContext
         CancellationToken.ThrowIfCancellationRequested();
         await _runtime.Gate.WaitAsync(CancellationToken).ConfigureAwait(false);
         var targets = _runtime.GetExecutionTargets(Node.Id, executionOutputName);
+
+        // If this is a streaming Completed path, ensure all pending OnItem tasks have finished
+        // before executing downstream (only relevant if there are downstream connections).
+        if (targets.Count > 0)
+        {
+            await _runtime.WaitForStreamItemsAsync(Node.Id, executionOutputName).ConfigureAwait(false);
+        }
+
         foreach (var (targetNodeId, _) in targets)
         {
             CancellationToken.ThrowIfCancellationRequested();
@@ -89,11 +97,13 @@ internal sealed class NodeExecutionContextImpl : INodeExecutionContext
         }
         else
         {
-            _ = Task.Run(async () =>
+            var task = Task.Run(async () =>
             {
                 try { await TriggerAsync(streamInfo.OnItemExecSocket).ConfigureAwait(false); }
                 catch (OperationCanceledException) { }
             }, CancellationToken);
+
+            _runtime.RegisterStreamItemTask(Node.Id, streamInfo.CompletedExecSocket, task);
         }
     }
 

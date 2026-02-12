@@ -4,7 +4,6 @@ using NodeEditor.Net.Services;
 using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Plugins;
 using NodeEditor.Net.Services.Registry;
-using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using Xunit.Abstractions;
@@ -25,14 +24,12 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
     private readonly IPluginLoader _pluginLoader;
     private readonly INodeRegistryService _registry;
     private readonly INodeExecutionService _executionService;
-    private readonly INodeContextRegistry _contextRegistry;
     private IReadOnlyList<INodePlugin>? _loadedPlugins;
     private readonly ITestOutputHelper output;
 
     public DynamicPluginLoadingTests(ITestOutputHelper output)
     {
         this.output = output;
-        // Prefer the packaged TestA plugin from the repo for dynamic loading tests
         _testPluginsDir = PrepareTestPluginsDir();
 
         var services = new ServiceCollection();
@@ -40,7 +37,6 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         services.AddSingleton<NodeDiscoveryService>();
         services.AddSingleton<INodeRegistryService, NodeRegistryService>();
         services.AddSingleton<IPluginServiceRegistry, PluginServiceRegistry>();
-        services.AddSingleton<INodeContextRegistry, NodeContextRegistry>();
         services.AddSingleton<IPluginLoader, PluginLoader>();
         services.AddSingleton<ExecutionPlanner>();
         services.AddSingleton<INodeExecutionService, NodeExecutionService>();
@@ -56,7 +52,6 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
         _pluginLoader = _serviceProvider.GetRequiredService<IPluginLoader>();
         _registry = _serviceProvider.GetRequiredService<INodeRegistryService>();
         _executionService = _serviceProvider.GetRequiredService<INodeExecutionService>();
-        _contextRegistry = _serviceProvider.GetRequiredService<INodeContextRegistry>();
     }
 
     public async Task InitializeAsync()
@@ -160,50 +155,32 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
     [Fact]
     public async Task DynamicLoad_TestPlugins_CanExecuteNodes()
     {
-        // Find the Echo String node definition
-        var echoDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Echo String");
-        Assert.NotNull(echoDef);
+        // Use PingNode which is an ExecutionInitiator – the engine will trigger it.
+        var pingDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Ping");
+        Assert.NotNull(pingDef);
+
+        // Verify it was discovered as a NodeBase subclass
+        Assert.NotNull(pingDef.NodeType);
 
         // Create node instance using the Factory
-        var echoNode = echoDef.Factory();
-        echoNode = echoNode with
-        {
-            Inputs = echoNode.Inputs.Select(s => s.Name switch
-            {
-                "Input" => s with { Value = SocketValue.FromObject("Hello") },
-                _ => s
-            }).ToArray()
-        };
+        var pingNode = pingDef.Factory();
 
-        var nodes = new List<NodeData> { echoNode };
+        var nodes = new List<NodeData> { pingNode };
         var connections = new List<ConnectionData>();
 
-        // Create context from currently loaded assemblies - must be done AFTER plugins are loaded
-        // The InitializeAsync already loaded plugins, so assemblies should be in AppDomain
-        var nodeContext = _contextRegistry.CreateCompositeContext();
-
-        // Verify the context has loaded contexts
-        Assert.NotEmpty(nodeContext.Contexts);
-
-
-
-        var executionContext = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
 
         await _executionService.ExecuteAsync(
             nodes, 
             connections, 
-            executionContext, 
-            nodeContext, 
+            context, 
+            null!, 
             DefaultOptions,
             CancellationToken.None);
 
-        // Check if the node was executed
-        Assert.True(executionContext.IsNodeExecuted(echoNode.Id), 
-            "Echo node should have been executed");
-
-        // Assert - Output should match input
-        var result = executionContext.GetSocketValue(echoNode.Id, "Output");
-        Assert.Equal("Hello", result);
+        // Check if the node was executed (PingNode is an initiator so the engine runs it)
+        Assert.True(context.IsNodeExecuted(pingNode.Id), 
+            "Ping node should have been executed");
     }
 
 
@@ -282,148 +259,19 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
                 IsExecution: false)
         };
 
-        // Execute
-        var nodeContext = _contextRegistry.CreateCompositeContext();
-        var executionContext = new NodeExecutionContext();
+        // Execute using the new NodeBase-based execution engine
+        var context = new NodeRuntimeStorage();
 
         await _executionService.ExecuteAsync(
             nodes,
             connections,
-            executionContext,
-            nodeContext,
+            context,
+            null!,
             DefaultOptions,
             CancellationToken.None);
 
         // Multiply: 10 * 5 = 50, Clamp(50, 0, 40) = 40
-        var result = executionContext.GetSocketValue(clampNode.Id, "Result");
+        var result = context.GetSocketValue(clampNode.Id, "Result");
         Assert.Equal(40.0, result);
-    }
-
-
-
-    private async Task ResolveDataFlowNode(
-        NodeData node,
-        List<ConnectionData> connections,
-        NodeExecutionContext executionContext,
-        INodeContext nodeContext)
-    {
-        output.WriteLine($"ResolveDataFlowNode called for node {node.Id}, DefinitionId: {node.DefinitionId}");
-        
-        // Find the method definition - parse from DefinitionId
-        // Format: "Namespace.ClassName.MethodName(ParamType1,ParamType2,...)"
-        // First split by '(' to get everything before parameters
-        // Then split that by '.' and take the last part to get just the method name
-        var methodName = node.DefinitionId != null
-            ? node.DefinitionId.Split('(')[0].Split('.')[^1]
-            : null;
-        output.WriteLine($"Extracted method name: '{methodName}'");
-
-        // Handle CompositeNodeContext - need to find the actual context that has the method
-        object? actualContext = nodeContext;
-        System.Reflection.MethodInfo? methodInfo = null;
-        
-        if (nodeContext is NodeEditor.Net.Services.Execution.CompositeNodeContext composite)
-        {
-            output.WriteLine($"NodeContext is CompositeNodeContext with {composite.Contexts.Count} contexts");
-            
-            // Search through all contexts for the method
-            foreach (var ctx in composite.Contexts)
-            {
-                var method = ctx.GetType().GetMethod(methodName ?? string.Empty,
-                    System.Reflection.BindingFlags.Public | 
-                    System.Reflection.BindingFlags.Instance | 
-                    System.Reflection.BindingFlags.IgnoreCase);
-                
-                if (method != null)
-                {
-                    output.WriteLine($"Found method '{methodName}' in context type: {ctx.GetType().FullName}");
-                    methodInfo = method;
-                    actualContext = ctx;
-                    break;
-                }
-            }
-        }
-        else
-        {
-            // Single context - search directly
-            methodInfo = methodName != null
-                ? nodeContext.GetType().GetMethod(methodName, 
-                    System.Reflection.BindingFlags.Public | 
-                    System.Reflection.BindingFlags.Instance | 
-                    System.Reflection.BindingFlags.IgnoreCase)
-                : null;
-        }
-
-        output.WriteLine($"MethodInfo found: {(methodInfo != null ? methodInfo.Name : "null")}");
-        
-        if (methodInfo == null || actualContext == null) return;
-
-        // Build input value dictionary
-        var inputValues = new Dictionary<string, object?>();
-
-        // Resolve inputs from connections
-        foreach (var conn in connections.Where(c => c.InputNodeId == node.Id))
-        {
-            var sourceSocketName = conn.InputSocketName;
-            var sourceValue = executionContext.GetSocketValue(conn.OutputNodeId, conn.OutputSocketName);
-            
-            if (sourceValue != null)
-            {
-                inputValues[sourceSocketName] = sourceValue;
-            }
-        }
-
-        // Add values from node sockets if they have values and no connection
-        foreach (var input in node.Inputs.Where(i => !connections.Any(c => c.InputNodeId == node.Id && c.InputSocketName == i.Name)))
-        {
-            if (input.Value.Json.HasValue)
-            {
-                inputValues[input.Name] = input.Value.ToObject<object>();
-            }
-        }
-
-        // Build parameter array for method invocation
-        var parameters = methodInfo.GetParameters();
-        var args = new object?[parameters.Length];
-
-        for (int i = 0; i < parameters.Length; i++)
-        {
-            var param = parameters[i];
-            if (!param.IsOut && inputValues.TryGetValue(param.Name!, out var value))
-            {
-                // Handle type conversion - if value is JsonElement, deserialize to proper type
-                if (value is System.Text.Json.JsonElement jsonElement)
-                {
-                    args[i] = System.Text.Json.JsonSerializer.Deserialize(jsonElement.GetRawText(), param.ParameterType);
-                }
-                else
-                {
-                    args[i] = value;
-                }
-            }
-        }
-
-        // Invoke the method using the actual context (not composite wrapper)
-        methodInfo.Invoke(actualContext, args);
-
-        output.WriteLine($"After method invocation, args: {string.Join(", ", args.Select((a, i) => $"[{i}]={a ?? "null"}"))}");
-
-        // Extract out parameters and store them as outputs
-        for (int i = 0; i < parameters.Length; i++)
-        {
-            if (parameters[i].IsOut)
-            {
-                var outputName = parameters[i].Name!.TrimStart('_'); // Remove leading underscore if any
-                var outputSocket = node.Outputs.FirstOrDefault(o => 
-                    string.Equals(o.Name, outputName, StringComparison.OrdinalIgnoreCase));
-                
-                output.WriteLine($"Out param [{i}]: name='{parameters[i].Name}', value={args[i] ?? "null"}, matched socket={outputSocket?.Name ?? "none"}");
-                
-                if (outputSocket != null && args[i] != null)
-                {
-                    executionContext.SetSocketValue(node.Id, outputSocket.Name, args[i]);
-                }
-            }
-        }
     }
 }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
 using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Net.Services.Execution;
@@ -17,6 +18,8 @@ internal sealed class ExecutionRuntime
     private readonly Dictionary<string, NodeBase?> _nodeInstances;
     private readonly Dictionary<string, NodeDefinition> _nodeDefinitions;
     private readonly HashSet<string> _createdNodes = new(StringComparer.Ordinal);
+    private readonly NodeExecutionOptions _options;
+    private readonly Dictionary<(string nodeId, string completedExecSocket), List<Task>> _pendingStreamItemTasks = new();
 
     public INodeRuntimeStorage RuntimeStorage { get; }
     public IServiceProvider Services { get; }
@@ -40,6 +43,7 @@ internal sealed class ExecutionRuntime
         IServiceProvider services,
         INodeRegistryService registry,
         ExecutionGate gate,
+        NodeExecutionOptions options,
         CancellationToken ct)
     {
         _nodes = nodes;
@@ -47,6 +51,7 @@ internal sealed class ExecutionRuntime
         Services = services;
         CancellationToken = ct;
         Gate = gate;
+        _options = options;
         _nodeMap = nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
         _execConnections = BuildExecConnectionMap(connections);
         _dataInputConnections = BuildDataInputConnectionMap(connections);
@@ -91,6 +96,27 @@ internal sealed class ExecutionRuntime
         {
             await ResolveAllDataInputsAsync(node).ConfigureAwait(false);
 
+            // Variable nodes are special: they have no NodeBase implementation and are executed
+            // by reading/writing runtime storage variables.
+            if (VariableNodeExecutor.IsVariableNode(node))
+            {
+                VariableNodeExecutor.Execute(node, RuntimeStorage);
+
+                if (VariableNodeExecutor.IsSetNode(node))
+                {
+                    await Gate.WaitAsync(CancellationToken).ConfigureAwait(false);
+                    var targets = GetExecutionTargets(node.Id, "Exit");
+                    foreach (var (targetNodeId, _) in targets)
+                    {
+                        CancellationToken.ThrowIfCancellationRequested();
+                        await ExecuteNodeByIdAsync(targetNodeId).ConfigureAwait(false);
+                    }
+                }
+
+                NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
+                return;
+            }
+
             if (!_nodeDefinitions.TryGetValue(nodeId, out var definition))
             {
                 throw new InvalidOperationException($"No node definition found for node '{node.Name}'.");
@@ -132,7 +158,7 @@ internal sealed class ExecutionRuntime
     {
         foreach (var input in node.Inputs.Where(i => !i.IsExecution))
         {
-            if (RuntimeStorage.TryGetSocketValue(node.Id, input.Name, out _))
+            if (!node.Callable && RuntimeStorage.TryGetSocketValue(node.Id, input.Name, out _))
             {
                 continue;
             }
@@ -192,7 +218,64 @@ internal sealed class ExecutionRuntime
         return definition.StreamSockets?.FirstOrDefault(s => s.ItemDataSocket == itemSocketName);
     }
 
-    internal StreamMode GetStreamMode(NodeData node) => StreamMode.Sequential;
+    internal StreamMode GetStreamMode(NodeData node) => _options.StreamMode;
+
+    internal void RegisterStreamItemTask(string nodeId, string? completedExecSocketName, Task task)
+    {
+        if (string.IsNullOrWhiteSpace(completedExecSocketName))
+        {
+            ObserveTaskFailure(task);
+            return;
+        }
+
+        lock (_pendingStreamItemTasks)
+        {
+            var key = (nodeId, completedExecSocketName);
+            if (!_pendingStreamItemTasks.TryGetValue(key, out var list))
+            {
+                list = new List<Task>();
+                _pendingStreamItemTasks[key] = list;
+            }
+
+            list.Add(task);
+        }
+
+        ObserveTaskFailure(task);
+    }
+
+    internal async Task WaitForStreamItemsAsync(string nodeId, string completedExecSocketName)
+    {
+        List<Task>? snapshot;
+        lock (_pendingStreamItemTasks)
+        {
+            var key = (nodeId, completedExecSocketName);
+            if (!_pendingStreamItemTasks.TryGetValue(key, out snapshot) || snapshot.Count == 0)
+            {
+                return;
+            }
+
+            _pendingStreamItemTasks.Remove(key);
+        }
+
+        try
+        {
+            await Task.WhenAll(snapshot).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Fire-and-forget mode shouldn't crash the producer due to downstream item failures.
+            // Faults are observed via ObserveTaskFailure().
+        }
+    }
+
+    private static void ObserveTaskFailure(Task task)
+    {
+        _ = task.ContinueWith(
+            t => _ = t.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
 
     internal T DeserializeSocketValue<T>(SocketValue socketValue)
     {
