@@ -61,9 +61,9 @@ public static class EventNodeExecutor
     /// </summary>
     public static void ExecuteListener(NodeData node, INodeRuntimeStorage context)
     {
-        var exit = new ExecutionPath();
-        exit.Signal();
-        context.SetSocketValue(node.Id, "Exit", exit);
+        // Signal execution path (boolean marker — the execution engine follows
+        // connections via GetExecutionTargets, not socket values)
+        context.SetSocketValue(node.Id, "Exit", true);
         context.MarkNodeExecuted(node.Id);
     }
 
@@ -83,9 +83,7 @@ public static class EventNodeExecutor
         await context.EventBus.TriggerAsync(eventId, token).ConfigureAwait(false);
 
         // Signal our own Exit path to continue the triggering execution chain
-        var exit = new ExecutionPath();
-        exit.Signal();
-        context.SetSocketValue(node.Id, "Exit", exit);
+        context.SetSocketValue(node.Id, "Exit", true);
         context.MarkNodeExecuted(node.Id);
     }
 }

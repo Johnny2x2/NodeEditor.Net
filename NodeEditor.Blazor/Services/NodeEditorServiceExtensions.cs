@@ -94,7 +94,6 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<ISocketTypeResolver>(provider =>
         {
             var resolver = new SocketTypeResolver();
-            resolver.Register<ExecutionPath>();
             resolver.Register<SerializableList>();
             return resolver;
         });
@@ -102,10 +101,6 @@ public static class NodeEditorServiceExtensions
         // Node registry & discovery
         services.AddSingleton<NodeDiscoveryService>();
         services.AddSingleton<INodeRegistryService, NodeRegistryService>();
-
-        // Node context factory & registry
-        services.AddSingleton<INodeContextFactory, NodeContextFactory>();
-        services.AddSingleton<INodeContextRegistry, NodeContextRegistry>();
 
         // Adapters
         services.AddSingleton<INodeAdapter, NodeAdapter>();

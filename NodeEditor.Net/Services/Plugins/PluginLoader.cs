@@ -2,7 +2,6 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Logging;
 using NodeEditor.Net.Services.Registry;
 
@@ -15,7 +14,6 @@ public sealed class PluginLoader : IPluginLoader
     private readonly PluginOptions _options;
     private readonly IServiceProvider _services;
     private readonly IPluginServiceRegistry _serviceRegistry;
-    private readonly INodeContextRegistry? _contextRegistry;
     private readonly ILogChannelRegistry? _channelRegistry;
     private readonly Dictionary<string, LoadedPlugin> _loadedPlugins = new(StringComparer.OrdinalIgnoreCase);
 
@@ -25,7 +23,6 @@ public sealed class PluginLoader : IPluginLoader
         ILogger<PluginLoader> logger,
         IServiceProvider services,
         IPluginServiceRegistry serviceRegistry,
-        INodeContextRegistry? contextRegistry = null,
         ILogChannelRegistry? channelRegistry = null)
     {
         _registry = registry;
@@ -33,7 +30,6 @@ public sealed class PluginLoader : IPluginLoader
         _options = options.Value;
         _services = services;
         _serviceRegistry = serviceRegistry;
-        _contextRegistry = contextRegistry;
         _channelRegistry = channelRegistry;
     }
 
@@ -108,55 +104,6 @@ public sealed class PluginLoader : IPluginLoader
         return plugins;
     }
 
-    private List<object> RegisterNodeContextsFromAssembly(IEnumerable<Assembly> assemblies)
-    {
-        var instances = new List<object>();
-        if (_contextRegistry is null) return instances;
-
-        foreach (var assembly in assemblies)
-        {
-            foreach (var type in SafeGetTypes(assembly))
-            {
-                if (type is null || type.IsAbstract || type.IsInterface)
-                {
-                    continue;
-                }
-
-                // Check both by type assignability and by interface name for cross-context compatibility
-                var isNodeContext = typeof(INodeContext).IsAssignableFrom(type) 
-                    || typeof(INodeMethodContext).IsAssignableFrom(type)
-                    || type.GetInterfaces().Any(i => i.Name == nameof(INodeContext) || i.Name == nameof(INodeMethodContext));
-
-                if (!isNodeContext)
-                {
-                    continue;
-                }
-
-                if (type.GetConstructor(Type.EmptyTypes) is null)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    var instance = Activator.CreateInstance(type);
-                    if (instance is not null)
-                    {
-                        _contextRegistry.Register(instance);
-                        instances.Add(instance);
-                        _logger.LogInformation("Registered node context '{ContextType}' from plugin.", type.FullName);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to create node context instance of type '{ContextType}'.", type.FullName);
-                }
-            }
-        }
-
-        return instances;
-    }
-
     public Task<IReadOnlyList<INodePlugin>> LoadPluginsAsync(
         string? pluginDirectory = null,
         CancellationToken token = default)
@@ -204,14 +151,6 @@ public sealed class PluginLoader : IPluginLoader
                 _logger.LogWarning(ex, "Plugin '{PluginId}' threw during unload.", pluginId);
             }
 
-            if (_contextRegistry is not null && entry.ContextInstances.Count > 0)
-            {
-                foreach (var context in entry.ContextInstances)
-                {
-                    _contextRegistry.Unregister(context);
-                }
-            }
-
             if (entry.ProviderDefinitions.Count > 0)
             {
                 _registry.RemoveDefinitions(entry.ProviderDefinitions);
@@ -257,14 +196,6 @@ public sealed class PluginLoader : IPluginLoader
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Plugin '{PluginId}' threw during unload.", pluginId);
-            }
-
-            if (_contextRegistry is not null && entry.ContextInstances.Count > 0)
-            {
-                foreach (var context in entry.ContextInstances)
-                {
-                    _contextRegistry.Unregister(context);
-                }
             }
 
             if (entry.ProviderDefinitions.Count > 0)
@@ -402,8 +333,7 @@ public sealed class PluginLoader : IPluginLoader
                 }
 
                 plugins.Add(plugin);
-                var contexts = RegisterNodeContextsFromAssembly(new[] { assembly });
-                _loadedPlugins[plugin.Id] = new LoadedPlugin(plugin, loadContext, assembly, contexts);
+                _loadedPlugins[plugin.Id] = new LoadedPlugin(plugin, loadContext, assembly);
                 _logger.LogInformation("Plugin '{PluginId}' loaded from '{AssemblyPath}'.", plugin.Id, candidate.AssemblyPath);
             }
             catch (Exception ex)
@@ -565,18 +495,16 @@ public sealed class PluginLoader : IPluginLoader
 
     private sealed class LoadedPlugin
     {
-        public LoadedPlugin(INodePlugin plugin, PluginLoadContext loadContext, Assembly assembly, List<object> contextInstances)
+        public LoadedPlugin(INodePlugin plugin, PluginLoadContext loadContext, Assembly assembly)
         {
             Plugin = plugin;
             LoadContext = loadContext;
             Assembly = assembly;
-            ContextInstances = contextInstances;
         }
 
         public INodePlugin Plugin { get; }
         public PluginLoadContext LoadContext { get; }
         public Assembly Assembly { get; }
-        public List<object> ContextInstances { get; }
         public List<NodeDefinition> ProviderDefinitions { get; } = new();
         public List<object> CustomEditors { get; } = new();
     }

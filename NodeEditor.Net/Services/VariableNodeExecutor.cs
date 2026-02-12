@@ -79,10 +79,9 @@ public static class VariableNodeExecutor
             // Pass-through: also write to output "Value" socket so downstream data-flow works
             context.SetSocketValue(node.Id, "Value", value);
 
-            // Signal execution path
-            var exit = new ExecutionPath();
-            exit.Signal();
-            context.SetSocketValue(node.Id, "Exit", exit);
+            // Signal execution path (boolean marker — the execution engine follows
+            // connections via GetExecutionTargets, not socket values)
+            context.SetSocketValue(node.Id, "Exit", true);
         }
 
         context.MarkNodeExecuted(node.Id);

@@ -1,5 +1,4 @@
 using NodeEditor.Net.Models;
-using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Net.Services;
@@ -69,7 +68,7 @@ public sealed class EventNodeFactory
     /// </summary>
     private static NodeDefinition BuildListenerDefinition(GraphEvent graphEvent)
     {
-        var execType = typeof(ExecutionPath).FullName!;
+        var execType = Execution.ExecutionSocket.TypeName;
 
         var outputs = new List<SocketData>
         {
@@ -99,7 +98,7 @@ public sealed class EventNodeFactory
     /// </summary>
     private static NodeDefinition BuildTriggerDefinition(GraphEvent graphEvent)
     {
-        var execType = typeof(ExecutionPath).FullName!;
+        var execType = Execution.ExecutionSocket.TypeName;
 
         var inputs = new List<SocketData>
         {

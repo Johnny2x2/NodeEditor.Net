@@ -1,5 +1,4 @@
 using NodeEditor.Net.Models;
-using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Net.Services;
@@ -103,13 +102,13 @@ public sealed class VariableNodeFactory
     {
         var inputs = new List<SocketData>
         {
-            new SocketData("Enter", typeof(ExecutionPath).FullName!, IsInput: true, IsExecution: true),
+            new SocketData("Enter", Execution.ExecutionSocket.TypeName, IsInput: true, IsExecution: true),
             new SocketData("Value", variable.TypeName, IsInput: true, IsExecution: false, variable.DefaultValue)
         };
 
         var outputs = new List<SocketData>
         {
-            new SocketData("Exit", typeof(ExecutionPath).FullName!, IsInput: false, IsExecution: true),
+            new SocketData("Exit", Execution.ExecutionSocket.TypeName, IsInput: false, IsExecution: true),
             new SocketData("Value", variable.TypeName, IsInput: false, IsExecution: false)
         };
 

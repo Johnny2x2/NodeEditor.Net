@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 
 namespace NodeEditor.Net.Services.Execution;
 
-public sealed class NodeExecutionContext : INodeRuntimeStorage
+public sealed class NodeRuntimeStorage : INodeRuntimeStorage
 {
     private readonly ConcurrentDictionary<string, object?> _socketValues;
     private readonly ConcurrentDictionary<string, bool> _executedNodes;
@@ -12,7 +12,7 @@ public sealed class NodeExecutionContext : INodeRuntimeStorage
 
     public ExecutionEventBus EventBus { get; }
 
-    public NodeExecutionContext()
+    public NodeRuntimeStorage()
     {
         _socketValues = new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
         _executedNodes = new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
@@ -20,7 +20,7 @@ public sealed class NodeExecutionContext : INodeRuntimeStorage
         EventBus = new ExecutionEventBus();
     }
 
-    private NodeExecutionContext(
+    private NodeRuntimeStorage(
         ConcurrentDictionary<string, object?> socketValues,
         ConcurrentDictionary<string, bool> executedNodes,
         ConcurrentDictionary<string, object?> variables,
@@ -104,7 +104,7 @@ public sealed class NodeExecutionContext : INodeRuntimeStorage
             ? new ConcurrentDictionary<string, object?>(_variables, StringComparer.Ordinal)
             : new ConcurrentDictionary<string, object?>(StringComparer.Ordinal);
 
-        return new NodeExecutionContext(socketValues, executedNodes, variables, EventBus);
+        return new NodeRuntimeStorage(socketValues, executedNodes, variables, EventBus);
     }
 
     private static string BuildSocketKey(string nodeId, string socketName)
