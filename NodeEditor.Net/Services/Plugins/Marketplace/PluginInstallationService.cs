@@ -57,31 +57,46 @@ public sealed class PluginInstallationService : IPluginInstallationService
         string? version = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Installing plugin {PluginId} from {Source}", pluginId, source.SourceId);
-
-        var existing = await GetInstalledPluginAsync(pluginId, cancellationToken).ConfigureAwait(false);
-        if (existing is not null)
+        try
         {
+            _logger.LogInformation("Installing plugin {PluginId} from {Source}", pluginId, source.SourceId);
+
+            var existing = await GetInstalledPluginAsync(pluginId, cancellationToken).ConfigureAwait(false);
+            if (existing is not null)
+            {
+                return new PluginInstallResult(
+                    false,
+                    ErrorMessage: $"Plugin '{pluginId}' is already installed (version {existing.Version}).",
+                    ErrorCode: PluginInstallErrorCode.AlreadyInstalled);
+            }
+
+            var downloadResult = await source.DownloadAsync(pluginId, version, cancellationToken).ConfigureAwait(false);
+            if (!downloadResult.Success)
+            {
+                return new PluginInstallResult(
+                    false,
+                    ErrorMessage: downloadResult.ErrorMessage ?? "Download failed.",
+                    ErrorCode: PluginInstallErrorCode.DownloadFailed);
+            }
+
+            return await InstallFromPackageInternalAsync(
+                downloadResult.LocalPath,
+                downloadResult.PackageStream,
+                source.SourceId,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to install plugin {PluginId} from {Source}", pluginId, source.SourceId);
             return new PluginInstallResult(
                 false,
-                ErrorMessage: $"Plugin '{pluginId}' is already installed (version {existing.Version}).",
-                ErrorCode: PluginInstallErrorCode.AlreadyInstalled);
+                ErrorMessage: ex.Message,
+                ErrorCode: PluginInstallErrorCode.Unknown);
         }
-
-        var downloadResult = await source.DownloadAsync(pluginId, version, cancellationToken).ConfigureAwait(false);
-        if (!downloadResult.Success)
-        {
-            return new PluginInstallResult(
-                false,
-                ErrorMessage: downloadResult.ErrorMessage ?? "Download failed.",
-                ErrorCode: PluginInstallErrorCode.DownloadFailed);
-        }
-
-        return await InstallFromPackageInternalAsync(
-            downloadResult.LocalPath,
-            downloadResult.PackageStream,
-            source.SourceId,
-            cancellationToken).ConfigureAwait(false);
     }
 
     public Task<PluginInstallResult> InstallFromPackageAsync(
@@ -449,11 +464,23 @@ public sealed class PluginInstallationService : IPluginInstallationService
             return new InstalledPluginsManifest();
         }
 
-        var json = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Deserialize<InstalledPluginsManifest>(json, new JsonSerializerOptions
+        try
         {
-            PropertyNameCaseInsensitive = true
-        }) ?? new InstalledPluginsManifest();
+            var json = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<InstalledPluginsManifest>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new InstalledPluginsManifest();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read installed plugin manifest at '{ManifestPath}'. Using empty manifest.", path);
+            return new InstalledPluginsManifest();
+        }
     }
 
     private async Task SaveInstalledManifestAsync(InstalledPluginsManifest manifest, CancellationToken cancellationToken)
