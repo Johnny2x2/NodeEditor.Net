@@ -11,7 +11,7 @@ internal sealed class NodeExecutionContextImpl : INodeExecutionContext
     private readonly ExecutionRuntime _runtime;
 
     public NodeData Node { get; }
-    public IServiceProvider Services => _runtime.Services;
+    public IServiceProvider Services => _runtime.GetServicesForNode(Node.Id);
     public CancellationToken CancellationToken => _runtime.CancellationToken;
     public ExecutionEventBus EventBus => _runtime.RuntimeStorage.EventBus;
     public INodeRuntimeStorage RuntimeStorage => _runtime.RuntimeStorage;

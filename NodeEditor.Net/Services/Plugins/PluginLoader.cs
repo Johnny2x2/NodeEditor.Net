@@ -9,6 +9,8 @@ namespace NodeEditor.Net.Services.Plugins;
 
 public sealed class PluginLoader : IPluginLoader
 {
+    private const string DisabledMarkerFileName = ".plugin-disabled";
+
     private readonly INodeRegistryService _registry;
     private readonly ILogger<PluginLoader> _logger;
     private readonly PluginOptions _options;
@@ -141,43 +143,55 @@ public sealed class PluginLoader : IPluginLoader
     {
         if (_loadedPlugins.TryGetValue(pluginId, out var entry))
         {
+            _loadedPlugins.Remove(pluginId);
+
+            INodePlugin? plugin = entry.Plugin;
+            var providerDefinitions = entry.ProviderDefinitions.ToList();
+            var customEditors = entry.CustomEditors.ToList();
+            Assembly? assembly = entry.Assembly;
+            PluginLoadContext? loadContext = entry.LoadContext;
+
             try
             {
-                await entry.Plugin.OnUnloadAsync(token).ConfigureAwait(false);
-                entry.Plugin.Unload();
+                await plugin.OnUnloadAsync(token).ConfigureAwait(false);
+                plugin.Unload();
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Plugin '{PluginId}' threw during unload.", pluginId);
             }
 
-            if (entry.ProviderDefinitions.Count > 0)
+            if (providerDefinitions.Count > 0)
             {
-                _registry.RemoveDefinitions(entry.ProviderDefinitions);
+                _registry.RemoveDefinitions(providerDefinitions);
             }
 
-            if (entry.CustomEditors.Count > 0)
+            if (customEditors.Count > 0)
             {
-                RemoveCustomEditors(entry.CustomEditors);
+                RemoveCustomEditors(customEditors);
             }
 
-            _registry.RemoveDefinitionsFromAssembly(entry.Assembly);
+            if (assembly is not null)
+            {
+                _registry.RemoveDefinitionsFromAssembly(assembly);
+            }
 
             _serviceRegistry.RemoveServices(pluginId);
 
             // Remove log channels registered by this plugin
             _channelRegistry?.RemoveChannelsByPlugin(pluginId);
 
-            try
+            var unloadRef = BeginUnload(loadContext, pluginId);
+
+            plugin = null;
+            assembly = null;
+            loadContext = null;
+
+            if (unloadRef is not null)
             {
-                entry.LoadContext.Unload();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Plugin '{PluginId}' failed to unload context.", pluginId);
+                await WaitForUnloadAsync(unloadRef, pluginId, token).ConfigureAwait(false);
             }
 
-            _loadedPlugins.Remove(pluginId);
             _logger.LogInformation("Plugin '{PluginId}' unloaded.", pluginId);
         }
 
@@ -188,45 +202,99 @@ public sealed class PluginLoader : IPluginLoader
     {
         foreach (var (pluginId, entry) in _loadedPlugins.ToList())
         {
+            INodePlugin? plugin = entry.Plugin;
+            var providerDefinitions = entry.ProviderDefinitions.ToList();
+            var customEditors = entry.CustomEditors.ToList();
+            Assembly? assembly = entry.Assembly;
+            PluginLoadContext? loadContext = entry.LoadContext;
+
             try
             {
-                await entry.Plugin.OnUnloadAsync(token).ConfigureAwait(false);
-                entry.Plugin.Unload();
+                await plugin.OnUnloadAsync(token).ConfigureAwait(false);
+                plugin.Unload();
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Plugin '{PluginId}' threw during unload.", pluginId);
             }
 
-            if (entry.ProviderDefinitions.Count > 0)
+            if (providerDefinitions.Count > 0)
             {
-                _registry.RemoveDefinitions(entry.ProviderDefinitions);
+                _registry.RemoveDefinitions(providerDefinitions);
             }
 
-            if (entry.CustomEditors.Count > 0)
+            if (customEditors.Count > 0)
             {
-                RemoveCustomEditors(entry.CustomEditors);
+                RemoveCustomEditors(customEditors);
             }
 
-            _registry.RemoveDefinitionsFromAssembly(entry.Assembly);
+            if (assembly is not null)
+            {
+                _registry.RemoveDefinitionsFromAssembly(assembly);
+            }
 
             _serviceRegistry.RemoveServices(pluginId);
 
             // Remove log channels registered by this plugin
             _channelRegistry?.RemoveChannelsByPlugin(pluginId);
 
-            try
+            var unloadRef = BeginUnload(loadContext, pluginId);
+
+            plugin = null;
+            assembly = null;
+            loadContext = null;
+
+            if (unloadRef is not null)
             {
-                entry.LoadContext.Unload();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Plugin '{PluginId}' failed to unload context.", pluginId);
+                await WaitForUnloadAsync(unloadRef, pluginId, token).ConfigureAwait(false);
             }
         }
 
         _loadedPlugins.Clear();
         return;
+    }
+
+    private WeakReference? BeginUnload(PluginLoadContext? loadContext, string pluginId)
+    {
+        if (loadContext is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var weakReference = new WeakReference(loadContext, trackResurrection: false);
+            loadContext.Unload();
+            return weakReference;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Plugin '{PluginId}' failed to unload context.", pluginId);
+            return null;
+        }
+    }
+
+    private async Task WaitForUnloadAsync(WeakReference unloadReference, string pluginId, CancellationToken token)
+    {
+        const int maxAttempts = 12;
+        for (var attempt = 1; attempt <= maxAttempts && unloadReference.IsAlive; attempt++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            if (!unloadReference.IsAlive)
+            {
+                break;
+            }
+
+            await Task.Delay(50 * attempt, token).ConfigureAwait(false);
+        }
+
+        if (unloadReference.IsAlive)
+        {
+            _logger.LogWarning("Plugin '{PluginId}' load context is still alive after unload attempts.", pluginId);
+        }
     }
 
     public (string PluginId, string PluginName, string? Version)? GetPluginForDefinition(string definitionId)
@@ -249,9 +317,7 @@ public sealed class PluginLoader : IPluginLoader
                 d.Id.Equals(definitionId, StringComparison.Ordinal));
             foreach (var def in assemblyDefs)
             {
-                // If the definition's factory type comes from this plugin's assembly
-                var factoryTarget = def.Factory.Target;
-                if (factoryTarget is not null && factoryTarget.GetType().Assembly == entry.Assembly)
+                if (IsDefinitionFromAssembly(def, entry.Assembly))
                 {
                     return (pluginId, entry.Plugin.Name, entry.Plugin.Version.ToString());
                 }
@@ -259,6 +325,29 @@ public sealed class PluginLoader : IPluginLoader
         }
 
         return null;
+    }
+
+    private static bool IsDefinitionFromAssembly(NodeDefinition definition, Assembly assembly)
+    {
+        if (definition.NodeType?.Assembly == assembly)
+        {
+            return true;
+        }
+
+        var factoryDeclaringAssembly = definition.Factory.Method.DeclaringType?.Assembly;
+        if (factoryDeclaringAssembly == assembly)
+        {
+            return true;
+        }
+
+        var factoryTargetAssembly = definition.Factory.Target?.GetType().Assembly;
+        if (factoryTargetAssembly == assembly)
+        {
+            return true;
+        }
+
+        var inlineDeclaringAssembly = definition.InlineExecutor?.Method.DeclaringType?.Assembly;
+        return inlineDeclaringAssembly == assembly;
     }
 
     public IReadOnlyList<(string PluginId, string PluginName, string? Version)> GetLoadedPlugins()
@@ -401,6 +490,13 @@ public sealed class PluginLoader : IPluginLoader
 
     private IEnumerable<PluginCandidate> DiscoverCandidatesFromDirectory(string directory)
     {
+        var disabledMarkerPath = Path.Combine(directory, DisabledMarkerFileName);
+        if (File.Exists(disabledMarkerPath))
+        {
+            _logger.LogInformation("Skipping disabled plugin directory '{PluginDirectory}'.", directory);
+            yield break;
+        }
+
         var manifestPath = Path.Combine(directory, _options.ManifestFileName);
         var manifest = PluginManifest.Load(manifestPath);
 

@@ -20,6 +20,8 @@ internal sealed class ExecutionRuntime
     private readonly HashSet<string> _createdNodes = new(StringComparer.Ordinal);
     private readonly NodeExecutionOptions _options;
     private readonly Dictionary<(string nodeId, string completedExecSocket), List<Task>> _pendingStreamItemTasks = new();
+    private readonly Func<string, IServiceProvider?>? _resolveServicesForDefinition;
+    private readonly Dictionary<string, IServiceProvider> _nodeServices = new(StringComparer.Ordinal);
 
     public INodeRuntimeStorage RuntimeStorage { get; }
     public IServiceProvider Services { get; }
@@ -44,7 +46,8 @@ internal sealed class ExecutionRuntime
         INodeRegistryService registry,
         ExecutionGate gate,
         NodeExecutionOptions options,
-        CancellationToken ct)
+        CancellationToken ct,
+        Func<string, IServiceProvider?>? resolveServicesForDefinition = null)
     {
         _nodes = nodes;
         RuntimeStorage = runtimeStorage;
@@ -52,11 +55,20 @@ internal sealed class ExecutionRuntime
         CancellationToken = ct;
         Gate = gate;
         _options = options;
+        _resolveServicesForDefinition = resolveServicesForDefinition;
         _nodeMap = nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
         _execConnections = BuildExecConnectionMap(connections);
         _dataInputConnections = BuildDataInputConnectionMap(connections);
         _nodeDefinitions = ResolveDefinitions(nodes, registry);
         _nodeInstances = new Dictionary<string, NodeBase?>(StringComparer.Ordinal);
+        BuildNodeServiceMap();
+    }
+
+    internal IServiceProvider GetServicesForNode(string nodeId)
+    {
+        return _nodeServices.TryGetValue(nodeId, out var services)
+            ? services
+            : Services;
     }
 
     internal NodeBase? GetOrCreateInstance(string nodeId)
@@ -138,7 +150,7 @@ internal sealed class ExecutionRuntime
 
                 if (_createdNodes.Add(nodeId))
                 {
-                    await instance.OnCreatedAsync(Services).ConfigureAwait(false);
+                    await instance.OnCreatedAsync(GetServicesForNode(nodeId)).ConfigureAwait(false);
                 }
 
                 await instance.ExecuteAsync(context, CancellationToken).ConfigureAwait(false);
@@ -360,5 +372,27 @@ internal sealed class ExecutionRuntime
         }
 
         return map;
+    }
+
+    private void BuildNodeServiceMap()
+    {
+        if (_resolveServicesForDefinition is null)
+        {
+            return;
+        }
+
+        foreach (var node in _nodes)
+        {
+            if (!_nodeDefinitions.TryGetValue(node.Id, out var definition))
+            {
+                continue;
+            }
+
+            var pluginServices = _resolveServicesForDefinition(definition.Id);
+            if (pluginServices is not null)
+            {
+                _nodeServices[node.Id] = pluginServices;
+            }
+        }
     }
 }

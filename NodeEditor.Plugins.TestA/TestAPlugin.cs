@@ -2,6 +2,7 @@ using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Plugins;
 using NodeEditor.Net.Services.Registry;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace NodeEditor.Plugins.TestA;
 
@@ -16,6 +17,21 @@ public sealed class TestAPlugin : INodePlugin
     {
         registry.RegisterFromAssembly(typeof(TestAPlugin).Assembly);
     }
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddSingleton<ITestAProbeService, TestAProbeService>();
+    }
+}
+
+public interface ITestAProbeService
+{
+    string GetValue();
+}
+
+public sealed class TestAProbeService : ITestAProbeService
+{
+    public string GetValue() => "plugin-service-ok";
 }
 
 public sealed class EchoStringNode : NodeBase
@@ -104,6 +120,34 @@ public sealed class LoadImageNode : NodeBase
         }
 
         context.SetOutput("Image", image);
+        await context.TriggerAsync("Exit");
+    }
+}
+
+public sealed class PluginServiceProbeNode : NodeBase
+{
+    private ITestAProbeService? _probeService;
+
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Plugin Service Probe").Category("Test")
+            .Description("Validates plugin-scoped service resolution during execution")
+            .ExecutionInitiator()
+            .Output<string>("Value")
+            .Output<bool>("Ok");
+    }
+
+    public override Task OnCreatedAsync(IServiceProvider services)
+    {
+        _probeService = services.GetRequiredService<ITestAProbeService>();
+        return Task.CompletedTask;
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var value = _probeService?.GetValue() ?? string.Empty;
+        context.SetOutput("Value", value);
+        context.SetOutput("Ok", !string.IsNullOrWhiteSpace(value));
         await context.TriggerAsync("Exit");
     }
 }

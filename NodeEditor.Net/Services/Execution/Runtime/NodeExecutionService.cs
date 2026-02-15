@@ -1,5 +1,6 @@
 ﻿using NodeEditor.Net.Models;
 using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Plugins;
 using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Net.Services.Execution;
@@ -9,12 +10,21 @@ public sealed class NodeExecutionService : INodeExecutionService
     private readonly ExecutionPlanner _planner;
     private readonly INodeRegistryService _registry;
     private readonly IServiceProvider _services;
+    private readonly IPluginLoader? _pluginLoader;
+    private readonly IPluginServiceRegistry? _pluginServiceRegistry;
 
-    public NodeExecutionService(ExecutionPlanner planner, INodeRegistryService registry, IServiceProvider services)
+    public NodeExecutionService(
+        ExecutionPlanner planner,
+        INodeRegistryService registry,
+        IServiceProvider services,
+        IPluginLoader? pluginLoader = null,
+        IPluginServiceRegistry? pluginServiceRegistry = null)
     {
         _planner = planner;
         _registry = registry;
         _services = services;
+        _pluginLoader = pluginLoader;
+        _pluginServiceRegistry = pluginServiceRegistry;
     }
 
     public event EventHandler<NodeExecutionEventArgs>? NodeStarted;
@@ -92,7 +102,7 @@ public sealed class NodeExecutionService : INodeExecutionService
 
         // 1. Build runtime
         var runtime = new ExecutionRuntime(nodes, connections, context,
-            _services, _registry, Gate, options, token);
+            _services, _registry, Gate, options, token, ResolveServicesForDefinition);
 
         // Forward runtime events to service events
         runtime.NodeStarted += (s, e) => NodeStarted?.Invoke(this, e);
@@ -108,7 +118,7 @@ public sealed class NodeExecutionService : INodeExecutionService
         {
             var instance = runtime.GetOrCreateInstance(node.Id);
             if (instance is not null)
-                await instance.OnCreatedAsync(_services).ConfigureAwait(false);
+                await instance.OnCreatedAsync(runtime.GetServicesForNode(node.Id)).ConfigureAwait(false);
         }
 
         // 4. Find initiator nodes and execute them
@@ -181,5 +191,25 @@ public sealed class NodeExecutionService : INodeExecutionService
                 }
             });
         }
+    }
+
+    private IServiceProvider? ResolveServicesForDefinition(string definitionId)
+    {
+        if (string.IsNullOrWhiteSpace(definitionId)
+            || _pluginLoader is null
+            || _pluginServiceRegistry is null)
+        {
+            return null;
+        }
+
+        var plugin = _pluginLoader.GetPluginForDefinition(definitionId);
+        if (plugin is null)
+        {
+            return null;
+        }
+
+        return _pluginServiceRegistry.TryGetServices(plugin.Value.PluginId, out var services)
+            ? services
+            : null;
     }
 }

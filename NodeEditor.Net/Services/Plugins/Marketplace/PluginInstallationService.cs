@@ -13,6 +13,7 @@ namespace NodeEditor.Net.Services.Plugins.Marketplace;
 public sealed class PluginInstallationService : IPluginInstallationService
 {
     private const string InstalledManifestFileName = "installed-plugins.json";
+    private const string DisabledMarkerFileName = ".plugin-disabled";
 
     private readonly PluginOptions _pluginOptions;
     private readonly MarketplaceOptions _marketplaceOptions;
@@ -122,9 +123,27 @@ public sealed class PluginInstallationService : IPluginInstallationService
         {
             await _pluginLoader.UnloadPluginAsync(pluginId).ConfigureAwait(false);
 
+            var softUninstall = false;
+            string? softUninstallReason = null;
+
             if (Directory.Exists(installed.InstallPath))
             {
-                Directory.Delete(installed.InstallPath, true);
+                try
+                {
+                    Directory.Delete(installed.InstallPath, true);
+                }
+                catch (IOException ex) when (IsLockingException(ex))
+                {
+                    softUninstall = true;
+                    softUninstallReason = ex.Message;
+                    MarkPluginDirectoryDisabled(installed.InstallPath, pluginId, ex.Message);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    softUninstall = true;
+                    softUninstallReason = ex.Message;
+                    MarkPluginDirectoryDisabled(installed.InstallPath, pluginId, ex.Message);
+                }
             }
 
             var manifest = await LoadInstalledManifestAsync(cancellationToken).ConfigureAwait(false);
@@ -133,6 +152,13 @@ public sealed class PluginInstallationService : IPluginInstallationService
             await SaveInstalledManifestAsync(manifest, cancellationToken).ConfigureAwait(false);
 
             _logger.LogInformation("Successfully uninstalled plugin {PluginId}", pluginId);
+            if (softUninstall)
+            {
+                _logger.LogWarning(
+                    "Plugin '{PluginId}' was unloaded and disabled, but files are still locked and will be removed later. Details: {Reason}",
+                    pluginId,
+                    softUninstallReason);
+            }
 
             PluginUninstalled?.Invoke(this, new PluginUninstalledEventArgs
             {
@@ -321,7 +347,16 @@ public sealed class PluginInstallationService : IPluginInstallationService
 
                 if (Directory.Exists(targetDir))
                 {
-                    Directory.Delete(targetDir, true);
+                    var prepared = await PrepareTargetDirectoryAsync(targetDir, manifest.Id, cancellationToken).ConfigureAwait(false);
+                    if (!prepared.Success)
+                    {
+                        _logger.LogWarning("Could not replace plugin directory '{TargetDir}'. Falling back to existing directory. {Reason}",
+                            targetDir, prepared.ErrorMessage);
+
+                        Directory.Delete(tempDir, true);
+                        return await FinalizeInstallUsingExistingDirectoryAsync(targetDir, manifest, sourceId, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
                 }
 
                 var pluginSourceDir = Path.GetDirectoryName(manifestPath)!;
@@ -361,7 +396,15 @@ public sealed class PluginInstallationService : IPluginInstallationService
 
                 if (Directory.Exists(targetDir))
                 {
-                    Directory.Delete(targetDir, true);
+                    var prepared = await PrepareTargetDirectoryAsync(targetDir, manifest.Id, cancellationToken).ConfigureAwait(false);
+                    if (!prepared.Success)
+                    {
+                        _logger.LogWarning("Could not replace plugin directory '{TargetDir}'. Falling back to existing directory. {Reason}",
+                            targetDir, prepared.ErrorMessage);
+
+                        return await FinalizeInstallUsingExistingDirectoryAsync(targetDir, manifest, sourceId, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
                 }
 
                 CopyDirectory(packagePath, targetDir);
@@ -397,6 +440,24 @@ public sealed class PluginInstallationService : IPluginInstallationService
                 ErrorMessage: "Package path does not exist.",
                 ErrorCode: PluginInstallErrorCode.DownloadFailed);
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "Failed to install plugin from package due to permission error.");
+            return new PluginInstallResult(
+                false,
+                ErrorMessage: ex.Message,
+                ErrorCode: PluginInstallErrorCode.PermissionDenied);
+        }
+        catch (IOException ex) when (ex.Message.Contains("access", StringComparison.OrdinalIgnoreCase)
+                                     || ex.Message.Contains("denied", StringComparison.OrdinalIgnoreCase)
+                                     || ex.Message.Contains("used by another process", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogError(ex, "Failed to install plugin from package due to file lock.");
+            return new PluginInstallResult(
+                false,
+                ErrorMessage: ex.Message,
+                ErrorCode: PluginInstallErrorCode.PermissionDenied);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to install plugin from package.");
@@ -413,6 +474,8 @@ public sealed class PluginInstallationService : IPluginInstallationService
         string? sourceId,
         CancellationToken cancellationToken)
     {
+        TryDeleteDisabledMarker(targetDir);
+
         var installedPlugin = new InstalledPluginInfo
         {
             Id = manifest.Id,
@@ -439,6 +502,34 @@ public sealed class PluginInstallationService : IPluginInstallationService
         PluginInstalled?.Invoke(this, new PluginInstalledEventArgs { Plugin = installedPlugin });
 
         return new PluginInstallResult(true, installedPlugin);
+    }
+
+    private async Task<PluginInstallResult> FinalizeInstallUsingExistingDirectoryAsync(
+        string targetDir,
+        PluginManifest expectedManifest,
+        string? sourceId,
+        CancellationToken cancellationToken)
+    {
+        var existingManifestPath = Path.Combine(targetDir, _marketplaceOptions.ManifestFileName);
+        if (!File.Exists(existingManifestPath))
+        {
+            _logger.LogWarning("Plugin directory '{TargetDir}' is locked and does not contain '{ManifestFileName}'. Reusing expected manifest metadata.",
+                targetDir,
+                _marketplaceOptions.ManifestFileName);
+
+            return await FinalizeInstallAsync(targetDir, expectedManifest, sourceId, cancellationToken).ConfigureAwait(false);
+        }
+
+        var existingManifest = await ReadManifestAsync(existingManifestPath, cancellationToken).ConfigureAwait(false);
+        if (!string.Equals(existingManifest.Id, expectedManifest.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            return new PluginInstallResult(
+                false,
+                ErrorMessage: $"Locked plugin directory contains '{existingManifest.Id}', expected '{expectedManifest.Id}'.",
+                ErrorCode: PluginInstallErrorCode.ManifestInvalid);
+        }
+
+        return await FinalizeInstallAsync(targetDir, existingManifest, sourceId, cancellationToken).ConfigureAwait(false);
     }
 
     private string GetPluginsDirectory()
@@ -550,6 +641,109 @@ public sealed class PluginInstallationService : IPluginInstallationService
     private static Version ParseVersionSafe(string? version)
     {
         return Version.TryParse(version, out var parsed) ? parsed : new Version(0, 0, 0);
+    }
+
+    private static bool IsLockingException(IOException ex)
+    {
+        return ex.Message.Contains("access", StringComparison.OrdinalIgnoreCase)
+               || ex.Message.Contains("denied", StringComparison.OrdinalIgnoreCase)
+               || ex.Message.Contains("used by another process", StringComparison.OrdinalIgnoreCase)
+               || ex.Message.Contains("cannot access the file", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void MarkPluginDirectoryDisabled(string pluginDirectory, string pluginId, string reason)
+    {
+        try
+        {
+            Directory.CreateDirectory(pluginDirectory);
+            var markerPath = Path.Combine(pluginDirectory, DisabledMarkerFileName);
+            var markerContents = $"PluginId={pluginId}{Environment.NewLine}DisabledAtUtc={DateTimeOffset.UtcNow:O}{Environment.NewLine}Reason={reason}";
+            File.WriteAllText(markerPath, markerContents);
+        }
+        catch (Exception markerEx)
+        {
+            _logger.LogWarning(markerEx,
+                "Failed to mark plugin directory '{PluginDirectory}' as disabled for plugin '{PluginId}'.",
+                pluginDirectory,
+                pluginId);
+        }
+    }
+
+    private static void TryDeleteDisabledMarker(string pluginDirectory)
+    {
+        try
+        {
+            var markerPath = Path.Combine(pluginDirectory, DisabledMarkerFileName);
+            if (File.Exists(markerPath))
+            {
+                File.Delete(markerPath);
+            }
+        }
+        catch
+        {
+            // Ignore marker cleanup failures.
+        }
+    }
+
+    private async Task<(bool Success, string? ErrorMessage)> PrepareTargetDirectoryAsync(
+        string targetDir,
+        string pluginId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _pluginLoader.UnloadPluginAsync(pluginId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Plugin '{PluginId}' could not be unloaded before install replacement.", pluginId);
+        }
+
+        ReleaseFileLocks();
+
+        const int maxAttempts = 5;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                if (!Directory.Exists(targetDir))
+                {
+                    return (true, null);
+                }
+
+                Directory.Delete(targetDir, true);
+                return (true, null);
+            }
+            catch (IOException ex) when (attempt < maxAttempts)
+            {
+                _logger.LogDebug(ex, "Retrying plugin directory cleanup (attempt {Attempt}/{MaxAttempts}).", attempt, maxAttempts);
+                await Task.Delay(150 * attempt, cancellationToken).ConfigureAwait(false);
+                ReleaseFileLocks();
+            }
+            catch (UnauthorizedAccessException ex) when (attempt < maxAttempts)
+            {
+                _logger.LogDebug(ex, "Retrying plugin directory cleanup (attempt {Attempt}/{MaxAttempts}).", attempt, maxAttempts);
+                await Task.Delay(150 * attempt, cancellationToken).ConfigureAwait(false);
+                ReleaseFileLocks();
+            }
+            catch (IOException ex)
+            {
+                return (false, $"Plugin '{pluginId}' is in use. Close running sessions and retry install. Details: {ex.Message}");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return (false, $"Plugin '{pluginId}' is in use. Close running sessions and retry install. Details: {ex.Message}");
+            }
+        }
+
+        return (false, $"Plugin '{pluginId}' could not be replaced because files are still locked.");
+    }
+
+    private static void ReleaseFileLocks()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 
     private sealed class InstalledPluginsManifest

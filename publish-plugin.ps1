@@ -146,5 +146,6 @@ if ($CreateZip) {
     Write-Host "  Package: $ZipPath" -ForegroundColor Gray
 }
 
-Write-Host "`n✓ Published '$PluginName' (v$($Manifest.version)) to local repository" -ForegroundColor Green
-Write-Host "  Users can now install it via Plugin Manager in the app" -ForegroundColor Gray
+Write-Host ""
+Write-Host "Published '$PluginName' (v$($Manifest.version)) to local repository" -ForegroundColor Green
+Write-Host "Users can now install it via Plugin Manager in the app" -ForegroundColor Gray

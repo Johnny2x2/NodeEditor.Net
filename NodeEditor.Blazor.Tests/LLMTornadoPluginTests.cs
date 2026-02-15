@@ -54,6 +54,9 @@ public sealed class LLMTornadoPluginTests
         Assert.Contains(registry.Definitions, d => d.NodeType == typeof(CreateResponseNode));
         Assert.Contains(registry.Definitions, d => d.NodeType == typeof(StreamChatNode));
         Assert.Contains(registry.Definitions, d => d.NodeType == typeof(StreamResponseNode));
+        Assert.Contains(registry.Definitions, d => d.NodeType == typeof(GenerateImageNode));
+        Assert.Contains(registry.Definitions, d => d.NodeType == typeof(LoadImageNode));
+        Assert.Contains(registry.Definitions, d => d.NodeType == typeof(LoadImageFromUrlNode));
     }
 
     [Fact]
@@ -167,6 +170,7 @@ public sealed class LLMTornadoPluginTests
     [InlineData(typeof(CreateResponseNode))]
     [InlineData(typeof(StreamChatNode))]
     [InlineData(typeof(StreamResponseNode))]
+    [InlineData(typeof(GenerateImageNode))]
     public async Task Nodes_WhenFactoryThrows_ReturnOkFalseAndError(Type nodeType)
     {
         var node = (NodeBase)Activator.CreateInstance(nodeType)!;
@@ -194,6 +198,7 @@ public sealed class LLMTornadoPluginTests
             .BuildServiceProvider();
 
         var context = TestNodeExecutionContext.CreateFor(node, services);
+        context.SetInput("EnableImageGeneration", true);
         await node.ExecuteAsync(context, CancellationToken.None);
 
         Assert.True(context.GetOutput<bool>("Ok"));
@@ -211,6 +216,7 @@ public sealed class LLMTornadoPluginTests
             .BuildServiceProvider();
 
         var context = TestNodeExecutionContext.CreateFor(node, services);
+        context.SetInput("EnableImageGeneration", true);
         await node.ExecuteAsync(context, CancellationToken.None);
 
         Assert.True(context.GetOutput<bool>("Ok"));
@@ -255,6 +261,8 @@ public sealed class LLMTornadoPluginTests
         Assert.Equal("resp_1", context.GetOutput<string>("ResponseId"));
         Assert.Equal("mock response text", context.GetOutput<string>("OutputText"));
         Assert.Equal("Completed", context.GetOutput<string>("Status"));
+        Assert.StartsWith("data:image/", context.GetOutput<string>("GeneratedImageReference"), StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(context.GetOutput<NodeImage?>("GeneratedImage"));
         Assert.Equal(7, context.GetOutput<int>("TotalTokens"));
         Assert.Contains("Exit", context.TriggeredExecutionSockets);
     }
@@ -291,10 +299,68 @@ public sealed class LLMTornadoPluginTests
 
         Assert.True(context.GetOutput<bool>("Ok"));
         Assert.Equal("Hello world", context.GetOutput<string>("FinalText"));
+        Assert.StartsWith("data:image/", context.GetOutput<string>("GeneratedImageReference"), StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(context.GetOutput<NodeImage?>("GeneratedImage"));
         Assert.Equal(6, context.GetOutput<int>("TotalTokens"));
         Assert.True(context.EmittedItems.TryGetValue("Delta", out var deltas));
         Assert.Equal(new[] { "Hello", " world" }, deltas!.Cast<string>().ToArray());
+        Assert.True(context.EmittedItems.TryGetValue("ImageDelta", out var imageDeltas));
+        Assert.NotNull(imageDeltas!.FirstOrDefault());
         Assert.Contains("Completed", context.TriggeredExecutionSockets);
+    }
+
+    [Fact]
+    public async Task GenerateImageNode_WithMockedHttp_ReturnsImageAndReference()
+    {
+        var node = new GenerateImageNode();
+        var services = new ServiceCollection()
+            .AddSingleton<ILLMTornadoApiFactory>(new MockedHttpApiFactory())
+            .BuildServiceProvider();
+
+        var context = TestNodeExecutionContext.CreateFor(node, services);
+        await node.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.True(context.GetOutput<bool>("Ok"));
+        var image = context.GetOutput<NodeImage?>("Image");
+        Assert.NotNull(image);
+        Assert.StartsWith("data:image/", image!.DataUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("data:image/", context.GetOutput<string>("ImageReference"), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(12, context.GetOutput<int>("TotalTokens"));
+        Assert.Contains("Exit", context.TriggeredExecutionSockets);
+    }
+
+    [Fact]
+    public async Task LoadImageNode_WithDataUrl_ReturnsImage()
+    {
+        var node = new LoadImageNode();
+        var services = new ServiceCollection().BuildServiceProvider();
+
+        var context = TestNodeExecutionContext.CreateFor(node, services);
+        context.SetInput("ImagePath", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/qz8AAAAASUVORK5CYII=");
+
+        await node.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.True(context.GetOutput<bool>("Ok"));
+        Assert.NotNull(context.GetOutput<NodeImage?>("Image"));
+        Assert.Equal(string.Empty, context.GetOutput<string>("Error"));
+        Assert.Contains("Exit", context.TriggeredExecutionSockets);
+    }
+
+    [Fact]
+    public async Task LoadImageFromUrlNode_WithInvalidUrl_ReturnsError()
+    {
+        var node = new LoadImageFromUrlNode();
+        var services = new ServiceCollection().BuildServiceProvider();
+
+        var context = TestNodeExecutionContext.CreateFor(node, services);
+        context.SetInput("ImageUrl", "not-a-url");
+
+        await node.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.False(context.GetOutput<bool>("Ok"));
+        Assert.NotNull(context.GetOutput<string>("Error"));
+        Assert.Contains("absolute URL", context.GetOutput<string>("Error"), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Exit", context.TriggeredExecutionSockets);
     }
 
     private sealed class ThrowingApiFactory : ILLMTornadoApiFactory
@@ -356,6 +422,11 @@ public sealed class LLMTornadoPluginTests
                         if (request.Method == HttpMethod.Post && path.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
                         {
                                 return isStream ? CreateSse(ResponseStreamSse) : CreateJson(ResponseJson);
+                        }
+
+                        if (request.Method == HttpMethod.Post && path.EndsWith("/images/generations", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return CreateJson(ImageGenerationJson);
                         }
 
                         return new HttpResponseMessage(HttpStatusCode.NotFound)
@@ -431,6 +502,12 @@ public sealed class LLMTornadoPluginTests
                             "status": "completed",
                             "output": [
                                 {
+                                    "type": "image_generation_call",
+                                    "id": "img_1",
+                                    "status": "completed",
+                                    "result": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/qz8AAAAASUVORK5CYII="
+                                },
+                                {
                                     "type": "message",
                                     "id": "msg_1",
                                     "status": "completed",
@@ -467,14 +544,33 @@ public sealed class LLMTornadoPluginTests
                         event: response.output_text.delta
                         data: {"type":"response.output_text.delta","sequence_number":1,"content_index":0,"item_id":"msg_1","output_index":0,"delta":"Hello"}
 
+                        event: response.image_generation_call.partial_image
+                        data: {"type":"response.image_generation_call.partial_image","sequence_number":1,"item_id":"img_1","output_index":0,"partial_image_b64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/qz8AAAAASUVORK5CYII=","partial_image_index":0}
+
                         event: response.output_text.delta
                         data: {"type":"response.output_text.delta","sequence_number":2,"content_index":0,"item_id":"msg_1","output_index":0,"delta":" world"}
 
                         event: response.completed
-                        data: {"type":"response.completed","sequence_number":3,"response":{"id":"resp_stream_1","status":"completed","output":[{"type":"message","id":"msg_1","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hello world","annotations":[]}]}],"usage":{"input_tokens":2,"output_tokens":4,"total_tokens":6}}}
+                        data: {"type":"response.completed","sequence_number":3,"response":{"id":"resp_stream_1","status":"completed","output":[{"type":"image_generation_call","id":"img_1","status":"completed","result":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/qz8AAAAASUVORK5CYII="},{"type":"message","id":"msg_1","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hello world","annotations":[]}]}],"usage":{"input_tokens":2,"output_tokens":4,"total_tokens":6}}}
 
                         data: [DONE]
 
+                        """;
+
+                private const string ImageGenerationJson = """
+                        {
+                            "created": 1730000000,
+                            "data": [
+                                {
+                                    "b64_json": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/qz8AAAAASUVORK5CYII="
+                                }
+                            ],
+                            "usage": {
+                                "input_tokens": 5,
+                                "output_tokens": 7,
+                                "total_tokens": 12
+                            }
+                        }
                         """;
         }
 
@@ -533,6 +629,11 @@ public sealed class LLMTornadoPluginTests
         {
             _inputs.TryGetValue(socketName, out var value);
             return value;
+        }
+
+        public void SetInput(string socketName, object? value)
+        {
+            _inputs[socketName] = value;
         }
 
         public bool TryGetInput<T>(string socketName, out T value)

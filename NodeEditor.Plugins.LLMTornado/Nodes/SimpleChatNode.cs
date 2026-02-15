@@ -1,7 +1,9 @@
 using LlmTornado.Chat;
 using LlmTornado.Chat.Models;
 using LlmTornado.Code;
+using LlmTornado.Images;
 using Microsoft.Extensions.DependencyInjection;
+using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
 using NodeEditor.Plugins.LLMTornado.Services;
 
@@ -21,6 +23,9 @@ public sealed class SimpleChatNode : NodeBase
             .Input<string>("ApiKey", "")
             .Input<string>("Organization", "")
             .Input<string>("BaseUrl", "")
+            .Input<NodeImage?>("Image", null)
+            .Input<string>("ImageUrl", "")
+            .Input<string>("ImageDetail", "Auto")
             .Input<double>("Temperature", 0.2)
             .Output<string>("Response")
             .Output<int>("TotalTokens")
@@ -37,6 +42,9 @@ public sealed class SimpleChatNode : NodeBase
         var apiKey = context.GetInput<string>("ApiKey");
         var organization = context.GetInput<string>("Organization");
         var baseUrl = context.GetInput<string>("BaseUrl");
+        var image = context.GetInput<NodeImage?>("Image");
+        var imageUrl = context.GetInput<string>("ImageUrl");
+        var imageDetail = ParseImageDetail(context.GetInput<string>("ImageDetail"));
         var temperature = context.GetInput<double>("Temperature");
 
         try
@@ -60,7 +68,8 @@ public sealed class SimpleChatNode : NodeBase
                 request.Messages.Add(new ChatMessage(ChatMessageRoles.System, system));
             }
 
-            request.Messages.Add(new ChatMessage(ChatMessageRoles.User, prompt));
+            var userParts = BuildUserParts(prompt, image, imageUrl, imageDetail);
+            request.Messages.Add(new ChatMessage(ChatMessageRoles.User, userParts));
 
             var result = await api.Chat.CreateChatCompletionSafe(request).ConfigureAwait(false);
 
@@ -88,9 +97,60 @@ public sealed class SimpleChatNode : NodeBase
             context.SetOutput("Response", string.Empty);
             context.SetOutput("TotalTokens", 0);
             context.SetOutput("Ok", false);
-            context.SetOutput("Error", ex.Message);
+            context.SetOutput("Error", BuildErrorMessage(ex));
         }
 
         await context.TriggerAsync("Exit");
+    }
+
+    private static string BuildErrorMessage(Exception ex)
+    {
+        if (ex is TypeInitializationException tie && tie.InnerException is not null)
+        {
+            return $"{tie.Message} Inner: {tie.InnerException.GetType().Name}: {tie.InnerException.Message}";
+        }
+
+        return ex.Message;
+    }
+
+    private static List<ChatMessagePart> BuildUserParts(string prompt, NodeImage? image, string? imageUrl, ImageDetail imageDetail)
+    {
+        var parts = new List<ChatMessagePart>();
+
+        if (!string.IsNullOrWhiteSpace(prompt))
+        {
+            parts.Add(new ChatMessagePart(prompt));
+        }
+
+        var imageContent = !string.IsNullOrWhiteSpace(image?.DataUrl)
+            ? image!.DataUrl
+            : imageUrl;
+
+        if (!string.IsNullOrWhiteSpace(imageContent))
+        {
+            parts.Add(new ChatMessagePart(imageContent, imageDetail));
+        }
+
+        if (parts.Count == 0)
+        {
+            parts.Add(new ChatMessagePart(string.Empty));
+        }
+
+        return parts;
+    }
+
+    private static ImageDetail ParseImageDetail(string? detail)
+    {
+        if (string.IsNullOrWhiteSpace(detail))
+        {
+            return ImageDetail.Auto;
+        }
+
+        return detail.Trim().ToLowerInvariant() switch
+        {
+            "low" => ImageDetail.Low,
+            "high" => ImageDetail.High,
+            _ => ImageDetail.Auto
+        };
     }
 }

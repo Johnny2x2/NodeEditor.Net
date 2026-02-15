@@ -183,6 +183,33 @@ public sealed class DynamicPluginLoadingTests : IAsyncLifetime
             "Ping node should have been executed");
     }
 
+    [Fact]
+    public async Task DynamicLoad_PluginScopedServices_AreResolvedDuringExecution()
+    {
+        var probeDef = _registry.Definitions.FirstOrDefault(d => d.Name == "Plugin Service Probe");
+        Assert.NotNull(probeDef);
+
+        var probeNode = probeDef!.Factory();
+
+        var nodes = new List<NodeData> { probeNode };
+        var connections = new List<ConnectionData>();
+        var context = new NodeRuntimeStorage();
+
+        await _executionService.ExecuteAsync(
+            nodes,
+            connections,
+            context,
+            null!,
+            DefaultOptions,
+            CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted(probeNode.Id),
+            "Plugin service probe node should have been executed");
+        Assert.True(context.GetSocketValue(probeNode.Id, "Ok") as bool? == true,
+            "Probe node should resolve plugin-scoped service successfully");
+        Assert.Equal("plugin-service-ok", context.GetSocketValue(probeNode.Id, "Value") as string);
+    }
+
 
     [Fact]
     public void DynamicLoad_AllPlugins_NoAssemblyLoadExceptions()
