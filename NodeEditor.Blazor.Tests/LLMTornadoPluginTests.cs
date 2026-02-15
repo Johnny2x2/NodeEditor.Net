@@ -664,6 +664,12 @@ public sealed class LLMTornadoPluginTests
             return Task.CompletedTask;
         }
 
+        public Task TriggerScopedAsync(string executionOutputName, INodeRuntimeStorage scope)
+        {
+            TriggeredExecutionSockets.Add(executionOutputName);
+            return Task.CompletedTask;
+        }
+
         public Task EmitAsync<T>(string streamItemSocket, T item)
         {
             return EmitAsync(streamItemSocket, (object?)item);

@@ -1,72 +1,22 @@
 @using NodeEditor.Blazor.Services.Editors
 @using NodeEditor.Net.Models
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
 
 <div class="ne-editor-image">
-    <style>
-        .ne-editor-image {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            max-width: 200px;
-        }
-
-        .ne-editor-button {
-            padding: 6px 12px;
-            border-radius: 4px;
-            border: 1px solid rgba(102, 153, 255, 0.4);
-            background: rgba(102, 153, 255, 0.15);
-            color: #ffffff;
-            font-size: 11px;
-            font-weight: 500;
-            cursor: pointer;
-            outline: none;
-            transition: all 0.15s ease;
-            white-space: nowrap;
-            display: inline-block;
-        }
-
-        .ne-editor-button:hover {
-            background: rgba(102, 153, 255, 0.25);
-            border-color: rgba(102, 153, 255, 0.6);
-            color: #ffffff;
-        }
-
-        .ne-editor-image-path {
-            font-size: 10px;
-            color: rgba(255, 255, 255, 0.6);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .ne-editor-image-preview {
-            margin-top: 4px;
-            max-width: 180px;
-            max-height: 180px;
-            overflow: hidden;
-            border-radius: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .ne-editor-image-preview img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-    </style>
-
     <InputFile OnChange="OnFileSelected" 
                accept="image/*" 
                id="@_fileInputId"
                style="display: none;" />
     
-    <label class="ne-editor-button"
-           for="@_fileInputId"
-           @onpointerdown:stopPropagation
-           @onclick:stopPropagation>
+    <button class="ne-editor-button"
+            type="button"
+            @onclick="TriggerFileInput"
+            @onclick:stopPropagation
+            @onpointerdown:stopPropagation>
         📁 Load Image
-    </label>
+    </button>
     
     @if (!string.IsNullOrEmpty(CurrentPath))
     {
@@ -88,6 +38,7 @@
     public SocketEditorContext Context { get; set; } = null!;
 
     private string _fileInputId = $"file-input-{Guid.NewGuid():N}";
+    private IJSObjectReference? _jsModule;
     private string? CurrentPath => Context.GetStringValue();
     private string DisplayName =>
         string.IsNullOrWhiteSpace(CurrentPath)
@@ -96,6 +47,13 @@
                 ? "Loaded image"
                 : System.IO.Path.GetFileName(CurrentPath));
     private string? PreviewDataUrl { get; set; }
+
+    private async Task TriggerFileInput()
+    {
+        _jsModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/NodeEditor.Blazor/nodeEditorCanvas.js");
+        await _jsModule.InvokeVoidAsync("triggerClick", _fileInputId);
+    }
 
     protected override async Task OnParametersSetAsync()
     {

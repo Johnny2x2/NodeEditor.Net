@@ -113,3 +113,10 @@ export function listSavedGraphNames() {
 export function promptForName(message, defaultValue) {
   return prompt(message, defaultValue);
 }
+
+export function triggerClick(elementId) {
+  const el = document.getElementById(elementId);
+  if (el) {
+    el.click();
+  }
+}

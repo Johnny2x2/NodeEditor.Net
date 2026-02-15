@@ -190,6 +190,140 @@ internal sealed class ExecutionRuntime
         }
     }
 
+    /// <summary>
+    /// Executes a node using a scoped storage layer. The scoped storage provides
+    /// write-isolation (outputs and execution tracking go to the scope) while
+    /// reading through to the parent for upstream values resolved earlier.
+    /// Used by parallel loop iterations.
+    /// </summary>
+    internal async Task ExecuteNodeByIdScopedAsync(string nodeId, INodeRuntimeStorage scope)
+    {
+        if (!_nodeMap.TryGetValue(nodeId, out var node))
+        {
+            return;
+        }
+
+        // In scoped execution, callable nodes always re-execute (scope has fresh execution tracking).
+        // Non-callable upstream nodes that were already executed in the parent are resolved via
+        // read-through in the layered storage.
+        if (!node.Callable && scope.IsNodeExecuted(nodeId))
+        {
+            return;
+        }
+
+        NodeStarted?.Invoke(this, new NodeExecutionEventArgs(node));
+
+        try
+        {
+            await ResolveAllDataInputsScopedAsync(node, scope).ConfigureAwait(false);
+
+            if (VariableNodeExecutor.IsVariableNode(node))
+            {
+                VariableNodeExecutor.Execute(node, scope);
+
+                if (VariableNodeExecutor.IsSetNode(node))
+                {
+                    await Gate.WaitAsync(CancellationToken).ConfigureAwait(false);
+                    var targets = GetExecutionTargets(node.Id, "Exit");
+                    foreach (var (targetNodeId, _) in targets)
+                    {
+                        CancellationToken.ThrowIfCancellationRequested();
+                        await ExecuteNodeByIdScopedAsync(targetNodeId, scope).ConfigureAwait(false);
+                    }
+                }
+
+                NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
+                return;
+            }
+
+            if (!_nodeDefinitions.TryGetValue(nodeId, out var definition))
+            {
+                throw new InvalidOperationException($"No node definition found for node '{node.Name}'.");
+            }
+
+            var context = new ScopedNodeExecutionContext(node, this, scope);
+
+            if (definition.InlineExecutor is not null)
+            {
+                await definition.InlineExecutor(context, CancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                // For scoped execution, create a fresh instance per scope to avoid shared mutable state.
+                NodeBase? instance;
+                if (!_nodeDefinitions.TryGetValue(nodeId, out var def) || def.NodeType is null)
+                {
+                    throw new InvalidOperationException($"No node implementation available for '{node.Name}'.");
+                }
+
+                instance = (NodeBase)Activator.CreateInstance(def.NodeType)!;
+                instance.NodeId = nodeId;
+
+                await instance.OnCreatedAsync(GetServicesForNode(nodeId)).ConfigureAwait(false);
+                await instance.ExecuteAsync(context, CancellationToken).ConfigureAwait(false);
+            }
+
+            scope.MarkNodeExecuted(nodeId);
+            NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
+        }
+        catch (Exception ex)
+        {
+            NodeFailed?.Invoke(this, new NodeExecutionFailedEventArgs(node, ex));
+            throw;
+        }
+    }
+
+    internal async Task ResolveAllDataInputsScopedAsync(NodeData node, INodeRuntimeStorage scope)
+    {
+        foreach (var input in node.Inputs.Where(i => !i.IsExecution))
+        {
+            if (!node.Callable && scope.TryGetSocketValue(node.Id, input.Name, out _))
+            {
+                continue;
+            }
+
+            var resolved = await ResolveInputScopedAsync(node, input.Name, scope).ConfigureAwait(false);
+            if (resolved is not null)
+            {
+                scope.SetSocketValue(node.Id, input.Name, resolved);
+                continue;
+            }
+
+            if (input.Value is not null)
+            {
+                var defaultValue = DeserializeSocketValue<object?>(input.Value);
+                scope.SetSocketValue(node.Id, input.Name, defaultValue);
+            }
+        }
+    }
+
+    internal async Task<object?> ResolveInputScopedAsync(NodeData node, string socketName, INodeRuntimeStorage scope)
+    {
+        if (!_dataInputConnections.TryGetValue((node.Id, socketName), out var source))
+        {
+            return null;
+        }
+
+        if (!_nodeMap.TryGetValue(source.sourceNodeId, out var sourceNode))
+        {
+            return null;
+        }
+
+        // For non-callable upstream nodes not yet executed: first check if the parent
+        // storage already has the value (read-through). If not, execute via the shared
+        // runtime (upstream data nodes produce the same result for all iterations).
+        if (!sourceNode.Callable && !scope.IsNodeExecuted(sourceNode.Id))
+        {
+            // Check if a value already exists via read-through (i.e., resolved before the loop)
+            if (!scope.TryGetSocketValue(source.sourceNodeId, source.sourceSocket, out _))
+            {
+                await ExecuteNodeByIdAsync(sourceNode.Id).ConfigureAwait(false);
+            }
+        }
+
+        return scope.GetSocketValue(source.sourceNodeId, source.sourceSocket);
+    }
+
     internal async Task<object?> ResolveInputAsync(NodeData node, string socketName)
     {
         if (!_dataInputConnections.TryGetValue((node.Id, socketName), out var source))

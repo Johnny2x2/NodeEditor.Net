@@ -35,6 +35,13 @@ public interface INodeExecutionContext
     /// </summary>
     Task TriggerAsync(string executionOutputName);
 
+    /// <summary>
+    /// Triggers a named execution output socket using a scoped storage layer.
+    /// Downstream nodes read/write to the provided scope, enabling parallel
+    /// iterations to run without interfering with each other's values.
+    /// </summary>
+    Task TriggerScopedAsync(string executionOutputName, INodeRuntimeStorage scope);
+
     // ── Streaming ──
 
     Task EmitAsync<T>(string streamItemSocket, T item);
