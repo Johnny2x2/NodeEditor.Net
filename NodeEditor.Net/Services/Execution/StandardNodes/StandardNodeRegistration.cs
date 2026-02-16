@@ -13,7 +13,18 @@ public static class StandardNodeRegistration
     public static IEnumerable<NodeDefinition> GetInlineDefinitions()
     {
         return StandardNumberNodes.GetDefinitions()
+            .Concat(StandardMathNodes.GetDefinitions())
+            .Concat(StandardMathExtraNodes.GetDefinitions())
             .Concat(StandardStringNodes.GetDefinitions())
-            .Concat(StandardListNodes.GetDefinitions());
+            .Concat(StandardStringExtraNodes.GetDefinitions())
+            .Concat(StandardListNodes.GetDefinitions())
+            .Concat(StandardListExtraNodes.GetDefinitions())
+            .Concat(StandardLogicNodes.GetDefinitions())
+            .Concat(StandardConversionNodes.GetDefinitions())
+            .Concat(StandardDateTimeNodes.GetDefinitions())
+            .Concat(StandardConstantNodes.GetDefinitions())
+            .Concat(StandardDictNodes.GetDefinitions())
+            .Concat(StandardRandomNodes.GetDefinitions())
+            .Concat(StandardJsonNodes.GetDefinitions());
     }
 }
