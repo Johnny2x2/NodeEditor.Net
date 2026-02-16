@@ -110,11 +110,17 @@
 	private object? _nodeContext;
 	private string? _loadStatus;
 	private bool _isPluginManagerOpen;
-	private string _selectedPreset = "graphs/loop-list-string.json";
+	private string _selectedPreset = "graphs/hello-world.json";
 	private IJSObjectReference? _jsModule;
 	private List<string> _savedGraphNames = new();
 	private readonly List<GraphPreset> _presets = new()
 	{
+		new GraphPreset("Hello World", "graphs/hello-world.json"),
+		new GraphPreset("Math & Branching", "graphs/math-and-branching.json"),
+		new GraphPreset("FizzBuzz", "graphs/fizzbuzz.json"),
+		new GraphPreset("List + ForEach + Greeting", "graphs/list-foreach-greeting.json"),
+		new GraphPreset("Variables & Flow Control", "graphs/variables-and-flow.json"),
+		new GraphPreset("Error Handling & Dict", "graphs/error-handling-and-dict.json"),
 		new GraphPreset("Loop + Lists + Strings", "graphs/loop-list-string.json"),
 		new GraphPreset("Parallel Execution", "graphs/parallel.json"),
 		new GraphPreset("Events: Basic Trigger", "graphs/event-basic.json"),
@@ -159,6 +165,7 @@
 		StateBridge.Attach(EditorState, InvokeAsync);
 
 		Registry.RegisterFromAssembly(typeof(StandardNodeRegistration).Assembly);
+		Registry.RegisterDefinitions(StandardNodeRegistration.GetInlineDefinitions());
 		_nodeContext = new object();
 
 		// Ensure the VariableNodeFactory is initialized (subscribes to state events)

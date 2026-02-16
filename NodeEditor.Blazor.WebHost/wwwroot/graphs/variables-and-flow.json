@@ -1,0 +1,349 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "start",
+      "typeId": null,
+      "name": "Start",
+      "callable": true,
+      "execInit": true,
+      "x": 60,
+      "y": 140,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "sequence",
+      "typeId": null,
+      "name": "Sequence",
+      "callable": true,
+      "execInit": false,
+      "x": 280,
+      "y": 120,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "Then 0", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "Then 1", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "Then 2", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "Then 3", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "set-score",
+      "typeId": null,
+      "name": "Set Variable",
+      "callable": true,
+      "execInit": false,
+      "x": 540,
+      "y": 0,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Name", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "score" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "Value", "typeName": "System.Object", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "set-name",
+      "typeId": null,
+      "name": "Set Variable",
+      "callable": true,
+      "execInit": false,
+      "x": 540,
+      "y": 120,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Name", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "playerName" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Player1" } }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "Value", "typeName": "System.Object", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "for-loop",
+      "typeId": null,
+      "name": "For Loop",
+      "callable": true,
+      "execInit": false,
+      "x": 540,
+      "y": 240,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "LoopTimes", "typeName": "System.Int32", "isInput": true, "isExecution": false, "value": { "typeName": "System.Int32", "json": 5 } }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "Index", "typeName": "System.Int32", "isInput": false, "isExecution": false, "value": null },
+        { "name": "LoopPath", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "get-score",
+      "typeId": null,
+      "name": "Get Variable",
+      "callable": false,
+      "execInit": false,
+      "x": 760,
+      "y": 340,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Name", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "score" } }
+      ],
+      "outputs": [
+        { "name": "Value", "typeName": "System.Object", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "num-10",
+      "typeId": null,
+      "name": "Number",
+      "callable": false,
+      "execInit": false,
+      "x": 760,
+      "y": 440,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "Value", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 10.0 } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.Double", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "add-score",
+      "typeId": null,
+      "name": "Add",
+      "callable": false,
+      "execInit": false,
+      "x": 1000,
+      "y": 360,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "A", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } },
+        { "name": "B", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.Double", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "update-score",
+      "typeId": null,
+      "name": "Set Variable",
+      "callable": true,
+      "execInit": false,
+      "x": 780,
+      "y": 220,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Name", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "score" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "Value", "typeName": "System.Object", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "get-name",
+      "typeId": null,
+      "name": "Get Variable",
+      "callable": false,
+      "execInit": false,
+      "x": 540,
+      "y": 460,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Name", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "playerName" } }
+      ],
+      "outputs": [
+        { "name": "Value", "typeName": "System.Object", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "get-final-score",
+      "typeId": null,
+      "name": "Get Variable",
+      "callable": false,
+      "execInit": false,
+      "x": 540,
+      "y": 560,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Name", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "score" } }
+      ],
+      "outputs": [
+        { "name": "Value", "typeName": "System.Object", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "str-format",
+      "typeId": null,
+      "name": "String Format",
+      "callable": false,
+      "execInit": false,
+      "x": 820,
+      "y": 480,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Format", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "{0} final score: {1}" } },
+        { "name": "Arg0", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null },
+        { "name": "Arg1", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null },
+        { "name": "Arg2", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null },
+        { "name": "Arg3", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "print-result",
+      "typeId": null,
+      "name": "Debug Print",
+      "callable": true,
+      "execInit": false,
+      "x": 540,
+      "y": 380,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Label", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Final" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "gt-30",
+      "typeId": null,
+      "name": "Greater Than",
+      "callable": false,
+      "execInit": false,
+      "x": 820,
+      "y": 600,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "A", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } },
+        { "name": "B", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 30.0 } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.Boolean", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "branch-score",
+      "typeId": null,
+      "name": "Branch",
+      "callable": true,
+      "execInit": false,
+      "x": 800,
+      "y": 380,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Start", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Cond", "typeName": "System.Boolean", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "True", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "False", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "print-high",
+      "typeId": null,
+      "name": "Debug Print",
+      "callable": true,
+      "execInit": false,
+      "x": 1060,
+      "y": 340,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Label", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Result" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "High score!" } }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "print-low",
+      "typeId": null,
+      "name": "Debug Print",
+      "callable": true,
+      "execInit": false,
+      "x": 1060,
+      "y": 460,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Label", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Result" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Keep trying!" } }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    }
+  ],
+  "connections": [
+    { "outputNodeId": "start", "outputSocketName": "Exit", "inputNodeId": "sequence", "inputSocketName": "Enter", "isExecution": true },
+
+    { "outputNodeId": "sequence", "outputSocketName": "Then 0", "inputNodeId": "set-score", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "sequence", "outputSocketName": "Then 1", "inputNodeId": "set-name", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "sequence", "outputSocketName": "Then 2", "inputNodeId": "for-loop", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "sequence", "outputSocketName": "Then 3", "inputNodeId": "print-result", "inputSocketName": "Enter", "isExecution": true },
+
+    { "outputNodeId": "for-loop", "outputSocketName": "LoopPath", "inputNodeId": "update-score", "inputSocketName": "Enter", "isExecution": true },
+
+    { "outputNodeId": "get-score", "outputSocketName": "Value", "inputNodeId": "add-score", "inputSocketName": "A", "isExecution": false },
+    { "outputNodeId": "num-10", "outputSocketName": "Result", "inputNodeId": "add-score", "inputSocketName": "B", "isExecution": false },
+    { "outputNodeId": "add-score", "outputSocketName": "Result", "inputNodeId": "update-score", "inputSocketName": "Value", "isExecution": false },
+
+    { "outputNodeId": "get-name", "outputSocketName": "Value", "inputNodeId": "str-format", "inputSocketName": "Arg0", "isExecution": false },
+    { "outputNodeId": "get-final-score", "outputSocketName": "Value", "inputNodeId": "str-format", "inputSocketName": "Arg1", "isExecution": false },
+    { "outputNodeId": "str-format", "outputSocketName": "Result", "inputNodeId": "print-result", "inputSocketName": "Value", "isExecution": false },
+
+    { "outputNodeId": "get-final-score", "outputSocketName": "Value", "inputNodeId": "gt-30", "inputSocketName": "A", "isExecution": false },
+    { "outputNodeId": "gt-30", "outputSocketName": "Result", "inputNodeId": "branch-score", "inputSocketName": "Cond", "isExecution": false },
+
+    { "outputNodeId": "print-result", "outputSocketName": "Exit", "inputNodeId": "branch-score", "inputSocketName": "Start", "isExecution": true },
+    { "outputNodeId": "branch-score", "outputSocketName": "True", "inputNodeId": "print-high", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "branch-score", "outputSocketName": "False", "inputNodeId": "print-low", "inputSocketName": "Enter", "isExecution": true }
+  ],
+  "viewport": { "x": 0, "y": 0, "width": 1400, "height": 700, "zoom": 1 },
+  "selectedNodeIds": []
+}

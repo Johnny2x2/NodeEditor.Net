@@ -1,0 +1,315 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "start",
+      "typeId": null,
+      "name": "Start",
+      "callable": true,
+      "execInit": true,
+      "x": 60,
+      "y": 140,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "list-create",
+      "typeId": null,
+      "name": "List Create",
+      "callable": false,
+      "execInit": false,
+      "x": 60,
+      "y": 300,
+      "width": 160,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        { "name": "Result", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "list-add-1",
+      "typeId": null,
+      "name": "List Add",
+      "callable": false,
+      "execInit": false,
+      "x": 260,
+      "y": 280,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "List", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": true, "isExecution": false, "value": null },
+        { "name": "Item", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Alice" } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "list-add-2",
+      "typeId": null,
+      "name": "List Add",
+      "callable": false,
+      "execInit": false,
+      "x": 460,
+      "y": 280,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "List", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": true, "isExecution": false, "value": null },
+        { "name": "Item", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Bob" } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "list-add-3",
+      "typeId": null,
+      "name": "List Add",
+      "callable": false,
+      "execInit": false,
+      "x": 660,
+      "y": 280,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "List", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": true, "isExecution": false, "value": null },
+        { "name": "Item", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Charlie" } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "list-add-4",
+      "typeId": null,
+      "name": "List Add",
+      "callable": false,
+      "execInit": false,
+      "x": 860,
+      "y": 280,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "List", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": true, "isExecution": false, "value": null },
+        { "name": "Item", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Diana" } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "list-count",
+      "typeId": null,
+      "name": "List Count",
+      "callable": false,
+      "execInit": false,
+      "x": 1060,
+      "y": 200,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "List", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.Int32", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "print-count",
+      "typeId": null,
+      "name": "Debug Print",
+      "callable": true,
+      "execInit": false,
+      "x": 300,
+      "y": 120,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Label", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Total names" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "foreach",
+      "typeId": null,
+      "name": "ForEach Loop",
+      "callable": true,
+      "execInit": false,
+      "x": 580,
+      "y": 100,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "List", "typeName": "NodeEditor.Net.Models.SerializableList", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "Obj", "typeName": "System.Object", "isInput": false, "isExecution": false, "value": null },
+        { "name": "LoopPath", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "str-greeting",
+      "typeId": null,
+      "name": "String",
+      "callable": false,
+      "execInit": false,
+      "x": 800,
+      "y": 200,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Value", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Hello, " } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "to-str-obj",
+      "typeId": null,
+      "name": "To String",
+      "callable": false,
+      "execInit": false,
+      "x": 820,
+      "y": 100,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "concat-greeting",
+      "typeId": null,
+      "name": "String Concat",
+      "callable": false,
+      "execInit": false,
+      "x": 1040,
+      "y": 100,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "A", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "" } },
+        { "name": "B", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "" } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "str-excl",
+      "typeId": null,
+      "name": "String",
+      "callable": false,
+      "execInit": false,
+      "x": 1040,
+      "y": 200,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Value", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "!" } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "concat-excl",
+      "typeId": null,
+      "name": "String Concat",
+      "callable": false,
+      "execInit": false,
+      "x": 1260,
+      "y": 100,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "A", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "" } },
+        { "name": "B", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "" } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "print-greeting",
+      "typeId": null,
+      "name": "Debug Print",
+      "callable": true,
+      "execInit": false,
+      "x": 1260,
+      "y": 0,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Label", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Greeting" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "marker-done",
+      "typeId": null,
+      "name": "Marker",
+      "callable": true,
+      "execInit": false,
+      "x": 880,
+      "y": 0,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    }
+  ],
+  "connections": [
+    { "outputNodeId": "list-create", "outputSocketName": "Result", "inputNodeId": "list-add-1", "inputSocketName": "List", "isExecution": false },
+    { "outputNodeId": "list-add-1", "outputSocketName": "Result", "inputNodeId": "list-add-2", "inputSocketName": "List", "isExecution": false },
+    { "outputNodeId": "list-add-2", "outputSocketName": "Result", "inputNodeId": "list-add-3", "inputSocketName": "List", "isExecution": false },
+    { "outputNodeId": "list-add-3", "outputSocketName": "Result", "inputNodeId": "list-add-4", "inputSocketName": "List", "isExecution": false },
+
+    { "outputNodeId": "list-add-4", "outputSocketName": "Result", "inputNodeId": "list-count", "inputSocketName": "List", "isExecution": false },
+    { "outputNodeId": "list-count", "outputSocketName": "Result", "inputNodeId": "print-count", "inputSocketName": "Value", "isExecution": false },
+
+    { "outputNodeId": "list-add-4", "outputSocketName": "Result", "inputNodeId": "foreach", "inputSocketName": "List", "isExecution": false },
+
+    { "outputNodeId": "start", "outputSocketName": "Exit", "inputNodeId": "print-count", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "print-count", "outputSocketName": "Exit", "inputNodeId": "foreach", "inputSocketName": "Enter", "isExecution": true },
+
+    { "outputNodeId": "foreach", "outputSocketName": "Obj", "inputNodeId": "to-str-obj", "inputSocketName": "Value", "isExecution": false },
+    { "outputNodeId": "str-greeting", "outputSocketName": "Result", "inputNodeId": "concat-greeting", "inputSocketName": "A", "isExecution": false },
+    { "outputNodeId": "to-str-obj", "outputSocketName": "Result", "inputNodeId": "concat-greeting", "inputSocketName": "B", "isExecution": false },
+
+    { "outputNodeId": "concat-greeting", "outputSocketName": "Result", "inputNodeId": "concat-excl", "inputSocketName": "A", "isExecution": false },
+    { "outputNodeId": "str-excl", "outputSocketName": "Result", "inputNodeId": "concat-excl", "inputSocketName": "B", "isExecution": false },
+
+    { "outputNodeId": "concat-excl", "outputSocketName": "Result", "inputNodeId": "print-greeting", "inputSocketName": "Value", "isExecution": false },
+
+    { "outputNodeId": "foreach", "outputSocketName": "LoopPath", "inputNodeId": "print-greeting", "inputSocketName": "Enter", "isExecution": true },
+
+    { "outputNodeId": "foreach", "outputSocketName": "Exit", "inputNodeId": "marker-done", "inputSocketName": "Enter", "isExecution": true }
+  ],
+  "viewport": { "x": 0, "y": 0, "width": 1600, "height": 500, "zoom": 1 },
+  "selectedNodeIds": []
+}

@@ -53,7 +53,6 @@ public class NodeRegistryService : INodeRegistryService
 
         var discovered = _discovery.DiscoverFromAssemblies(new[] { assembly });
         RegisterDefinitions(discovered);
-        _initialized = true;
     }
 
     public void RegisterPluginAssembly(Assembly assembly)

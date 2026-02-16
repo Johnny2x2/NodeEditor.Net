@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "start",
+      "typeId": null,
+      "name": "Start",
+      "callable": true,
+      "execInit": true,
+      "x": 60,
+      "y": 120,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "debug-hello",
+      "typeId": null,
+      "name": "Debug Print",
+      "callable": true,
+      "execInit": false,
+      "x": 300,
+      "y": 100,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Label", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Greeting" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "str-hello",
+      "typeId": null,
+      "name": "String",
+      "callable": false,
+      "execInit": false,
+      "x": 60,
+      "y": 260,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Value", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Hello, World!" } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "debug-goodbye",
+      "typeId": null,
+      "name": "Debug Print",
+      "callable": true,
+      "execInit": false,
+      "x": 560,
+      "y": 100,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Label", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Farewell" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "str-goodbye",
+      "typeId": null,
+      "name": "String",
+      "callable": false,
+      "execInit": false,
+      "x": 300,
+      "y": 260,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Value", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Goodbye, World!" } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "marker-done",
+      "typeId": null,
+      "name": "Marker",
+      "callable": true,
+      "execInit": false,
+      "x": 820,
+      "y": 100,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    }
+  ],
+  "connections": [
+    { "outputNodeId": "start", "outputSocketName": "Exit", "inputNodeId": "debug-hello", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "str-hello", "outputSocketName": "Result", "inputNodeId": "debug-hello", "inputSocketName": "Value", "isExecution": false },
+    { "outputNodeId": "debug-hello", "outputSocketName": "Exit", "inputNodeId": "debug-goodbye", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "str-goodbye", "outputSocketName": "Result", "inputNodeId": "debug-goodbye", "inputSocketName": "Value", "isExecution": false },
+    { "outputNodeId": "debug-goodbye", "outputSocketName": "Exit", "inputNodeId": "marker-done", "inputSocketName": "Enter", "isExecution": true }
+  ],
+  "viewport": { "x": 0, "y": 0, "width": 1200, "height": 500, "zoom": 1 },
+  "selectedNodeIds": []
+}
