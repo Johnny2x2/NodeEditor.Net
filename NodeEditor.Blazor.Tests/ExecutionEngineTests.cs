@@ -1,7 +1,9 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
 using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.ViewModels;
 
 namespace NodeEditor.Blazor.Tests;
 
@@ -627,8 +629,30 @@ public sealed class ExecutionEngineTests
 
     //  Phase 13A spec-named tests (using TestGraphBuilder) 
 
-    [Fact]
-    public async Task ForLoopStepNode_HandlesNegativeStep()
+    [Fact]    public async Task SingleForLoop_WithIncrementNode_Works()
+    {
+        var service = CreateService(out var registry);
+        EnsureIncrementNodeRegistered(registry);
+
+        var (nodes, connections) = new TestGraphBuilder()
+            .AddNodeFromDefinition(registry, "Start", "start")
+            .AddNodeFromDefinition(registry, "For Loop", "loop", ("LoopTimes", 3))
+            .AddNodeFromDefinition(registry, "TestIncrement", "inc", ("Key", "count"))
+            .AddNodeFromDefinition(registry, "Marker", "end")
+            .ConnectExecution("start", "Exit", "loop", "Enter")
+            .ConnectExecution("loop", "LoopPath", "inc", "Enter")
+            .ConnectExecution("loop", "Exit", "end", "Enter")
+            .Build();
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("end"), "Exit should have been reached");
+        Assert.True(context.IsNodeExecuted("inc"), "Increment node should have been executed");
+        Assert.Equal(3, context.GetVariable("count"));
+    }
+
+    [Fact]    public async Task ForLoopStepNode_HandlesNegativeStep()
     {
         var service = CreateService(out var registry);
         EnsureIncrementNodeRegistered(registry);
@@ -637,7 +661,7 @@ public sealed class ExecutionEngineTests
             .AddNodeFromDefinition(registry, "Start", "start")
             .AddNodeFromDefinition(registry, "For Loop Step", "loop",
                 ("StartValue", 6), ("EndValue", 0), ("Step", -2))
-            .AddNodeFromDefinition(registry, "Increment", "inc", ("Key", "count"))
+            .AddNodeFromDefinition(registry, "TestIncrement", "inc", ("Key", "count"))
             .AddNodeFromDefinition(registry, "Marker", "end")
             .ConnectExecution("start", "Exit", "loop", "Enter")
             .ConnectExecution("loop", "LoopPath", "inc", "Enter")
@@ -662,7 +686,7 @@ public sealed class ExecutionEngineTests
             .AddNodeFromDefinition(registry, "Start", "start")
             .AddNodeFromDefinition(registry, "For Loop", "outer", ("LoopTimes", 3))
             .AddNodeFromDefinition(registry, "For Loop", "inner", ("LoopTimes", 2))
-            .AddNodeFromDefinition(registry, "Increment", "inc", ("Key", "count"))
+            .AddNodeFromDefinition(registry, "TestIncrement", "inc", ("Key", "count"))
             .AddNodeFromDefinition(registry, "Marker", "end")
             .ConnectExecution("start", "Exit", "outer", "Enter")
             .ConnectExecution("outer", "LoopPath", "inner", "Enter")
@@ -705,8 +729,8 @@ public sealed class ExecutionEngineTests
 
     private static void EnsureIncrementNodeRegistered(NodeRegistryService registry)
     {
-        // Stable ID = "Increment" (NodeBuilder.BuildDefinitionId uses name when NodeType is null)
-        var incrementDefinition = NodeBuilder.Create("Increment")
+        // Use a unique name to avoid conflict with the built-in Math "Increment" node
+        var incrementDefinition = NodeBuilder.Create("TestIncrement")
             .Category("Test")
             .Callable()
             .Input<string>("Key", "count")
@@ -764,9 +788,112 @@ public sealed class ExecutionEngineTests
             Outputs: outputs,
             DefinitionId: defId);
     }
-}
 
-// â”€â”€ Shared helpers â”€â”€
+    // ── Execution call-depth guard ──
+
+    [Fact]
+    public async Task ExecutionFlowCycle_ThrowsBeforeStackOverflow()
+    {
+        // Arrange: two callable nodes wired in a cycle (A.Exit → B.Enter, B.Exit → A.Enter)
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var nodeA = NodeFromDef(registry, "Marker", "a");
+        var nodeB = NodeFromDef(registry, "Marker", "b");
+
+        var nodes = new List<NodeData> { start, nodeA, nodeB };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "a", "Enter"),
+            TestConnections.Exec("a", "Exit", "b", "Enter"),
+            TestConnections.Exec("b", "Exit", "a", "Enter") // cycle!
+        };
+
+        var context = new NodeRuntimeStorage();
+        var options = new NodeExecutionOptions(ExecutionMode.Sequential, false, 1, MaxCallDepth: 20);
+
+        // Act & Assert: should get InvalidOperationException, not StackOverflowException
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ExecuteAsync(nodes, connections, context, null!, options, CancellationToken.None));
+
+        Assert.Contains("Execution call depth exceeded", ex.Message);
+    }
+
+    // ── Event node execution ──
+
+    [Fact]
+    public async Task EventTriggerNode_FiresBusAndFollowsExit()
+    {
+        // Arrange: trigger → marker, with listener wired to a second marker
+        var service = CreateService(out var registry);
+        var graphEvent = GraphEvent.Create("TestEvent");
+        var eventId = graphEvent.Id;
+
+        var execType = "NodeEditor.Blazor.Services.Execution.ExecutionPath";
+
+        // Register event definitions via the real NodeEditorState
+        var state = new NodeEditorState();
+        var eventFactory = new EventNodeFactory(registry, state);
+        state.AddEvent(graphEvent);
+
+        var start = NodeFromDef(registry, "Start", "start");
+        var triggerMarker = NodeFromDef(registry, "Marker", "trigger-marker");
+        var listenerMarker = NodeFromDef(registry, "Marker", "listener-marker");
+
+        // Build event nodes manually matching EventNodeFactory pattern
+        var triggerNode = new NodeData("trigger", "Trigger Event: TestEvent", Callable: true, ExecInit: false,
+            Inputs: new[] { new SocketData("Enter", execType, IsInput: true, IsExecution: true) },
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) },
+            DefinitionId: GraphEvent.TriggerDefinitionPrefix + eventId);
+
+        var listenerNode = new NodeData("listener", "Custom Event: TestEvent", Callable: true, ExecInit: true,
+            Inputs: Array.Empty<SocketData>(),
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) },
+            DefinitionId: GraphEvent.ListenerDefinitionPrefix + eventId);
+
+        var nodes = new List<NodeData> { start, triggerNode, triggerMarker, listenerNode, listenerMarker };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "trigger", "Enter"),
+            TestConnections.Exec("trigger", "Exit", "trigger-marker", "Enter"),
+            TestConnections.Exec("listener", "Exit", "listener-marker", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        // Both markers should be executed
+        Assert.True(context.IsNodeExecuted("trigger"));
+        Assert.True(context.IsNodeExecuted("trigger-marker"));
+        Assert.True(context.IsNodeExecuted("listener"));
+        Assert.True(context.IsNodeExecuted("listener-marker"));
+    }
+
+    // ── Execution-flow cycle validation ──
+
+    [Fact]
+    public void ExecutionPlanner_DetectsExecutionFlowCycle()
+    {
+        var execType = "NodeEditor.Blazor.Services.Execution.ExecutionPath";
+        var nodeA = new NodeData("a", "A", Callable: true, ExecInit: true,
+            Inputs: new[] { new SocketData("Enter", execType, IsInput: true, IsExecution: true) },
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) });
+        var nodeB = new NodeData("b", "B", Callable: true, ExecInit: false,
+            Inputs: new[] { new SocketData("Enter", execType, IsInput: true, IsExecution: true) },
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) });
+
+        var nodes = new List<NodeData> { nodeA, nodeB };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("a", "Exit", "b", "Enter"),
+            TestConnections.Exec("b", "Exit", "a", "Enter")
+        };
+
+        var planner = new ExecutionPlanner();
+        var result = planner.ValidateGraph(nodes, connections);
+
+        Assert.Contains(result.Messages, m => m.Message.Contains("Execution-flow cycle"));
+    }
+}
 
 internal static class TestConnections
 {
@@ -795,3 +922,4 @@ internal static partial class ExecutionTestHelpers
         return predicate();
     }
 }
+

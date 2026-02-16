@@ -22,6 +22,7 @@ internal sealed class ExecutionRuntime
     private readonly Dictionary<(string nodeId, string completedExecSocket), List<Task>> _pendingStreamItemTasks = new();
     private readonly Func<string, IServiceProvider?>? _resolveServicesForDefinition;
     private readonly Dictionary<string, IServiceProvider> _nodeServices = new(StringComparer.Ordinal);
+    private int _callDepth;
 
     public INodeRuntimeStorage RuntimeStorage { get; }
     public IServiceProvider Services { get; }
@@ -102,6 +103,28 @@ internal sealed class ExecutionRuntime
             return;
         }
 
+        // Guard against execution-flow cycles that would cause a stack overflow.
+        if (++_callDepth > _options.MaxCallDepth)
+        {
+            _callDepth--;
+            throw new InvalidOperationException(
+                $"Execution call depth exceeded {_options.MaxCallDepth}. " +
+                $"This usually indicates an execution-flow cycle involving node '{node.Name}' ({nodeId}). " +
+                $"Check for circular execution connections in your graph.");
+        }
+
+        try
+        {
+            await ExecuteNodeCoreAsync(nodeId, node).ConfigureAwait(false);
+        }
+        finally
+        {
+            _callDepth--;
+        }
+    }
+
+    private async Task ExecuteNodeCoreAsync(string nodeId, NodeData node)
+    {
         NodeStarted?.Invoke(this, new NodeExecutionEventArgs(node));
 
         try
@@ -125,6 +148,33 @@ internal sealed class ExecutionRuntime
                     }
                 }
 
+                NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
+                return;
+            }
+
+            // Event nodes are special: they have no NodeBase implementation.
+            // Trigger nodes fire the event bus; listener nodes are handled by the bus
+            // and should be skipped when reached as initiators.
+            if (EventNodeExecutor.IsEventNode(node))
+            {
+                if (EventNodeExecutor.IsTriggerNode(node))
+                {
+                    await EventNodeExecutor.ExecuteTriggerAsync(node, RuntimeStorage, CancellationToken)
+                        .ConfigureAwait(false);
+
+                    await Gate.WaitAsync(CancellationToken).ConfigureAwait(false);
+                    var targets = GetExecutionTargets(node.Id, "Exit");
+                    foreach (var (targetNodeId, _) in targets)
+                    {
+                        CancellationToken.ThrowIfCancellationRequested();
+                        await ExecuteNodeByIdAsync(targetNodeId).ConfigureAwait(false);
+                    }
+                }
+
+                // Listener nodes: execution is driven by the event bus handler
+                // registered in NodeExecutionService.RegisterEventListeners.
+                // When reached as an initiator, we simply mark them done.
+                RuntimeStorage.MarkNodeExecuted(nodeId);
                 NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
                 return;
             }
@@ -232,6 +282,28 @@ internal sealed class ExecutionRuntime
                     }
                 }
 
+                NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
+                return;
+            }
+
+            // Event nodes in scoped execution: same handling as unscoped.
+            if (EventNodeExecutor.IsEventNode(node))
+            {
+                if (EventNodeExecutor.IsTriggerNode(node))
+                {
+                    await EventNodeExecutor.ExecuteTriggerAsync(node, scope, CancellationToken)
+                        .ConfigureAwait(false);
+
+                    await Gate.WaitAsync(CancellationToken).ConfigureAwait(false);
+                    var targets = GetExecutionTargets(node.Id, "Exit");
+                    foreach (var (targetNodeId, _) in targets)
+                    {
+                        CancellationToken.ThrowIfCancellationRequested();
+                        await ExecuteNodeByIdScopedAsync(targetNodeId, scope).ConfigureAwait(false);
+                    }
+                }
+
+                scope.MarkNodeExecuted(nodeId);
                 NodeCompleted?.Invoke(this, new NodeExecutionEventArgs(node));
                 return;
             }
