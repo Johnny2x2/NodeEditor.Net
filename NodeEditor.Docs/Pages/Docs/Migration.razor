@@ -1,0 +1,149 @@
+@page "/docs/migration"
+
+<PageTitle>Migration Guide — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Migration Guide: WinForms to Blazor</h1>
+        <p>
+            This guide helps you migrate from the legacy WinForms <code>NodeEditor</code> library
+            to the new <code>NodeEditor.Blazor</code> library for MAUI Blazor and Blazor WebAssembly applications.
+        </p>
+
+        <h2>Why Migrate?</h2>
+        <ul>
+            <li><strong>Cross-platform</strong> — Runs on Web, MAUI (Windows, Mac, iOS, Android)</li>
+            <li><strong>Modern architecture</strong> — Event-based reactive pattern</li>
+            <li><strong>Better performance</strong> — Viewport culling, render optimization</li>
+            <li><strong>Plugin system</strong> — Extensible node types</li>
+            <li><strong>Serialization</strong> — Save/load graphs with version migration</li>
+            <li><strong>Better separation</strong> — MVVM pattern with clean model/view/viewmodel layers</li>
+        </ul>
+
+        <h2>Key Differences</h2>
+        <table class="docs-table">
+            <thead><tr><th>Aspect</th><th>WinForms</th><th>Blazor</th></tr></thead>
+            <tbody>
+                <tr><td>UI Framework</td><td>Windows Forms</td><td>Blazor Components</td></tr>
+                <tr><td>Threading</td><td>UI thread + background</td><td>Async/await pattern</td></tr>
+                <tr><td>Events</td><td>WinForms events</td><td>Event-based architecture</td></tr>
+                <tr><td>Rendering</td><td>GDI+</td><td>HTML/CSS + SVG</td></tr>
+                <tr><td>State</td><td>Mutable objects</td><td>Immutable models + mutable ViewModels</td></tr>
+                <tr><td>Extensibility</td><td>Inheritance</td><td>Composition + DI</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Architecture Changes</h2>
+
+        <h3>WinForms Architecture</h3>
+        <pre><code>NodeControl (UserControl)
+  ├── NodeGraph (manages nodes)
+  ├── NodeVisual (renders node)
+  ├── SocketVisual (renders socket)
+  └── NodeConnection (renders connection)
+  
+NodeManager (execution engine)
+INodesContext (node methods)</code></pre>
+
+        <h3>Blazor Architecture</h3>
+        <pre><code>NodeEditorCanvas (Blazor component)
+  ├── NodeEditorState (state management)
+  ├── NodeComponent (renders node)
+  ├── SocketComponent (renders socket)
+  └── ConnectionPath (renders connection SVG)
+  
+NodeExecutionService (execution engine)
+INodeContext (node methods)
+NodeRegistryService (node definitions)
+GraphSerializer (save/load)
+PluginLoader (plugin system)</code></pre>
+
+        <h2>Component Mapping</h2>
+        <table class="docs-table">
+            <thead><tr><th>WinForms Class</th><th>Blazor Equivalent</th><th>Notes</th></tr></thead>
+            <tbody>
+                <tr><td><code>NodeControl</code></td><td><code>NodeEditorCanvas</code></td><td>Main canvas component</td></tr>
+                <tr><td><code>NodeVisual</code></td><td><code>NodeComponent</code></td><td>Individual node rendering</td></tr>
+                <tr><td><code>SocketVisual</code></td><td><code>SocketComponent</code></td><td>Socket with inline editors</td></tr>
+                <tr><td><code>NodeConnection</code></td><td><code>ConnectionPath</code></td><td>SVG Bézier curves</td></tr>
+                <tr><td><code>NodeGraph</code></td><td><code>NodeEditorState</code></td><td>State management service</td></tr>
+                <tr><td><code>NodeManager</code></td><td><code>NodeExecutionService</code></td><td>Graph execution</td></tr>
+                <tr><td><code>INodesContext</code></td><td><code>INodeContext</code></td><td>Same concept, new namespace</td></tr>
+                <tr><td>N/A</td><td><code>NodeRegistryService</code></td><td>New: node definition registry</td></tr>
+                <tr><td>N/A</td><td><code>GraphSerializer</code></td><td>New: JSON serialization</td></tr>
+                <tr><td>N/A</td><td><code>PluginLoader</code></td><td>New: dynamic plugin loading</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Migration Steps</h2>
+
+        <h3>Step 1: Update Project References</h3>
+        <p>Replace WinForms NodeEditor reference with Blazor:</p>
+        <pre><code>&lt;!-- Remove --&gt;
+&lt;PackageReference Include="NodeEditor.WinForms" /&gt;
+
+&lt;!-- Add --&gt;
+&lt;ProjectReference Include="../NodeEditor.Blazor/NodeEditor.Blazor.csproj" /&gt;</code></pre>
+
+        <h3>Step 2: Register Services</h3>
+        <pre><code>// Program.cs
+builder.Services.AddNodeEditor();</code></pre>
+
+        <h3>Step 3: Update Node Context Classes</h3>
+        <pre><code>// Before (WinForms)
+public class MyNodes : INodesContext
+{
+    [Node("Add")]
+    public void Add(int a, int b, out int result)
+    {
+        result = a + b;
+    }
+}
+
+// After (Blazor) — same pattern, new namespace
+using NodeEditor.Net.Services.Registry;
+
+public class MyNodes : INodeContext
+{
+    [Node("Add", category: "Math")]
+    public void Add(int a, int b, out int result)
+    {
+        result = a + b;
+    }
+}</code></pre>
+
+        <h3>Step 4: Replace Canvas</h3>
+        <pre><code>// Before (WinForms)
+var nodeControl = new NodeControl();
+panel.Controls.Add(nodeControl);
+
+// After (Blazor)
+&lt;NodeEditorCanvas State="@@EditorState" /&gt;</code></pre>
+
+        <h3>Step 5: Update Event Handling</h3>
+        <pre><code>// Before (WinForms)
+nodeControl.NodeAdded += OnNodeAdded;
+
+// After (Blazor) — same pattern
+EditorState.NodeAdded += OnNodeAdded;
+
+// Don't forget to unsubscribe in Dispose()
+EditorState.NodeAdded -= OnNodeAdded;</code></pre>
+
+        <h2>Platform Considerations</h2>
+        <table class="docs-table">
+            <thead><tr><th>Platform</th><th>Dynamic Plugins</th><th>Notes</th></tr></thead>
+            <tbody>
+                <tr><td>Blazor Server</td><td>✅ Yes</td><td>Full feature support (recommended)</td></tr>
+                <tr><td>MAUI Windows/Mac</td><td>✅ Yes</td><td>Full feature support</td></tr>
+                <tr><td>MAUI iOS</td><td>❌ No</td><td>Register plugins at compile time</td></tr>
+                <tr><td>MAUI Android</td><td>⚠️ Limited</td><td>Some restrictions on AssemblyLoadContext</td></tr>
+                <tr><td>Blazor WASM</td><td>❌ No</td><td>Register plugins at compile time</td></tr>
+            </tbody>
+        </table>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>
