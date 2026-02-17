@@ -1,0 +1,210 @@
+@page "/features"
+
+<PageTitle>Features — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container">
+        <div class="section-header">
+            <h1>Features Overview</h1>
+            <p>A comprehensive guide to every major capability of NodeEditor.Net</p>
+        </div>
+
+        <!-- Interactive Canvas -->
+        <div class="feature-detail">
+            <h2>🖱️ Interactive Canvas</h2>
+            <p>
+                The <code>NodeEditorCanvas</code> is the main Blazor component that renders the node graph.
+                It provides a fully interactive workspace where users can create, connect, arrange, and execute nodes.
+            </p>
+            <div class="feature-grid">
+                <div class="card">
+                    <h4>Mouse &amp; Touch</h4>
+                    <p>Pan (middle-click drag), zoom (scroll wheel), box-select (left-click drag on canvas), and multi-touch gestures for mobile/tablet.</p>
+                </div>
+                <div class="card">
+                    <h4>Keyboard Shortcuts</h4>
+                    <p><strong>Delete/Backspace</strong> — remove selected nodes. <strong>Ctrl+A</strong> — select all. <strong>Escape</strong> — cancel current operation.</p>
+                </div>
+                <div class="card">
+                    <h4>Context Menu</h4>
+                    <p>Right-click the canvas to open a searchable node picker. Nodes are organized by category (Math, Strings, Flow, Debug, etc.).</p>
+                </div>
+                <div class="card">
+                    <h4>Viewport Culling</h4>
+                    <p>Only visible nodes are rendered, enabling smooth performance with 500+ nodes on the canvas.</p>
+                </div>
+            </div>
+            <pre><code>@@using NodeEditor.Blazor.Components
+@@using NodeEditor.Net.Services
+@@inject NodeEditorState EditorState
+
+&lt;NodeEditorCanvas State="@@EditorState"
+                  MinZoom="0.1"
+                  MaxZoom="3.0"
+                  ZoomStep="0.1" /&gt;</code></pre>
+        </div>
+
+        <!-- Execution Engine -->
+        <div class="feature-detail">
+            <h2>⚡ Execution Engine</h2>
+            <p>
+                The execution engine transforms visual node graphs into runnable computations with multiple execution strategies.
+            </p>
+            <div class="feature-grid">
+                <div class="card">
+                    <h4>Sequential Execution</h4>
+                    <p>Follow execution paths through callable nodes in order, respecting the wired connections.</p>
+                </div>
+                <div class="card">
+                    <h4>Parallel Execution</h4>
+                    <p>Run independent data nodes concurrently for maximum throughput on multi-core systems.</p>
+                </div>
+                <div class="card">
+                    <h4>Event-Driven</h4>
+                    <p>Trigger execution via custom events with auto-generated Trigger and Listener node pairs.</p>
+                </div>
+                <div class="card">
+                    <h4>Step Debugging</h4>
+                    <p>Pause, step through one node at a time, resume, or stop execution for full debugging control.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plugin System -->
+        <div class="feature-detail">
+            <h2>🔌 Plugin System &amp; Marketplace</h2>
+            <p>
+                Extend the editor with custom node types packaged as plugins. The marketplace lets users browse,
+                install, update, and uninstall plugins from local or remote repositories.
+            </p>
+            <div class="feature-grid">
+                <div class="card">
+                    <h4>Plugin Lifecycle</h4>
+                    <p>Plugins implement <code>INodePlugin</code> with hooks: <code>OnLoadAsync</code> → <code>Register</code> → <code>ConfigureServices</code> → <code>OnInitializeAsync</code> → <code>OnUnloadAsync</code>.</p>
+                </div>
+                <div class="card">
+                    <h4>Marketplace Sources</h4>
+                    <p>Local directory-based repositories and remote HTTP repositories with token-based authentication and cached metadata.</p>
+                </div>
+                <div class="card">
+                    <h4>Template Project</h4>
+                    <p>Use the included <code>NodeEditor.Plugins.Template</code> as a starting point — copy, rename, and add your custom nodes.</p>
+                </div>
+                <div class="card">
+                    <h4>Version Checking</h4>
+                    <p>Plugin manifests include version compatibility checking, so incompatible plugins are flagged before installation.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Variables & Events -->
+        <div class="feature-detail">
+            <h2>📊 Graph Variables &amp; Events</h2>
+            <p>
+                Define graph-scoped variables that auto-generate Get/Set nodes, and custom events that create
+                Trigger/Listener node pairs for event-driven flow control.
+            </p>
+            <div class="feature-grid">
+                <div class="card">
+                    <h4>Variables</h4>
+                    <p>Named, typed variables scoped to the graph. Seeded before execution and stay synchronized across all referencing nodes.</p>
+                </div>
+                <div class="card">
+                    <h4>Events</h4>
+                    <p>Custom events with auto-generated Trigger and Listener nodes. Fire events from one execution chain and handle them in another.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- MCP Integration -->
+        <div class="feature-detail">
+            <h2>🤖 MCP Integration</h2>
+            <p>
+                The Model Context Protocol server enables AI assistants (Claude, Cursor, etc.) to programmatically build and execute node graphs.
+            </p>
+            <div class="feature-grid">
+                <div class="card">
+                    <h4>Stdio Transport</h4>
+                    <p>Run headless as a standalone process — perfect for terminal-based AI assistants.</p>
+                </div>
+                <div class="card">
+                    <h4>HTTP/SSE Transport</h4>
+                    <p>Embed in the WebHost for real-time canvas control — AI edits appear live in the browser.</p>
+                </div>
+                <div class="card">
+                    <h4>60+ Abilities</h4>
+                    <p>Organized across 8 categories: catalog, nodes, connections, graph, execution, plugins, logging, overlays.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Features -->
+        <div class="feature-detail">
+            <h2>More Capabilities</h2>
+            <div class="feature-grid">
+                <div class="card">
+                    <div class="feature-icon">💾</div>
+                    <h4>Serialization</h4>
+                    <p>Save/load graphs as JSON with version migration. Export to file, import from file, or persist to browser storage.</p>
+                </div>
+                <div class="card">
+                    <div class="feature-icon">🎨</div>
+                    <h4>Socket Editors</h4>
+                    <p>9 built-in editors: Text, Number, Bool, Dropdown, Button, Image, NumberUpDown, TextArea, Custom.</p>
+                </div>
+                <div class="card">
+                    <div class="feature-icon">🗂️</div>
+                    <h4>Overlays</h4>
+                    <p>Visual organizer shapes to group and annotate sections of your graph with titles, descriptions, and colors.</p>
+                </div>
+                <div class="card">
+                    <div class="feature-icon">📝</div>
+                    <h4>Structured Logging</h4>
+                    <p>Channel-based logging with configurable retention policies. Filter by channel (Execution, Debug, Application).</p>
+                </div>
+                <div class="card">
+                    <div class="feature-icon">🖥️</div>
+                    <h4>Headless Execution</h4>
+                    <p>Run graphs without UI via <code>HeadlessGraphRunner</code> — use in console apps, APIs, or CI/CD pipelines.</p>
+                </div>
+                <div class="card">
+                    <div class="feature-icon">📱</div>
+                    <h4>Touch Support</h4>
+                    <p>Multi-touch gestures for pan, zoom, and interaction on mobile and tablet devices.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Built-in Nodes -->
+        <div class="feature-detail">
+            <h2>Built-in Standard Nodes</h2>
+            <p>The <code>StandardNodeContext</code> provides ready-to-use nodes for common operations:</p>
+            <div class="grid-4" style="margin-top: 24px;">
+                <div class="card">
+                    <h4>🔢 Math</h4>
+                    <p>Add, Subtract, Multiply, Divide, Power</p>
+                </div>
+                <div class="card">
+                    <h4>📝 Strings</h4>
+                    <p>Concat, Split, Replace, Length, Contains</p>
+                </div>
+                <div class="card">
+                    <h4>📋 Lists</h4>
+                    <p>Map, Filter, Reduce, ForEach, Create, Add</p>
+                </div>
+                <div class="card">
+                    <h4>🔀 Conditions</h4>
+                    <p>If/Branch, Switch, Comparison, Equality</p>
+                </div>
+                <div class="card">
+                    <h4>🔄 Flow</h4>
+                    <p>For Loop, Parallel, Sequence, Delay</p>
+                </div>
+                <div class="card">
+                    <h4>🐛 Debug</h4>
+                    <p>Print, Consume, Marker</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

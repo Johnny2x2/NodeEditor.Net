@@ -1,0 +1,124 @@
+.page-top {
+    padding-top: 100px;
+}
+
+.tutorial-content {
+    max-width: 860px;
+}
+
+.prereqs {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 48px;
+}
+
+.prereqs h3 {
+    margin-bottom: 12px;
+    font-size: 1rem;
+}
+
+.prereqs ul {
+    list-style: none;
+    padding: 0;
+}
+
+.prereqs li {
+    padding: 4px 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.prereqs li::before {
+    content: "✓ ";
+    color: var(--accent-green);
+    font-weight: bold;
+}
+
+.step {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 48px;
+    padding-bottom: 48px;
+    border-bottom: 1px solid rgba(61, 61, 92, 0.2);
+}
+
+.step:last-of-type {
+    border-bottom: none;
+}
+
+.step-number {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--accent);
+    background: rgba(102, 153, 255, 0.1);
+    border: 1px solid rgba(102, 153, 255, 0.25);
+    border-radius: 12px;
+}
+
+.step-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.step-body h2 {
+    font-size: 1.3rem;
+    margin-bottom: 12px;
+}
+
+.step-body p {
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    line-height: 1.6;
+}
+
+.step-body ul {
+    margin: 12px 0;
+    padding-left: 20px;
+    color: var(--text-secondary);
+}
+
+.step-body li {
+    margin-bottom: 6px;
+    line-height: 1.5;
+}
+
+.next-steps {
+    margin-top: 48px;
+    padding-top: 48px;
+    border-top: 1px solid rgba(61, 61, 92, 0.3);
+}
+
+.next-steps h2 {
+    margin-bottom: 24px;
+}
+
+.next-link {
+    text-decoration: none;
+    display: block;
+}
+
+.next-link h4 {
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.next-link p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .step {
+        flex-direction: column;
+        gap: 12px;
+    }
+}

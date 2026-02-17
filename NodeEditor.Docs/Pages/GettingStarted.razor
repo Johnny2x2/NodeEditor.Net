@@ -1,0 +1,268 @@
+@page "/getting-started"
+
+<PageTitle>Getting Started — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container tutorial-content">
+        <div class="section-header" style="text-align: left;">
+            <h1>Getting Started</h1>
+            <p style="margin: 0;">Set up NodeEditor.Net, create your first node graph, and run it.</p>
+        </div>
+
+        <div class="prereqs">
+            <h3>Prerequisites</h3>
+            <ul>
+                <li><a href="https://dotnet.microsoft.com/download/dotnet/10.0" target="_blank">.NET 10 SDK</a></li>
+                <li>A code editor (Visual Studio, VS Code, Rider, etc.)</li>
+            </ul>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-body">
+                <h2>Create a New Blazor Project</h2>
+                <pre><code>dotnet new blazor -n MyNodeEditor --interactivity Server
+cd MyNodeEditor</code></pre>
+            </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-body">
+                <h2>Add NodeEditor.Net References</h2>
+                <p>Add a project reference to <code>NodeEditor.Blazor</code> (which transitively includes <code>NodeEditor.Net</code>):</p>
+                <pre><code>&lt;!-- MyNodeEditor.csproj --&gt;
+&lt;ItemGroup&gt;
+  &lt;ProjectReference Include="../NodeEditor.Blazor/NodeEditor.Blazor.csproj" /&gt;
+&lt;/ItemGroup&gt;</code></pre>
+            </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-body">
+                <h2>Register Services</h2>
+                <p>In your <code>Program.cs</code>, register all node editor services with a single call:</p>
+                <pre><code>using NodeEditor.Blazor.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+// Register all node editor services
+builder.Services.AddNodeEditor();
+
+var app = builder.Build();
+
+app.UseStaticFiles();
+app.UseAntiforgery();
+app.MapRazorComponents&lt;App&gt;()
+    .AddInteractiveServerRenderMode();
+
+app.Run();</code></pre>
+
+                <h4>Registered Services</h4>
+                <table class="docs-table">
+                    <thead>
+                        <tr><th>Service</th><th>Lifetime</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>NodeEditorState</code></td><td>Scoped</td><td>Central state management with events</td></tr>
+                        <tr><td><code>NodeExecutionService</code></td><td>Scoped</td><td>Executes node graphs</td></tr>
+                        <tr><td><code>GraphSerializer</code></td><td>Scoped</td><td>JSON save/load</td></tr>
+                        <tr><td><code>NodeRegistryService</code></td><td>Singleton</td><td>Manages available node definitions</td></tr>
+                        <tr><td><code>PluginLoader</code></td><td>Singleton</td><td>Loads plugins from disk</td></tr>
+                        <tr><td><code>SocketTypeResolver</code></td><td>Singleton</td><td>Maps type names to .NET types</td></tr>
+                        <tr><td><code>INodeEditorLogger</code></td><td>Singleton</td><td>Channel-based logging</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-body">
+                <h2>Add the Canvas</h2>
+                <p>Create a Razor page with the node editor canvas:</p>
+                <pre><code>@@page "/editor"
+@@using NodeEditor.Blazor.Components
+@@using NodeEditor.Net.Services
+@@using NodeEditor.Net.Services.Registry
+@@inject NodeEditorState EditorState
+@@inject NodeRegistryService Registry
+
+&lt;PageTitle&gt;Node Editor&lt;/PageTitle&gt;
+
+&lt;div style="width: 100%; height: 100vh; position: relative;"&gt;
+    &lt;NodeEditorCanvas State="@@EditorState" /&gt;
+&lt;/div&gt;
+
+@@code {
+    protected override void OnInitialized()
+    {
+        Registry.EnsureInitialized(
+            new[] { typeof(MyNodes).Assembly });
+    }
+}</code></pre>
+            </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="step">
+            <div class="step-number">5</div>
+            <div class="step-body">
+                <h2>Define Your First Nodes</h2>
+                <p>Create a node context class with <code>[Node]</code>-attributed methods:</p>
+                <pre><code>using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.Services.Execution;
+
+public sealed class MyNodes : INodeContext
+{
+    // Data node — computes a value
+    [Node("Add", category: "Math",
+          description: "Adds two numbers",
+          isCallable: false)]
+    public void Add(double A, double B,
+                    out double Result)
+    {
+        Result = A + B;
+    }
+
+    // Callable node — has execution flow
+    [Node("Print", category: "Debug",
+          isCallable: true)]
+    public void Print(ExecutionPath Entry,
+                      string Message,
+                      out ExecutionPath Exit)
+    {
+        Console.WriteLine(Message);
+        Exit = new ExecutionPath();
+        Exit.Signal();
+    }
+
+    // Execution initiator — starts the chain
+    [Node("Start", category: "Flow",
+          isCallable: true,
+          isExecutionInitiator: true)]
+    public void Start(out ExecutionPath Exit)
+    {
+        Exit = new ExecutionPath();
+        Exit.Signal();
+    }
+}</code></pre>
+            </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="step">
+            <div class="step-number">6</div>
+            <div class="step-body">
+                <h2>Run Your App</h2>
+                <pre><code>dotnet run</code></pre>
+                <p>Open the browser and navigate to <code>/editor</code>. You should see:</p>
+                <ul>
+                    <li>A dark canvas that you can <strong>pan</strong> (middle-click drag) and <strong>zoom</strong> (scroll wheel)</li>
+                    <li><strong>Right-click</strong> to open the context menu and add nodes</li>
+                    <li><strong>Drag from a socket</strong> to create connections between nodes</li>
+                    <li><strong>Click a node</strong> to select it; press <strong>Delete</strong> to remove it</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Node Types -->
+        <div class="step">
+            <div class="step-number">📖</div>
+            <div class="step-body">
+                <h2>Understanding Node Types</h2>
+                <div class="grid-2" style="margin-top: 16px;">
+                    <div class="card">
+                        <h4>Data Nodes</h4>
+                        <p><code>isCallable: false</code> — Compute outputs from inputs. No execution flow sockets. Evaluate lazily when their outputs are needed.</p>
+                    </div>
+                    <div class="card">
+                        <h4>Callable Nodes</h4>
+                        <p><code>isCallable: true</code> — Participate in execution flow via <code>ExecutionPath</code> input/output sockets.</p>
+                    </div>
+                    <div class="card">
+                        <h4>Execution Initiators</h4>
+                        <p><code>isExecutionInitiator: true</code> — Start an execution chain. No execution input, only outputs.</p>
+                    </div>
+                    <div class="card">
+                        <h4>Branching Nodes</h4>
+                        <p>Multiple <code>out ExecutionPath</code> parameters. Signal the correct path based on conditions.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Interactions -->
+        <div class="step">
+            <div class="step-number">🎮</div>
+            <div class="step-body">
+                <h2>Canvas Interactions</h2>
+                <table class="docs-table">
+                    <thead>
+                        <tr><th>Action</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Right-click</strong> on canvas</td><td>Open context menu to add nodes</td></tr>
+                        <tr><td><strong>Left-click + drag</strong> on canvas</td><td>Box selection</td></tr>
+                        <tr><td><strong>Left-click + drag</strong> on a node</td><td>Move node (or all selected)</td></tr>
+                        <tr><td><strong>Left-click + drag</strong> from a socket</td><td>Create a connection</td></tr>
+                        <tr><td><strong>Middle-click + drag</strong></td><td>Pan the canvas</td></tr>
+                        <tr><td><strong>Scroll wheel</strong></td><td>Zoom in/out</td></tr>
+                        <tr><td><strong>Delete / Backspace</strong></td><td>Delete selected nodes</td></tr>
+                        <tr><td><strong>Ctrl+A</strong></td><td>Select all nodes</td></tr>
+                        <tr><td><strong>Escape</strong></td><td>Cancel current operation</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Saving / Loading -->
+        <div class="step">
+            <div class="step-number">💾</div>
+            <div class="step-body">
+                <h2>Saving &amp; Loading Graphs</h2>
+                <pre><code>@@inject GraphSerializer Serializer
+
+// Save
+var dto = Serializer.Export(EditorState);
+var json = Serializer.Serialize(dto);
+File.WriteAllText("my-graph.json", json);
+
+// Load
+var json = File.ReadAllText("my-graph.json");
+var dto = Serializer.Deserialize(json);
+var result = Serializer.Import(EditorState, dto);</code></pre>
+            </div>
+        </div>
+
+        <!-- Next Steps -->
+        <div class="next-steps">
+            <h2>Next Steps</h2>
+            <div class="grid-2">
+                <a href="features" class="card next-link">
+                    <h4>📋 Features Overview</h4>
+                    <p>Learn about all the capabilities of NodeEditor.Net</p>
+                </a>
+                <a href="documentation" class="card next-link">
+                    <h4>📚 Documentation</h4>
+                    <p>Browse all guides, references, and API docs</p>
+                </a>
+                <a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/NodeEditor.Blazor/docs/CUSTOM-NODES.md" target="_blank" class="card next-link">
+                    <h4>🎨 Custom Nodes Tutorial</h4>
+                    <p>Advanced node creation patterns and socket editors</p>
+                </a>
+                <a href="https://github.com/Johnny2x2/NodeEditor.Net/blob/main/docs/reference/PLUGIN_SDK.md" target="_blank" class="card next-link">
+                    <h4>🔌 Plugin SDK</h4>
+                    <p>Package your nodes as a reusable, distributable plugin</p>
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
