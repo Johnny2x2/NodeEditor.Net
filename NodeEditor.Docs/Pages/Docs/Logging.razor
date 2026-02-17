@@ -1,0 +1,181 @@
+@page "/docs/logging"
+
+<PageTitle>Logging — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Logging System</h1>
+        <p>
+            NodeEditor.Net includes a structured, channel-based logging system designed for debugging
+            complex graphs with multiple plugins.
+        </p>
+
+        <h2>Overview</h2>
+        <p>
+            Log messages are organized into <strong>named channels</strong> (Execution, Plugins, Serialization, etc.)
+            with configurable retention policies. The <code>OutputTerminalPanel</code> component displays logs in the UI,
+            and plugins can register their own custom channels.
+        </p>
+
+        <h2>Architecture</h2>
+        <pre><code>INodeEditorLogger (singleton)
+├── Writes log entries to channels
+├── Supports multiple log levels
+└── Dispatches to UI via events
+
+ILogChannelRegistry (singleton)
+├── Registers named log channels
+├── Tracks channel ownership (plugin ID)
+└── Manages ChannelClearPolicy per channel
+
+LogEntry
+├── Message, Level, Channel, Timestamp
+└── Optional structured data</code></pre>
+
+        <h2>INodeEditorLogger</h2>
+        <p>The central logging interface. Registered as a singleton and available throughout the application.</p>
+        <pre><code>public interface INodeEditorLogger
+{
+    void Log(LogLevel level, string channel, string message);
+    void LogInfo(string channel, string message);
+    void LogWarning(string channel, string message);
+    void LogError(string channel, string message);
+    IReadOnlyList&lt;LogEntry&gt; GetEntries(string? channel = null);
+    void Clear(string? channel = null);
+    event EventHandler&lt;LogEntry&gt;? EntryAdded;
+}</code></pre>
+
+        <h2>ILogChannelRegistry</h2>
+        <p>Manages named log channels and their configuration:</p>
+        <pre><code>public interface ILogChannelRegistry
+{
+    void RegisterChannel(string name, string? pluginId = null,
+                         ChannelClearPolicy clearPolicy = ChannelClearPolicy.Manual);
+    void UnregisterChannel(string name);
+    IReadOnlyList&lt;LogChannelRegistration&gt; GetChannels();
+}</code></pre>
+
+        <h2>Log Levels</h2>
+        <pre><code>public enum LogLevel
+{
+    Debug,
+    Info,
+    Warning,
+    Error
+}</code></pre>
+
+        <h2>Channel Clear Policies</h2>
+        <pre><code>public enum ChannelClearPolicy
+{
+    Manual,        // Only cleared when explicitly requested
+    OnExecution,   // Cleared when a new execution starts
+    OnGraphLoad    // Cleared when a new graph is loaded
+}</code></pre>
+
+        <h2>Pre-defined Channels</h2>
+        <p>The <code>LogChannels</code> class defines standard channel names used by the core system:</p>
+        <table class="docs-table">
+            <thead><tr><th>Channel</th><th>Used By</th></tr></thead>
+            <tbody>
+                <tr><td>Execution</td><td><code>NodeExecutionService</code> — logs execution events</td></tr>
+                <tr><td>Plugins</td><td><code>PluginLoader</code> — logs plugin loading/unloading</td></tr>
+                <tr><td>Serialization</td><td><code>GraphSerializer</code> — logs save/load operations</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Plugin Log Channels</h2>
+        <p>Plugins that implement <code>ILogChannelAware</code> can register their own named channels:</p>
+        <pre><code>using NodeEditor.Net.Services.Plugins;
+using NodeEditor.Net.Services.Logging;
+
+public sealed class MyPlugin : INodePlugin, ILogChannelAware
+{
+    public string Name =&gt; "My Plugin";
+    public string Id =&gt; "com.example.myplugin";
+    // ... other INodePlugin members ...
+
+    public void RegisterChannels(ILogChannelRegistry registry)
+    {
+        registry.RegisterChannel("My Plugin Output", pluginId: Id);
+    }
+}</code></pre>
+        <p>Plugin channels are automatically unregistered when the plugin is unloaded.</p>
+
+        <h2>Logging from Services</h2>
+        <pre><code>public class MyService
+{
+    private readonly INodeEditorLogger _logger;
+
+    public MyService(INodeEditorLogger logger)
+    {
+        _logger = logger;
+    }
+
+    public void DoWork()
+    {
+        _logger.LogInfo("Execution", "Processing started");
+        try
+        {
+            // ... work ...
+            _logger.LogInfo("Execution", "Processing complete");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Execution", $"Processing failed: {ex.Message}");
+        }
+    }
+}</code></pre>
+
+        <h2>Subscribing to Log Events</h2>
+        <pre><code>@@inject INodeEditorLogger Logger
+@@implements IDisposable
+
+@@code {
+    protected override void OnInitialized()
+    {
+        Logger.EntryAdded += OnLogEntryAdded;
+    }
+
+    private void OnLogEntryAdded(object? sender, LogEntry entry)
+    {
+        if (entry.Level &gt;= LogLevel.Warning)
+        {
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        Logger.EntryAdded -= OnLogEntryAdded;
+    }
+}</code></pre>
+
+        <h2>Output Terminal Panel</h2>
+        <p>The <code>OutputTerminalPanel</code> Blazor component provides a built-in UI for viewing log output:</p>
+        <ul>
+            <li>Displays log entries from all channels</li>
+            <li>Supports filtering by channel and log level</li>
+            <li>Auto-scrolls to latest entries</li>
+            <li>Clear button respects channel clear policies</li>
+        </ul>
+
+        <h2>Namespaces</h2>
+        <table class="docs-table">
+            <thead><tr><th>Type</th><th>Namespace</th></tr></thead>
+            <tbody>
+                <tr><td><code>INodeEditorLogger</code></td><td><code>NodeEditor.Net.Services.Logging</code></td></tr>
+                <tr><td><code>NodeEditorLogger</code></td><td><code>NodeEditor.Net.Services.Logging</code></td></tr>
+                <tr><td><code>ILogChannelRegistry</code></td><td><code>NodeEditor.Net.Services.Logging</code></td></tr>
+                <tr><td><code>LogEntry</code></td><td><code>NodeEditor.Net.Services.Logging</code></td></tr>
+                <tr><td><code>LogLevel</code></td><td><code>NodeEditor.Net.Services.Logging</code></td></tr>
+                <tr><td><code>LogChannels</code></td><td><code>NodeEditor.Net.Services.Logging</code></td></tr>
+                <tr><td><code>ChannelClearPolicy</code></td><td><code>NodeEditor.Net.Services.Logging</code></td></tr>
+                <tr><td><code>ILogChannelAware</code></td><td><code>NodeEditor.Net.Services.Plugins</code></td></tr>
+            </tbody>
+        </table>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,12 @@
+<Solution>
+  <Project Path="NodeEditor.Blazor.WebHost/NodeEditor.Blazor.WebHost.csproj" />
+  <Project Path="NodeEditor.Blazor/NodeEditor.Blazor.csproj" />
+  <Project Path="NodeEditor.Blazor.Tests/NodeEditor.Blazor.Tests.csproj" />
+  <Project Path="NodeEditor.Docs/NodeEditor.Docs.csproj" />
+  <Project Path="NodeEditor.Mcp/NodeEditor.Mcp.csproj" />
+  <Project Path="NodeEditor.Net/NodeEditor.Net.csproj" />
+  <Project Path="NodeEditor.Plugins.Template/NodeEditor.Plugins.Template.csproj" />
+  <Project Path="NodeEditor.Plugins.LLMTornado/NodeEditor.Plugins.LLMTornado.csproj" />
+  <Project Path="NodeEditor.Plugins.TestA/NodeEditor.Plugins.TestA.csproj" />
+  <Project Path="NodeEditor.Plugins.TestB/NodeEditor.Plugins.TestB.csproj" />
+</Solution>

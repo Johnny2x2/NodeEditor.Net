@@ -1,0 +1,193 @@
+@namespace NodeEditor.Blazor.Components.Marketplace
+@using NodeEditor.Net.Services.Plugins.Marketplace
+@using Microsoft.Extensions.Options
+@inject IOptions<MarketplaceOptions> Options
+@inject IPluginMarketplaceAuthProvider? AuthProvider
+@inject IPluginMarketplaceCache Cache
+
+<div class="ne-marketplace-settings">
+    <h3>Marketplace Settings</h3>
+
+    <div class="ne-settings-section">
+        <h4>Account</h4>
+
+        @if (AuthProvider is not null)
+        {
+            @if (AuthProvider.IsAuthenticated && AuthProvider.CurrentUser is not null)
+            {
+                <div class="ne-settings-user">
+                    <div class="ne-settings-user-avatar">
+                        @if (!string.IsNullOrEmpty(AuthProvider.CurrentUser.AvatarUrl))
+                        {
+                            <img src="@AuthProvider.CurrentUser.AvatarUrl" alt="Avatar" />
+                        }
+                        else
+                        {
+                            <span>@AuthProvider.CurrentUser.Username[0].ToString().ToUpper()</span>
+                        }
+                    </div>
+                    <div class="ne-settings-user-info">
+                        <span class="ne-settings-user-name">@AuthProvider.CurrentUser.Username</span>
+                        @if (!string.IsNullOrEmpty(AuthProvider.CurrentUser.Email))
+                        {
+                            <span class="ne-settings-user-email">@AuthProvider.CurrentUser.Email</span>
+                        }
+                    </div>
+                    <button class="ne-settings-btn ne-settings-btn--secondary" @onclick="SignOut">
+                        Sign Out
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="ne-settings-login">
+                    <div class="ne-settings-form-group">
+                        <label>Username</label>
+                        <input type="text" @bind="_username" placeholder="Enter username" />
+                    </div>
+                    <div class="ne-settings-form-group">
+                        <label>Password</label>
+                        <input type="password" @bind="_password" placeholder="Enter password" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(_authError))
+                    {
+                        <div class="ne-settings-error">@_authError</div>
+                    }
+                    <button class="ne-settings-btn ne-settings-btn--primary"
+                            disabled="@_isSigningIn"
+                            @onclick="SignIn">
+                        @if (_isSigningIn)
+                        {
+                            <span>Signing in...</span>
+                        }
+                        else
+                        {
+                            <span>Sign In</span>
+                        }
+                    </button>
+                </div>
+            }
+        }
+        else
+        {
+            <p class="ne-settings-note">Authentication not configured for this installation.</p>
+        }
+    </div>
+
+    <div class="ne-settings-section">
+        <h4>Plugin Sources</h4>
+
+        <div class="ne-settings-sources">
+            <div class="ne-settings-source">
+                <div class="ne-settings-source-info">
+                    <span class="ne-settings-source-name">Local Repository</span>
+                    <span class="ne-settings-source-path">@Options.Value.LocalRepositoryPath</span>
+                </div>
+                <span class="ne-settings-source-status ne-settings-source-status--active">Active</span>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Options.Value.RemoteApiUrl))
+            {
+                <div class="ne-settings-source">
+                    <div class="ne-settings-source-info">
+                        <span class="ne-settings-source-name">Online Marketplace</span>
+                        <span class="ne-settings-source-path">@Options.Value.RemoteApiUrl</span>
+                    </div>
+                    <span class="ne-settings-source-status @(_remoteAvailable ? "ne-settings-source-status--active" : "ne-settings-source-status--inactive")">
+                        @(_remoteAvailable ? "Connected" : "Unavailable")
+                    </span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="ne-settings-section">
+        <h4>Cache</h4>
+
+        <div class="ne-settings-cache">
+            <p>Cache duration: @Options.Value.CacheDurationMinutes minutes</p>
+            <button class="ne-settings-btn ne-settings-btn--secondary" @onclick="ClearCache">
+                Clear Cache
+            </button>
+        </div>
+    </div>
+
+    <div class="ne-settings-section">
+        <h4>Options</h4>
+
+        <div class="ne-settings-options">
+            <label class="ne-settings-checkbox">
+                <input type="checkbox" checked="@Options.Value.CheckForUpdatesOnStartup"
+                       @onchange="ToggleUpdateCheck" />
+                <span>Check for plugin updates on startup</span>
+            </label>
+
+            <label class="ne-settings-checkbox">
+                <input type="checkbox" checked="@Options.Value.PreferOnlineMarketplace"
+                       @onchange="TogglePreferOnline" />
+                <span>Prefer online marketplace over local</span>
+            </label>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _username = "";
+    private string _password = "";
+    private string _authError = "";
+    private bool _isSigningIn;
+    private bool _remoteAvailable;
+
+    protected override Task OnInitializedAsync()
+    {
+        _remoteAvailable = !string.IsNullOrEmpty(Options.Value.RemoteApiUrl);
+        return Task.CompletedTask;
+    }
+
+    private async Task SignIn()
+    {
+        if (AuthProvider is null) return;
+
+        _isSigningIn = true;
+        _authError = "";
+        StateHasChanged();
+
+        try
+        {
+            var result = await AuthProvider.SignInAsync(_username, _password);
+
+            if (!result.Success)
+            {
+                _authError = result.ErrorMessage ?? "Sign in failed";
+            }
+            else
+            {
+                _username = "";
+                _password = "";
+            }
+        }
+        finally
+        {
+            _isSigningIn = false;
+        }
+    }
+
+    private async Task SignOut()
+    {
+        if (AuthProvider is null) return;
+        await AuthProvider.SignOutAsync();
+    }
+
+    private async Task ClearCache()
+    {
+        await Cache.ClearAsync();
+    }
+
+    private void ToggleUpdateCheck(ChangeEventArgs e)
+    {
+    }
+
+    private void TogglePreferOnline(ChangeEventArgs e)
+    {
+    }
+}

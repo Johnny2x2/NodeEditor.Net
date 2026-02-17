@@ -1,0 +1,80 @@
+@using NodeEditor.Net.ViewModels
+
+<div class="ne-overlay @(Overlay.IsSelected ? "ne-overlay--selected" : "")"
+     style="@OverlayStyle"
+     @onpointerdown="OnPointerDown"
+     @onpointerdown:stopPropagation>
+    <div class="ne-overlay-header" @onpointerdown:stopPropagation>
+        <input class="ne-overlay-title"
+               placeholder="Title"
+               @bind="Overlay.Title"
+               @bind:event="oninput"
+               @onpointerdown:stopPropagation />
+        <input class="ne-overlay-color"
+               type="color"
+               title="Overlay color"
+               @bind="Overlay.Color"
+               @bind:event="oninput"
+               @onpointerdown:stopPropagation />
+        <input class="ne-overlay-opacity"
+               type="range"
+               min="0.1"
+               max="0.9"
+               step="0.05"
+               title="Overlay opacity"
+               @bind="Overlay.Opacity"
+               @bind:event="oninput"
+               @onpointerdown:stopPropagation />
+    </div>
+    <textarea class="ne-overlay-body"
+              placeholder="Notes..."
+              @bind="Overlay.Body"
+              @bind:event="oninput"
+              @onpointerdown:stopPropagation />
+    <div class="ne-overlay-resize-handle"
+         @onpointerdown="OnResizePointerDown"
+         @onpointerdown:stopPropagation />
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public OverlayViewModel Overlay { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback<OverlayPointerEventArgs> OnOverlayPointerDown { get; set; }
+
+    [Parameter]
+    public EventCallback<OverlayPointerEventArgs> OnOverlayResizePointerDown { get; set; }
+
+    private string OverlayStyle =>
+        $"left: {Overlay.Position.X}px; top: {Overlay.Position.Y}px; width: {Overlay.Size.Width}px; height: {Overlay.Size.Height}px;" +
+        $" background-color: {Overlay.Color}; opacity: {Overlay.Opacity};";
+
+    private async Task OnPointerDown(PointerEventArgs e)
+    {
+        if (OnOverlayPointerDown.HasDelegate)
+        {
+            await OnOverlayPointerDown.InvokeAsync(new OverlayPointerEventArgs
+            {
+                OverlayId = Overlay.Id,
+                Position = new Point2D(e.ClientX, e.ClientY),
+                CtrlKey = e.CtrlKey,
+                ShiftKey = e.ShiftKey
+            });
+        }
+    }
+
+    private async Task OnResizePointerDown(PointerEventArgs e)
+    {
+        if (OnOverlayResizePointerDown.HasDelegate)
+        {
+            await OnOverlayResizePointerDown.InvokeAsync(new OverlayPointerEventArgs
+            {
+                OverlayId = Overlay.Id,
+                Position = new Point2D(e.ClientX, e.ClientY),
+                CtrlKey = e.CtrlKey,
+                ShiftKey = e.ShiftKey
+            });
+        }
+    }
+}

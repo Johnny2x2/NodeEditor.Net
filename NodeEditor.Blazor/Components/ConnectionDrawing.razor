@@ -1,0 +1,24 @@
+@using System.Collections.ObjectModel
+
+@* Renders the in-progress connection line being drawn from an output socket. *@
+@if (Connection is not null && EndPoint is not null)
+{
+    <ConnectionPath Connection="Connection"
+                    Nodes="Nodes"
+                    IsPending="true"
+                    PendingEndPoint="EndPoint" />
+}
+
+@code {
+    /// <summary>The partial connection data (output side filled in).</summary>
+    [Parameter]
+    public ConnectionData? Connection { get; set; }
+
+    /// <summary>Current mouse/touch position in graph space.</summary>
+    [Parameter]
+    public Point2D? EndPoint { get; set; }
+
+    /// <summary>All nodes — needed by <see cref="ConnectionPath"/> to locate socket positions.</summary>
+    [Parameter]
+    public ObservableCollection<NodeViewModel>? Nodes { get; set; }
+}

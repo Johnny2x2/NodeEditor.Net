@@ -1,0 +1,23 @@
+<button class="ne-context-menu-item" @onclick="HandleClick">
+    <div class="ne-context-menu-item-name">@Definition.Name</div>
+    @if (!string.IsNullOrWhiteSpace(Definition.Description))
+    {
+        <div class="ne-context-menu-item-description">@Definition.Description</div>
+    }
+</button>
+
+@code {
+    [Parameter, EditorRequired]
+    public NodeDefinition Definition { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback<NodeDefinition> OnSelect { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (OnSelect.HasDelegate)
+        {
+            await OnSelect.InvokeAsync(Definition);
+        }
+    }
+}

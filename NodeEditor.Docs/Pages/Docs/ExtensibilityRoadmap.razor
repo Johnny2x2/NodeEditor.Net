@@ -1,0 +1,122 @@
+@page "/docs/extensibility-roadmap"
+
+<PageTitle>Extensibility Roadmap — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Plugin Extensibility Roadmap</h1>
+        <p>
+            Implementation status and roadmap for enhanced plugin extensibility features.
+        </p>
+
+        <h2>Phase 1: Core Extensibility Foundation ✅</h2>
+        <p><strong>Goal:</strong> Enable plugins to properly integrate with the host application lifecycle and dependency injection.</p>
+
+        <h3>1.1 Service Registration ✅</h3>
+        <ul>
+            <li>✅ <code>ConfigureServices(IServiceCollection)</code> on <code>INodePlugin</code></li>
+            <li>✅ <code>PluginLoader</code> calls plugin's <code>ConfigureServices()</code></li>
+            <li>✅ Plugin services stored in <code>IPluginServiceRegistry</code></li>
+            <li>✅ Service cleanup on plugin unload</li>
+            <li>✅ Error handling for registration failures</li>
+        </ul>
+
+        <h3>1.2 Lifecycle Hooks ✅</h3>
+        <ul>
+            <li>✅ <code>OnLoadAsync()</code> — called after assembly load</li>
+            <li>✅ <code>OnInitializeAsync(IServiceProvider)</code> — called with DI access</li>
+            <li>✅ <code>OnUnloadAsync()</code> — cleanup before unload</li>
+            <li>✅ <code>OnError(Exception)</code> — error handling</li>
+            <li>✅ Cancellation token support for async operations</li>
+        </ul>
+
+        <h3>1.3 Node Registration ✅</h3>
+        <ul>
+            <li>✅ Assembly-based auto-discovery via <code>RegisterFromAssembly()</code></li>
+            <li>✅ Manual registration via <code>RegisterDefinitions()</code></li>
+            <li>✅ Definition removal on plugin unload</li>
+            <li>✅ Catalog query API via <code>GetCatalog()</code></li>
+        </ul>
+
+        <h2>Phase 2: Event System ✅</h2>
+        <p><strong>Goal:</strong> Allow plugins to react to and influence editor events.</p>
+
+        <h3>2.1 Plugin Event Bus ✅</h3>
+        <ul>
+            <li>✅ <code>IPluginEventBus</code> service with subscribe/publish pattern</li>
+            <li>✅ Events: NodeAdded, NodeRemoved, ConnectionAdded, ConnectionRemoved, SelectionChanged, ViewportChanged, ZoomChanged, SocketValuesChanged, NodeExecutionStateChanged, LogMessage</li>
+            <li>✅ <code>IDisposable</code> subscriptions for clean unsubscription</li>
+        </ul>
+
+        <h2>Phase 3: Custom UI Extensions ✅</h2>
+        <p><strong>Goal:</strong> Let plugins provide custom Blazor UI elements.</p>
+
+        <h3>3.1 Custom Socket Editors ✅</h3>
+        <ul>
+            <li>✅ <code>INodeCustomEditor</code> interface</li>
+            <li>✅ Auto-discovery from plugin assemblies</li>
+            <li>✅ <code>CanEdit(SocketData)</code> predicate</li>
+            <li>✅ <code>Render(SocketEditorContext)</code> method returning <code>RenderFragment</code></li>
+        </ul>
+
+        <h3>3.2 Standard Socket Editors ✅</h3>
+        <ul>
+            <li>✅ <code>[SocketEditor]</code> attribute with <code>SocketEditorKind</code></li>
+            <li>✅ Built-in editors: Text, Number, Bool, Dropdown, Button, Image, NumberUpDown, TextArea</li>
+        </ul>
+
+        <h2>Phase 4: Logging Integration ✅</h2>
+        <ul>
+            <li>✅ <code>ILogChannelAware</code> optional interface for plugins</li>
+            <li>✅ Plugin log channel registration and auto-unregistration</li>
+            <li>✅ <code>ChannelClearPolicy</code> configuration</li>
+        </ul>
+
+        <h2>Phase 5: Marketplace ✅</h2>
+        <ul>
+            <li>✅ Local and remote plugin sources</li>
+            <li>✅ Install / uninstall / update operations</li>
+            <li>✅ ZIP upload with local repository persistence</li>
+            <li>✅ Plugin metadata and marketplace UI</li>
+            <li>✅ Token-based authentication for private repos</li>
+        </ul>
+
+        <h2>Phase 6: MCP Integration ✅</h2>
+        <ul>
+            <li>✅ <code>IPluginAbilityContributor</code> for plugin-provided MCP abilities</li>
+            <li>✅ Plugin abilities discoverable via <code>discover_abilities</code> with <code>includePlugins</code> flag</li>
+        </ul>
+
+        <h2>Planned Enhancements ⬜</h2>
+
+        <h3>Canvas Customization</h3>
+        <ul>
+            <li>⬜ Custom canvas themes and styling</li>
+            <li>⬜ Custom toolbar items and menus</li>
+            <li>⬜ Custom context menu entries</li>
+            <li>⬜ Custom connection rendering rules</li>
+            <li>⬜ Custom keyboard shortcuts</li>
+            <li>⬜ Custom panel/dock layout</li>
+        </ul>
+
+        <h3>Advanced Plugin Features</h3>
+        <ul>
+            <li>⬜ Plugin lifecycle state tracking (Loading → Initialized → Active → Unloading)</li>
+            <li>⬜ Timeout handling for long-running lifecycle hooks</li>
+            <li>⬜ Plugin dependency declarations and resolution</li>
+            <li>⬜ Plugin version constraints</li>
+            <li>⬜ Sandboxed execution for untrusted plugins</li>
+        </ul>
+
+        <h3>Infrastructure</h3>
+        <ul>
+            <li>⬜ Extract interfaces for remaining concrete services (NodeRegistryService, NodeExecutionService, etc.)</li>
+            <li>⬜ Convert static classes to injectable services</li>
+            <li>⬜ Builder pattern for <code>AddNodeEditor()</code> configuration</li>
+        </ul>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

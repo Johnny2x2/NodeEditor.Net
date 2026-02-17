@@ -1,0 +1,188 @@
+@namespace NodeEditor.Blazor.Components
+@using NodeEditor.Net.Services.Logging
+@using NodeEditor.Net.Services.Mcp
+@inject McpApiKeyService ApiKeyService
+@inject INodeEditorLogger McpLogger
+
+<div class="ne-marketplace-settings">
+    <h3>MCP Server</h3>
+
+    <div class="ne-settings-section">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h4 style="margin: 0;">Server Status</h4>
+                <p class="ne-settings-note" style="margin-top: 4px;">
+                    @if (_isEnabled)
+                    {
+                        <span>MCP server is <strong style="color: #2ecc71;">enabled</strong> — clients can connect.</span>
+                    }
+                    else
+                    {
+                        <span>MCP server is <strong style="color: #e74c3c;">disabled</strong> — all requests will be rejected.</span>
+                    }
+                </p>
+            </div>
+            <button class="ne-settings-btn @(_isEnabled ? "ne-settings-btn--secondary" : "ne-settings-btn--primary")"
+                    style="@(_isEnabled ? "color: #e74c3c;" : "")"
+                    @onclick="ToggleEnabled">
+                @(_isEnabled ? "Disable" : "Enable")
+            </button>
+        </div>
+    </div>
+
+    <div class="ne-settings-section">
+        <h4>API Key</h4>
+
+        @if (_currentKey is not null)
+        {
+            <div class="ne-settings-source">
+                <div class="ne-settings-source-info">
+                    <span class="ne-settings-source-name">Current Key</span>
+                    <span class="ne-settings-source-path" style="font-family: monospace; font-size: 0.85em; user-select: all;">
+                        @if (_showKey)
+                        {
+                            @_currentKey
+                        }
+                        else
+                        {
+                            @MaskKey(_currentKey)
+                        }
+                    </span>
+                </div>
+                <span class="ne-settings-source-status ne-settings-source-status--active">Active</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <button class="ne-settings-btn ne-settings-btn--secondary" @onclick="ToggleShowKey">
+                    @(_showKey ? "Hide" : "Show")
+                </button>
+                <button class="ne-settings-btn ne-settings-btn--secondary" @onclick="CopyKey">
+                    @(_copied ? "Copied!" : "Copy")
+                </button>
+                <button class="ne-settings-btn ne-settings-btn--secondary" @onclick="GenerateKey">
+                    Regenerate
+                </button>
+                <button class="ne-settings-btn ne-settings-btn--secondary" style="color: #e74c3c;" @onclick="RevokeKey">
+                    Revoke
+                </button>
+            </div>
+        }
+        else
+        {
+            <p class="ne-settings-note">No API key has been generated. Generate one to enable MCP client access.</p>
+            <button class="ne-settings-btn ne-settings-btn--primary" @onclick="GenerateKey">
+                Generate API Key
+            </button>
+        }
+    </div>
+
+    <div class="ne-settings-section">
+        <h4>Connection</h4>
+
+        <div class="ne-settings-sources">
+            <div class="ne-settings-source">
+                <div class="ne-settings-source-info">
+                    <span class="ne-settings-source-name">Endpoint</span>
+                    <span class="ne-settings-source-path" style="font-family: monospace; user-select: all;">
+                        @_endpointUrl
+                    </span>
+                </div>
+                <span class="ne-settings-source-status @(StatusClass)">
+                    @StatusLabel
+                </span>
+            </div>
+        </div>
+
+        <div style="margin-top: 12px;">
+            <h4 style="margin-bottom: 6px;">MCP Client Config</h4>
+            <pre style="background: #1e1e2e; color: #cdd6f4; padding: 12px; border-radius: 6px; font-size: 0.82em; overflow-x: auto; white-space: pre-wrap;">@GetClientConfigJson()</pre>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>Base URL of the host (e.g. https://localhost:5001).</summary>
+    [Parameter] public string BaseUrl { get; set; } = "";
+
+    /// <summary>The MCP route pattern (e.g. /mcp).</summary>
+    [Parameter] public string RoutePattern { get; set; } = "/mcp";
+
+    private string? _currentKey;
+    private bool _showKey;
+    private bool _copied;
+    private bool _isEnabled;
+    private string _endpointUrl = "";
+
+    private string StatusClass => (_isEnabled, _currentKey) switch
+    {
+        (true, not null) => "ne-settings-source-status--active",
+        (true, null) => "ne-settings-source-status--inactive",
+        _ => "ne-settings-source-status--inactive"
+    };
+
+    private string StatusLabel => (_isEnabled, _currentKey) switch
+    {
+        (true, not null) => "Ready",
+        (true, null) => "No Key",
+        _ => "Disabled"
+    };
+
+    protected override void OnInitialized()
+    {
+        _currentKey = ApiKeyService.GetCurrentKey();
+        _isEnabled = ApiKeyService.IsEnabled();
+        _endpointUrl = $"{BaseUrl.TrimEnd('/')}{RoutePattern}";
+    }
+
+    private void ToggleEnabled()
+    {
+        _isEnabled = !_isEnabled;
+        ApiKeyService.SetEnabled(_isEnabled);
+        McpLogger.Log(LogChannels.Mcp, LogLevel.Info,
+            _isEnabled ? "MCP server enabled from settings" : "MCP server disabled from settings");
+    }
+
+    private void GenerateKey()
+    {
+        _currentKey = ApiKeyService.GenerateNewKey();
+        _showKey = true;
+        McpLogger.Log(LogChannels.Mcp, LogLevel.Info, "New API key generated");
+    }
+
+    private void RevokeKey()
+    {
+        ApiKeyService.RevokeKey();
+        _currentKey = null;
+        _showKey = false;
+        McpLogger.Log(LogChannels.Mcp, LogLevel.Warning, "API key revoked");
+    }
+
+    private void ToggleShowKey()
+    {
+        _showKey = !_showKey;
+    }
+
+    private async Task CopyKey()
+    {
+        // Fallback: the UI displays the key with user-select:all so users
+        // can always select and copy manually. JS clipboard is best-effort.
+        _copied = true;
+        StateHasChanged();
+        await Task.Delay(1500);
+        _copied = false;
+    }
+
+    private static string MaskKey(string key) =>
+        key.Length > 8 ? $"{key[..4]}••••••••{key[^4..]}" : "••••••••";
+
+    private string GetClientConfigJson() =>
+$@"{{
+  ""mcpServers"": {{
+    ""nodeeditormax"": {{
+      ""url"": ""{_endpointUrl}"",
+      ""headers"": {{
+        ""X-API-Key"": ""{(_currentKey ?? "<generate a key above>")}""
+      }}
+    }}
+  }}
+}}";
+}

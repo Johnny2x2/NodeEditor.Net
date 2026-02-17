@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "events": [
+    { "id": "event-onping", "name": "OnPing" }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "typeId": null,
+      "name": "Start",
+      "callable": true,
+      "execInit": true,
+      "x": 60,
+      "y": 80,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "trigger-onping",
+      "typeId": "event.trigger.event-onping",
+      "name": "Trigger Event: OnPing",
+      "callable": true,
+      "execInit": false,
+      "x": 300,
+      "y": 80,
+      "width": 220,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "marker-main",
+      "typeId": null,
+      "name": "Marker",
+      "callable": true,
+      "execInit": false,
+      "x": 560,
+      "y": 80,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "listener-a",
+      "typeId": "event.listener.event-onping",
+      "name": "Custom Event: OnPing",
+      "callable": true,
+      "execInit": true,
+      "x": 300,
+      "y": 220,
+      "width": 240,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "marker-a",
+      "typeId": null,
+      "name": "Marker",
+      "callable": true,
+      "execInit": false,
+      "x": 560,
+      "y": 220,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "listener-b",
+      "typeId": "event.listener.event-onping",
+      "name": "Custom Event: OnPing",
+      "callable": true,
+      "execInit": true,
+      "x": 300,
+      "y": 360,
+      "width": 240,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "delay-b",
+      "typeId": null,
+      "name": "Delay",
+      "callable": true,
+      "execInit": false,
+      "x": 560,
+      "y": 360,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        },
+        {
+          "name": "DelayMs",
+          "typeName": "System.Int32",
+          "isInput": true,
+          "isExecution": false,
+          "value": { "typeName": "System.Int32", "json": 500 }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "marker-b",
+      "typeId": null,
+      "name": "Marker",
+      "callable": true,
+      "execInit": false,
+      "x": 800,
+      "y": 360,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        {
+          "name": "Enter",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": true,
+          "isExecution": true,
+          "value": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Exit",
+          "typeName": "NodeEditor.Blazor.Services.Execution.ExecutionPath",
+          "isInput": false,
+          "isExecution": true,
+          "value": null
+        }
+      ]
+    }
+  ],
+  "connections": [
+    { "outputNodeId": "start", "outputSocketName": "Exit", "inputNodeId": "trigger-onping", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "trigger-onping", "outputSocketName": "Exit", "inputNodeId": "marker-main", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "listener-a", "outputSocketName": "Exit", "inputNodeId": "marker-a", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "listener-b", "outputSocketName": "Exit", "inputNodeId": "delay-b", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "delay-b", "outputSocketName": "Exit", "inputNodeId": "marker-b", "inputSocketName": "Enter", "isExecution": true }
+  ],
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "width": 1400,
+    "height": 800,
+    "zoom": 1
+  },
+  "selectedNodeIds": []
+}

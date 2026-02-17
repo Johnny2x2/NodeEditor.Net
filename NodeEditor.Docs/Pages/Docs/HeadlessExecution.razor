@@ -1,0 +1,129 @@
+@page "/docs/headless-execution"
+
+<PageTitle>Headless Execution — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Headless Execution</h1>
+        <p>
+            NodeEditor.Net supports running node graphs without any UI. The <code>HeadlessGraphRunner</code> service
+            loads graphs from JSON or <code>GraphData</code> objects and executes them in any .NET host—console apps,
+            APIs, background services, or unit tests.
+        </p>
+
+        <h2>Why Headless Execution?</h2>
+        <table class="docs-table">
+            <thead><tr><th>Use Case</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><strong>CI/CD Pipelines</strong></td><td>Run data processing graphs as part of build automation</td></tr>
+                <tr><td><strong>API Endpoints</strong></td><td>Execute graphs in response to HTTP requests</td></tr>
+                <tr><td><strong>Background Services</strong></td><td>Schedule graph execution on a timer or queue</td></tr>
+                <tr><td><strong>Unit Testing</strong></td><td>Validate graph behavior programmatically</td></tr>
+                <tr><td><strong>MCP Server</strong></td><td>The MCP <code>execution.run_json</code> ability uses headless execution</td></tr>
+                <tr><td><strong>Batch Processing</strong></td><td>Process multiple datasets through the same graph</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Architecture</h2>
+        <pre><code>HeadlessGraphRunner (scoped)
+├── GraphSerializer — loads JSON into GraphData
+├── NodeExecutionService — executes the plan
+├── NodeContextRegistry — resolves node implementations
+├── SocketTypeResolver — maps type names to CLR types
+└── ExecutionPlanner — builds topological execution order</code></pre>
+        <p>
+            The <code>HeadlessGraphRunner</code> bypasses all Blazor components and ViewModels. It works directly
+            with the model layer (<code>NodeData</code>, <code>ConnectionData</code>, <code>GraphData</code>)
+            and the execution layer.
+        </p>
+
+        <h2>Basic Execution from JSON</h2>
+        <pre><code>using NodeEditor.Net.Services.Execution;
+
+// Get the runner from DI
+var runner = serviceProvider.GetRequiredService&lt;HeadlessGraphRunner&gt;();
+
+// Load and execute a graph from a JSON file
+var json = File.ReadAllText("my-graph.json");
+var result = await runner.ExecuteFromJsonAsync(json, cancellationToken);</code></pre>
+
+        <h2>Execution with Options</h2>
+        <pre><code>var options = new NodeExecutionOptions
+{
+    Mode = ExecutionMode.Parallel,
+    MaxDegreeOfParallelism = 8
+};
+
+var result = await runner.ExecuteFromJsonAsync(json, options, cancellationToken);</code></pre>
+
+        <h2>Execution from GraphData</h2>
+        <pre><code>var serializer = serviceProvider.GetRequiredService&lt;GraphSerializer&gt;();
+var graphData = serializer.Deserialize(json);
+
+var result = await runner.ExecuteAsync(graphData, options, cancellationToken);</code></pre>
+
+        <h2>Using Custom Node Contexts</h2>
+        <p>If your graph uses nodes defined in custom <code>INodeContext</code> classes, register them before execution:</p>
+        <pre><code>// Register custom node contexts
+var registry = serviceProvider.GetRequiredService&lt;NodeRegistryService&gt;();
+registry.RegisterFromAssembly(typeof(MyCustomNodes).Assembly);
+
+// Execute
+var result = await runner.ExecuteFromJsonAsync(json, cancellationToken);</code></pre>
+
+        <h2>Console App Example</h2>
+        <pre><code>using Microsoft.Extensions.DependencyInjection;
+using NodeEditor.Blazor.Services;
+using NodeEditor.Net.Services.Execution;
+
+var services = new ServiceCollection();
+services.AddNodeEditor();
+var provider = services.BuildServiceProvider();
+
+using var scope = provider.CreateScope();
+var runner = scope.ServiceProvider.GetRequiredService&lt;HeadlessGraphRunner&gt;();
+
+var json = File.ReadAllText(args[0]);
+await runner.ExecuteFromJsonAsync(json, CancellationToken.None);
+
+Console.WriteLine("Graph executed successfully.");</code></pre>
+
+        <h2>Integration with MCP</h2>
+        <p>
+            The MCP server's <code>execution.run_json</code> ability uses <code>HeadlessGraphRunner</code>
+            internally. When an AI assistant sends a graph as JSON via MCP, it's executed headlessly
+            without affecting the canvas state.
+        </p>
+
+        <h2>Variables in Headless Execution</h2>
+        <p>
+            Graph variables are supported in headless execution. The <code>VariableNodeExecutor</code>
+            seeds variables from their default values before execution begins, and Get/Set nodes read
+            and write the shared execution context.
+        </p>
+
+        <h2>Service Registration</h2>
+        <p>
+            <code>HeadlessGraphRunner</code> is registered as a <strong>scoped</strong> service by
+            <code>AddNodeEditor()</code>. In non-Blazor hosts, create a scope for each execution:
+        </p>
+        <pre><code>using var scope = provider.CreateScope();
+var runner = scope.ServiceProvider.GetRequiredService&lt;HeadlessGraphRunner&gt;();
+await runner.ExecuteFromJsonAsync(json, token);</code></pre>
+
+        <h2>Namespaces</h2>
+        <table class="docs-table">
+            <thead><tr><th>Type</th><th>Namespace</th></tr></thead>
+            <tbody>
+                <tr><td><code>HeadlessGraphRunner</code></td><td><code>NodeEditor.Net.Services.Execution</code></td></tr>
+                <tr><td><code>NodeExecutionOptions</code></td><td><code>NodeEditor.Net.Services.Execution</code></td></tr>
+                <tr><td><code>ExecutionMode</code></td><td><code>NodeEditor.Net.Services.Execution</code></td></tr>
+                <tr><td><code>NodeExecutionContext</code></td><td><code>NodeEditor.Net.Services.Execution</code></td></tr>
+            </tbody>
+        </table>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

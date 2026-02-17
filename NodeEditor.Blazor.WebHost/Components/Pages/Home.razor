@@ -1,0 +1,958 @@
+﻿@page "/"
+@implements IDisposable
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+@using NodeEditor.Blazor.Components
+@using NodeEditor.Blazor.Components.Marketplace
+@using NodeEditor.Net.Models
+@using NodeEditor.Blazor.Services
+@using NodeEditor.Net.Services.Registry
+@using NodeEditor.Net.ViewModels
+@using NodeEditor.Net.Services.Execution
+@using NodeEditor.Net.Services.Execution.StandardNodes
+@using NodeEditor.Net.Services.Logging
+@using NodeEditor.Net.Services.Serialization
+@inject INodeEditorState EditorState
+@inject INodeExecutionService ExecutionService
+@inject INodeRegistryService Registry
+@inject IGraphSerializer GraphSerializer
+@inject INodeEditorLogger NodeLogger
+@inject ILogChannelRegistry ChannelRegistry
+@inject VariableNodeFactory VariableNodeFactory
+@inject EventNodeFactory EventNodeFactory
+@inject ISocketTypeResolver SocketTypeResolver
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject INodeEditorStateBridge StateBridge
+@inject NavigationManager Nav
+@using Microsoft.Extensions.Options
+@using NodeEditor.Net.Services.Mcp
+@inject IOptions<McpOptions> McpOptionsAccessor
+
+<PageTitle>Node Editor</PageTitle>
+
+<div class="node-editor-toolbar">
+	<button @onclick="StartExecutionAsync" disabled="@_isExecuting">Start</button>
+	<button @onclick="StepOnce" disabled="@(!_isPaused)" title="Execute one node">Step</button>
+	<button @onclick="PauseExecution" disabled="@(!_isExecuting || _isPaused)" title="Pause execution">Pause</button>
+	<button @onclick="ResumeExecution" disabled="@(!_isPaused)" title="Resume execution">Resume</button>
+	<button @onclick="StopExecution" disabled="@(!_isExecuting)">Stop</button>
+	<button @onclick="CreateNewGraph" disabled="@_isExecuting">New</button>
+	<button @onclick="SaveGraphLocalAsync" disabled="@_isExecuting"
+			title="Save graph to browser storage">Save</button>
+	<select @bind="_selectedPreset" disabled="@_isExecuting">
+		@if (_savedGraphNames.Count > 0)
+		{
+			<optgroup label="Saved Graphs">
+				@foreach (var name in _savedGraphNames)
+				{
+					<option value="@($"local:{name}")">@name</option>
+				}
+			</optgroup>
+		}
+		<optgroup label="Presets">
+			@foreach (var preset in _presets)
+			{
+				<option value="@preset.Path">@preset.Name</option>
+			}
+		</optgroup>
+	</select>
+	<button @onclick="LoadSelectedPresetAsync" disabled="@_isExecuting">Load</button>
+	<button @onclick="DeleteSelectedSavedGraphAsync" disabled="@(_isExecuting || !IsLocalGraphSelected)"
+			title="Delete the selected saved graph">Delete</button>
+	<span class="toolbar-separator"></span>
+	<button @onclick="ExportGraphToFileAsync" disabled="@_isExecuting"
+			title="Export graph to a .json file">Export</button>
+	<button @onclick="OpenPluginManager"
+			title="Plugin Manager">Plugins</button>
+	<button @onclick="ToggleTerminal"
+			class="@(_isTerminalVisible ? "toolbar-btn--active" : "")"
+			title="Toggle Output Terminal">Terminal</button>
+	<label class="load-file-btn" title="Import graph from a .json file">
+		Import
+		<InputFile OnChange="ImportGraphFromFileAsync" accept=".json" style="display:none" />
+	</label>
+	<span class="execution-status">@_executionStatus</span>
+	@if (!string.IsNullOrWhiteSpace(_loadStatus))
+	{
+		<span class="execution-message">@_loadStatus</span>
+	}
+</div>
+
+<PluginManagerDialog @bind-IsOpen="_isPluginManagerOpen" OnClosed="OnPluginManagerClosed"
+                     McpBaseUrl="@GetMcpBaseUrl()"
+                     McpRoutePattern="@(McpOptionsAccessor.Value.RoutePattern)" />
+
+<NodePropertiesPanel State="EditorState" />
+<VariablesPanel State="EditorState"
+                OnVariableDrag="OnVariableDragStarted"
+                OnCreateVariableNode="OnVariableNodeRequested" />
+<EventsPanel State="EditorState"
+             OnCreateEventNode="OnEventNodeRequested" />
+
+<OutputTerminalPanel @ref="_terminalRef"
+                     Logger="NodeLogger"
+                     ChannelRegistry="ChannelRegistry"
+                     @bind-IsVisible="_isTerminalVisible" />
+
+<div class="node-editor-container" style="@(_isTerminalVisible ? "height: calc(100% - 48px - 220px);" : "")">
+	<NodeEditorCanvas @ref="_canvasRef" State="EditorState" />
+</div>
+
+@code {
+	private NodeEditorCanvas? _canvasRef;
+	private OutputTerminalPanel? _terminalRef;
+	private CancellationTokenSource? _executionCts;
+	private bool _isExecuting;
+	private bool _isPaused;
+	private bool _isTerminalVisible;
+	private string _executionStatus = "Idle";
+	private object? _nodeContext;
+	private string? _loadStatus;
+	private bool _isPluginManagerOpen;
+	private string _selectedPreset = "graphs/hello-world.json";
+	private IJSObjectReference? _jsModule;
+	private List<string> _savedGraphNames = new();
+	private readonly List<GraphPreset> _presets = new()
+	{
+		new GraphPreset("Hello World", "graphs/hello-world.json"),
+		new GraphPreset("Math & Branching", "graphs/math-and-branching.json"),
+		new GraphPreset("FizzBuzz", "graphs/fizzbuzz.json"),
+		new GraphPreset("List + ForEach + Greeting", "graphs/list-foreach-greeting.json"),
+		new GraphPreset("Variables & Flow Control", "graphs/variables-and-flow.json"),
+		new GraphPreset("Error Handling & Dict", "graphs/error-handling-and-dict.json"),
+		new GraphPreset("Loop + Lists + Strings", "graphs/loop-list-string.json"),
+		new GraphPreset("Parallel Execution", "graphs/parallel.json"),
+		new GraphPreset("Events: Basic Trigger", "graphs/event-basic.json"),
+		new GraphPreset("Events: Multiple Listeners", "graphs/event-multi.json")
+	};
+
+	private bool IsLocalGraphSelected => _selectedPreset.StartsWith("local:", StringComparison.Ordinal);
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			await EnsureJsModuleAsync();
+			await RefreshSavedGraphNamesAsync();
+			StateHasChanged();
+		}
+	}
+
+	private async Task EnsureJsModuleAsync()
+	{
+		_jsModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+			"import",
+			"./_content/NodeEditor.Blazor/nodeEditorCanvas.js");
+	}
+
+	private async Task RefreshSavedGraphNamesAsync()
+	{
+		if (_jsModule is null) return;
+		var names = await _jsModule.InvokeAsync<string[]>("listSavedGraphNames");
+		_savedGraphNames = names?.ToList() ?? new List<string>();
+	}
+
+	private void OpenPluginManager()
+	{
+		_isPluginManagerOpen = true;
+	}
+
+	protected override void OnInitialized()
+	{
+		// Attach the scoped state to the singleton bridge so MCP can reach it
+		// Pass InvokeAsync so the bridge can dispatch mutations onto the Blazor circuit thread
+		StateBridge.Attach(EditorState, InvokeAsync);
+
+		Registry.RegisterFromAssembly(typeof(StandardNodeRegistration).Assembly);
+		Registry.RegisterDefinitions(StandardNodeRegistration.GetInlineDefinitions());
+		_nodeContext = new object();
+
+		// Ensure the VariableNodeFactory is initialized (subscribes to state events)
+		_ = VariableNodeFactory;
+
+		ExecutionService.NodeStarted += OnNodeStarted;
+		ExecutionService.NodeCompleted += OnNodeCompleted;
+		ExecutionService.NodeFailed += OnNodeFailed;
+		ExecutionService.Gate.StateChanged += OnGateStateChanged;
+		ExecutionService.FeedbackReceived += OnFeedbackReceived;
+		ExecutionService.ExecutionFailed += OnExecutionFailed;
+		ExecutionService.ExecutionCanceled += OnExecutionCanceled;
+
+		AddDefaultStartNode();
+	}
+
+	private void OnVariableDragStarted(VariableDragData data)
+	{
+		_canvasRef?.SetPendingVariableDrag(data);
+	}
+
+	private void OnVariableNodeRequested(VariableNodeRequest request)
+	{
+		_canvasRef?.CreateVariableNode(request.VariableId, request.IsSetNode);
+	}
+
+	private void OnEventNodeRequested(EventNodeRequest request)
+	{
+		_canvasRef?.CreateEventNode(request.EventId, request.IsTrigger);
+	}
+
+	private void OnPluginManagerClosed()
+	{
+		_isPluginManagerOpen = false;
+		// Refresh node context to pick up newly installed plugins
+		_nodeContext = new object();
+	}
+
+	public void Dispose()
+	{
+		// Detach the scoped state from the bridge
+		StateBridge.Detach(EditorState);
+
+		ExecutionService.NodeStarted -= OnNodeStarted;
+		ExecutionService.NodeCompleted -= OnNodeCompleted;
+		ExecutionService.NodeFailed -= OnNodeFailed;
+		ExecutionService.Gate.StateChanged -= OnGateStateChanged;
+		ExecutionService.FeedbackReceived -= OnFeedbackReceived;
+		ExecutionService.ExecutionFailed -= OnExecutionFailed;
+		ExecutionService.ExecutionCanceled -= OnExecutionCanceled;
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		Dispose();
+		if (_jsModule is not null)
+		{
+			try
+			{
+				await _jsModule.DisposeAsync();
+			}
+			catch (JSDisconnectedException) { }
+			catch (TaskCanceledException) { }
+		}
+	}
+
+	private async Task StartExecutionAsync()
+	{
+		if (_isExecuting)
+		{
+			return;
+		}
+
+		_nodeContext ??= new object();
+
+		_isExecuting = true;
+		_executionStatus = "Running";
+		EditorState.ResetNodeExecutionState();
+
+		// Notify terminal to clear ClearOnRun channels
+		_terminalRef?.NotifyExecutionStarting();
+		NodeLogger.LogExecution("Execution started.");
+
+		_executionCts?.Dispose();
+		_executionCts = new CancellationTokenSource();
+
+		var context = new NodeRuntimeStorage();
+
+		// Seed graph variables into the execution context
+		VariableNodeExecutor.SeedVariables(context, EditorState.Variables, SocketTypeResolver);
+
+		var executionNodes = EditorState.BuildExecutionNodes();
+
+		try
+		{
+			ExecutionService.Gate.Run();
+			await ExecutionService.ExecuteAsync(
+				executionNodes,
+				EditorState.Connections.ToList(),
+				context,
+				_nodeContext ?? throw new InvalidOperationException("Node context is not initialized."),
+				null,
+				_executionCts.Token).ConfigureAwait(false);
+
+			await InvokeAsync(() =>
+			{
+				EditorState.ApplyExecutionContext(context);
+				_executionStatus = "Completed";
+			});
+		}
+		catch (OperationCanceledException)
+		{
+			_executionStatus = "Canceled";
+		}
+		catch (Exception ex)
+		{
+			_executionStatus = $"Failed: {ex.Message}";
+		}
+		finally
+		{
+			_isExecuting = false;
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private void OnNodeStarted(object? sender, NodeExecutionEventArgs e)
+	{
+		NodeLogger.LogExecution($"Node started: {e.Node.Name}", e.Node.Id, e.Node.Name);
+		_ = InvokeAsync(() =>
+		{
+			EditorState.SetNodeExecuting(e.Node.Id, true);
+			EditorState.SetNodeError(e.Node.Id, false);
+		});
+	}
+
+	private void OnNodeCompleted(object? sender, NodeExecutionEventArgs e)
+	{
+		NodeLogger.LogExecution($"Node completed: {e.Node.Name}", e.Node.Id, e.Node.Name);
+		_ = InvokeAsync(() =>
+		{
+			EditorState.SetNodeExecuting(e.Node.Id, false);
+		});
+	}
+
+	private void OnNodeFailed(object? sender, NodeExecutionFailedEventArgs e)
+	{
+		NodeLogger.Log(LogChannels.Execution, LogLevel.Error,
+			$"Node failed: {e.Node.Name} — {e.Exception.Message}", e.Node.Id, e.Node.Name);
+		_ = InvokeAsync(() =>
+		{
+			EditorState.SetNodeExecuting(e.Node.Id, false);
+			EditorState.SetNodeError(e.Node.Id, true);
+		});
+	}
+
+	private void StopExecution()
+	{
+		if (!_isExecuting)
+		{
+			return;
+		}
+
+		_executionStatus = "Canceling";
+		_executionCts?.Cancel();
+	}
+
+	private async Task StartSteppedAsync()
+	{
+		if (_isExecuting) return;
+
+		_nodeContext ??= new object();
+
+		_isExecuting = true;
+		_isPaused = true;
+		_executionStatus = "Paused (Step mode)";
+		EditorState.ResetNodeExecutionState();
+
+		_executionCts?.Dispose();
+		_executionCts = new CancellationTokenSource();
+
+		var context = new NodeRuntimeStorage();
+		VariableNodeExecutor.SeedVariables(context, EditorState.Variables, SocketTypeResolver);
+		var executionNodes = EditorState.BuildExecutionNodes();
+
+		try
+		{
+			ExecutionService.Gate.StartPaused();
+			await ExecutionService.ExecuteAsync(
+				executionNodes,
+				EditorState.Connections.ToList(),
+				context,
+				_nodeContext ?? throw new InvalidOperationException("Node context is not initialized."),
+				null,
+				_executionCts.Token).ConfigureAwait(false);
+
+			await InvokeAsync(() =>
+			{
+				EditorState.ApplyExecutionContext(context);
+				_executionStatus = "Completed";
+			});
+		}
+		catch (OperationCanceledException)
+		{
+			_executionStatus = "Canceled";
+		}
+		catch (Exception ex)
+		{
+			_executionStatus = $"Failed: {ex.Message}";
+		}
+		finally
+		{
+			_isExecuting = false;
+			_isPaused = false;
+			ExecutionService.Gate.Complete();
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private void StepOnce()
+	{
+		if (!_isPaused) return;
+		_executionStatus = "Stepping...";
+		ExecutionService.Gate.StepOnce();
+	}
+
+	private void PauseExecution()
+	{
+		if (!_isExecuting || _isPaused) return;
+		ExecutionService.Gate.Pause();
+		_isPaused = true;
+		_executionStatus = "Paused";
+	}
+
+	private void ResumeExecution()
+	{
+		if (!_isPaused) return;
+		ExecutionService.Gate.Resume();
+		_isPaused = false;
+		_executionStatus = "Running";
+	}
+
+	private void OnGateStateChanged(object? sender, EventArgs e)
+	{
+		_ = InvokeAsync(() =>
+		{
+			_isPaused = ExecutionService.Gate.State == ExecutionState.Paused;
+			StateHasChanged();
+		});
+	}
+
+	private void ToggleTerminal()
+	{
+		_isTerminalVisible = !_isTerminalVisible;
+	}
+
+	private void OnFeedbackReceived(object? sender, FeedbackMessageEventArgs e)
+	{
+		var level = e.Type == ExecutionFeedbackType.DebugPrint ? LogLevel.Debug : LogLevel.Info;
+		var channel = e.Type == ExecutionFeedbackType.DebugPrint ? LogChannels.Debug : LogChannels.Execution;
+		NodeLogger.Log(channel, level, e.Message, e.Node.Id, e.Node.Name);
+	}
+
+	private void OnExecutionFailed(object? sender, Exception e)
+	{
+		NodeLogger.Log(LogChannels.Execution, LogLevel.Error, $"Execution failed: {e.Message}");
+	}
+
+	private void OnExecutionCanceled(object? sender, EventArgs e)
+	{
+		NodeLogger.Log(LogChannels.Execution, LogLevel.Warning, "Execution canceled.");
+	}
+
+	private void CreateNewGraph()
+	{
+		EditorState.Clear();
+		EditorState.ResetNodeExecutionState();
+		AddDefaultStartNode();
+		_executionStatus = "Idle";
+		_loadStatus = "New graph.";
+		NodeLogger.LogApplication("New graph created.");
+	}
+
+	private void AddDefaultStartNode()
+	{
+		// Try to find a registered Start definition from the registry
+		var startDef = Registry.Definitions.FirstOrDefault(d =>
+			d.Name.Equals("Start", StringComparison.OrdinalIgnoreCase)
+			&& d.Category.Equals("Flow", StringComparison.OrdinalIgnoreCase));
+
+		NodeViewModel startNode;
+		if (startDef is not null)
+		{
+			var nodeData = startDef.Factory();
+			startNode = new NodeViewModel(nodeData)
+			{
+				Position = new Point2D(100, 200)
+			};
+		}
+		else
+		{
+			// Fallback: create a Start node manually
+			var execType = ExecutionSocket.TypeName;
+			startNode = new NodeViewModel(new NodeData(
+				Id: Guid.NewGuid().ToString(),
+				Name: "Start",
+				Callable: true,
+				ExecInit: true,
+				Inputs: Array.Empty<SocketData>(),
+				Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+			{
+				Position = new Point2D(100, 200)
+			};
+		}
+
+		EditorState.AddNode(startNode);
+	}
+
+	private async Task LoadSelectedPresetAsync()
+	{
+		try
+		{
+			_loadStatus = "Loading graph...";
+			string json;
+
+			if (_selectedPreset.StartsWith("local:", StringComparison.Ordinal))
+			{
+				// Load from browser localStorage
+				var name = _selectedPreset.Substring("local:".Length);
+				await EnsureJsModuleAsync();
+				json = await _jsModule!.InvokeAsync<string>("loadGraphFromLocal", name);
+				if (string.IsNullOrEmpty(json))
+				{
+					_loadStatus = $"Saved graph '{name}' not found.";
+					return;
+				}
+			}
+			else
+			{
+				// Load from wwwroot preset
+				json = await Http.GetStringAsync(_selectedPreset);
+			}
+
+			var dto = GraphSerializer.Deserialize(json);
+			var result = GraphSerializer.Import(EditorState, dto);
+			_loadStatus = result.Warnings.Count > 0
+				? string.Join(" ", result.Warnings)
+				: "Graph loaded.";
+		}
+		catch (Exception ex)
+		{
+			_loadStatus = $"Load failed: {ex.Message}";
+		}
+		finally
+		{
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task SaveGraphLocalAsync()
+	{
+		try
+		{
+			await EnsureJsModuleAsync();
+
+			// Prompt the user for a name
+			var defaultName = $"Graph {DateTime.Now:yyyy-MM-dd HH:mm}";
+			var name = await _jsModule!.InvokeAsync<string?>("promptForName", "Enter a name for this graph:", defaultName);
+			if (string.IsNullOrWhiteSpace(name))
+			{
+				_loadStatus = "Save cancelled.";
+				return;
+			}
+
+			_loadStatus = "Saving graph...";
+			StateHasChanged();
+
+			var dto = GraphSerializer.Export(EditorState);
+			var json = GraphSerializer.Serialize(dto);
+
+			await _jsModule!.InvokeVoidAsync("saveGraphToLocal", name, json);
+			await RefreshSavedGraphNamesAsync();
+
+			// Auto-select the newly saved graph
+			_selectedPreset = $"local:{name}";
+
+			var pluginCount = dto.RequiredPlugins?.Count ?? 0;
+			_loadStatus = pluginCount > 0
+				? $"Graph saved as '{name}' ({pluginCount} plugin dep(s) recorded)."
+				: $"Graph saved as '{name}'.";
+		}
+		catch (Exception ex)
+		{
+			_loadStatus = $"Save failed: {ex.Message}";
+		}
+		finally
+		{
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task DeleteSelectedSavedGraphAsync()
+	{
+		if (!IsLocalGraphSelected) return;
+
+		var name = _selectedPreset.Substring("local:".Length);
+		try
+		{
+			await EnsureJsModuleAsync();
+			await _jsModule!.InvokeVoidAsync("deleteGraphFromLocal", name);
+			await RefreshSavedGraphNamesAsync();
+
+			// Reset selection to the first preset
+			_selectedPreset = _savedGraphNames.Count > 0
+				? $"local:{_savedGraphNames[0]}"
+				: _presets.First().Path;
+
+			_loadStatus = $"Deleted saved graph '{name}'.";
+		}
+		catch (Exception ex)
+		{
+			_loadStatus = $"Delete failed: {ex.Message}";
+		}
+		finally
+		{
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task ExportGraphToFileAsync()
+	{
+		try
+		{
+			_loadStatus = "Exporting graph...";
+			var dto = GraphSerializer.Export(EditorState);
+			var json = GraphSerializer.Serialize(dto);
+			var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+			var base64 = Convert.ToBase64String(bytes);
+
+			await EnsureJsModuleAsync();
+
+			var fileName = $"node-graph-{DateTime.Now:yyyy-MM-dd-HHmmss}.json";
+			await _jsModule!.InvokeVoidAsync("downloadFile", fileName, "application/json", base64);
+
+			var pluginCount = dto.RequiredPlugins?.Count ?? 0;
+			_loadStatus = pluginCount > 0
+				? $"Graph exported ({pluginCount} plugin dep(s) recorded)."
+				: "Graph exported.";
+		}
+		catch (Exception ex)
+		{
+			_loadStatus = $"Export failed: {ex.Message}";
+		}
+		finally
+		{
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task ImportGraphFromFileAsync(InputFileChangeEventArgs e)
+	{
+		try
+		{
+			_loadStatus = "Importing graph from file...";
+			StateHasChanged();
+
+			var file = e.File;
+			if (file is null)
+			{
+				_loadStatus = "No file selected.";
+				return;
+			}
+
+			const long maxSize = 10 * 1024 * 1024; // 10 MB
+			using var stream = file.OpenReadStream(maxSize);
+			using var reader = new System.IO.StreamReader(stream);
+			var json = await reader.ReadToEndAsync();
+
+			var dto = GraphSerializer.Deserialize(json);
+			var result = GraphSerializer.Import(EditorState, dto);
+			_loadStatus = result.Warnings.Count > 0
+				? string.Join(" ", result.Warnings)
+				: $"Graph imported from '{file.Name}'.";
+		}
+		catch (Exception ex)
+		{
+			_loadStatus = $"Import failed: {ex.Message}";
+		}
+		finally
+		{
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private sealed record GraphPreset(string Name, string Path);
+
+	private void CreateSampleGraph()
+	{
+		var execType = ExecutionSocket.TypeName;
+		var listType = typeof(SerializableList).FullName ?? "SerializableList";
+		var intType = typeof(int).FullName ?? "System.Int32";
+		var stringType = typeof(string).FullName ?? "System.String";
+		var doubleType = typeof(double).FullName ?? "System.Double";
+
+		var startLoop = new NodeViewModel(new NodeData(
+			Id: "start-loop",
+			Name: "Start",
+			Callable: true,
+			ExecInit: true,
+			Inputs: Array.Empty<SocketData>(),
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(60, 80)
+		};
+
+		var forLoop = new NodeViewModel(new NodeData(
+			Id: "for-loop",
+			Name: "For Loop Step",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("StartValue", intType, true, false, SocketValue.FromObject(0)),
+				new SocketData("EndValue", intType, true, false, SocketValue.FromObject(4)),
+				new SocketData("Step", intType, true, false, SocketValue.FromObject(1))
+			},
+			Outputs: new[]
+			{
+				new SocketData("Exit", execType, false, true),
+				new SocketData("LoopPath", execType, false, true),
+				new SocketData("Index", intType, false, false)
+			}))
+		{
+			Position = new Point2D(260, 60)
+		};
+
+		var consumeLoop = new NodeViewModel(new NodeData(
+			Id: "consume-loop",
+			Name: "Consume",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("Value", intType, true, false)
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(500, 60)
+		};
+
+		var markerLoop = new NodeViewModel(new NodeData(
+			Id: "marker-loop",
+			Name: "Marker",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[] { new SocketData("Enter", execType, true, true) },
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(760, 60)
+		};
+
+		var startList = new NodeViewModel(new NodeData(
+			Id: "start-list",
+			Name: "Start",
+			Callable: true,
+			ExecInit: true,
+			Inputs: Array.Empty<SocketData>(),
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(60, 260)
+		};
+
+		var listCreate = new NodeViewModel(new NodeData(
+			Id: "list-create",
+			Name: "List Create",
+			Callable: false,
+			ExecInit: false,
+			Inputs: Array.Empty<SocketData>(),
+			Outputs: new[] { new SocketData("List", listType, false, false) }))
+		{
+			Position = new Point2D(240, 240)
+		};
+
+		var listAddA = new NodeViewModel(new NodeData(
+			Id: "list-add-a",
+			Name: "List Add",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("List", listType, true, false),
+				new SocketData("Value", stringType, true, false, SocketValue.FromObject("Alpha"))
+			},
+			Outputs: new[] { new SocketData("Result", listType, false, false) }))
+		{
+			Position = new Point2D(420, 220)
+		};
+
+		var listAddB = new NodeViewModel(new NodeData(
+			Id: "list-add-b",
+			Name: "List Add",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("List", listType, true, false),
+				new SocketData("Value", stringType, true, false, SocketValue.FromObject("Beta"))
+			},
+			Outputs: new[] { new SocketData("Result", listType, false, false) }))
+		{
+			Position = new Point2D(600, 220)
+		};
+
+		var listCount = new NodeViewModel(new NodeData(
+			Id: "list-count",
+			Name: "List Count",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[] { new SocketData("List", listType, true, false) },
+			Outputs: new[] { new SocketData("Count", intType, false, false) }))
+		{
+			Position = new Point2D(780, 220)
+		};
+
+		var consumeList = new NodeViewModel(new NodeData(
+			Id: "consume-list",
+			Name: "Consume",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("Value", intType, true, false)
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(980, 220)
+		};
+
+		var stringConcat = new NodeViewModel(new NodeData(
+			Id: "string-concat",
+			Name: "String Concat",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("A", stringType, true, false, SocketValue.FromObject("Loop count: ")),
+				new SocketData("B", stringType, true, false)
+			},
+			Outputs: new[] { new SocketData("Result", stringType, false, false) }))
+		{
+			Position = new Point2D(780, 320)
+		};
+
+		var stringLength = new NodeViewModel(new NodeData(
+			Id: "string-length",
+			Name: "String Length",
+			Callable: false,
+			ExecInit: false,
+			Inputs: new[] { new SocketData("Input", stringType, true, false) },
+			Outputs: new[] { new SocketData("Length", intType, false, false) }))
+		{
+			Position = new Point2D(980, 320)
+		};
+
+		var consumeString = new NodeViewModel(new NodeData(
+			Id: "consume-string",
+			Name: "Consume",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("Value", intType, true, false)
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(1180, 320)
+		};
+
+		// Parallel demo: two independent execution chains run concurrently via layer parallelism
+		var startParallelA = new NodeViewModel(new NodeData(
+			Id: "start-parallel-a",
+			Name: "Start",
+			Callable: true,
+			ExecInit: true,
+			Inputs: Array.Empty<SocketData>(),
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(60, 480)
+		};
+
+		var delayA = new NodeViewModel(new NodeData(
+			Id: "delay-a",
+			Name: "Delay",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("DelayMs", intType, true, false, SocketValue.FromObject(400))
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(260, 460)
+		};
+
+		var startParallelB = new NodeViewModel(new NodeData(
+			Id: "start-parallel-b",
+			Name: "Start",
+			Callable: true,
+			ExecInit: true,
+			Inputs: Array.Empty<SocketData>(),
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(60, 560)
+		};
+
+		var delayB = new NodeViewModel(new NodeData(
+			Id: "delay-b",
+			Name: "Delay",
+			Callable: true,
+			ExecInit: false,
+			Inputs: new[]
+			{
+				new SocketData("Enter", execType, true, true),
+				new SocketData("DelayMs", intType, true, false, SocketValue.FromObject(700))
+			},
+			Outputs: new[] { new SocketData("Exit", execType, false, true) }))
+		{
+			Position = new Point2D(260, 540)
+		};
+
+		EditorState.AddNode(startLoop);
+		EditorState.AddNode(forLoop);
+		EditorState.AddNode(consumeLoop);
+		EditorState.AddNode(markerLoop);
+		EditorState.AddNode(startList);
+		EditorState.AddNode(listCreate);
+		EditorState.AddNode(listAddA);
+		EditorState.AddNode(listAddB);
+		EditorState.AddNode(listCount);
+		EditorState.AddNode(consumeList);
+		EditorState.AddNode(stringConcat);
+		EditorState.AddNode(stringLength);
+		EditorState.AddNode(consumeString);
+		EditorState.AddNode(startParallelA);
+		EditorState.AddNode(delayA);
+		EditorState.AddNode(startParallelB);
+		EditorState.AddNode(delayB);
+
+		EditorState.AddConnection(new ConnectionData("start-loop", "for-loop", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("for-loop", "consume-loop", "LoopPath", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("for-loop", "marker-loop", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("for-loop", "consume-loop", "Index", "Value", false));
+
+		EditorState.AddConnection(new ConnectionData("start-list", "consume-list", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("list-create", "list-add-a", "List", "List", false));
+		EditorState.AddConnection(new ConnectionData("list-add-a", "list-add-b", "Result", "List", false));
+		EditorState.AddConnection(new ConnectionData("list-add-b", "list-count", "Result", "List", false));
+		EditorState.AddConnection(new ConnectionData("list-count", "consume-list", "Count", "Value", false));
+
+		EditorState.AddConnection(new ConnectionData("list-count", "string-concat", "Count", "B", false));
+		EditorState.AddConnection(new ConnectionData("string-concat", "string-length", "Result", "Input", false));
+		EditorState.AddConnection(new ConnectionData("start-list", "consume-string", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("string-length", "consume-string", "Length", "Value", false));
+
+		// Parallel: two independent chains run concurrently
+		EditorState.AddConnection(new ConnectionData("start-parallel-a", "delay-a", "Exit", "Enter", true));
+		EditorState.AddConnection(new ConnectionData("start-parallel-b", "delay-b", "Exit", "Enter", true));
+	}
+
+	/// <summary>
+	/// Returns the base URL for MCP clients. Prefers HTTP to avoid self-signed
+	/// certificate issues with external tools (Claude, Cursor, VS Code, etc.).
+	/// </summary>
+	private string GetMcpBaseUrl()
+	{
+		var uri = new Uri(Nav.BaseUri);
+		// If the browser is on HTTPS, derive the HTTP equivalent on port 5066
+		// (the default Kestrel HTTP port from launchSettings).
+		if (uri.Scheme == "https")
+		{
+			var httpPort = 5066; // matches launchSettings.json "http" profile
+			return $"http://{uri.Host}:{httpPort}";
+		}
+		return uri.GetLeftPart(UriPartial.Authority);
+	}
+}

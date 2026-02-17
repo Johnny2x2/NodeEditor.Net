@@ -1,0 +1,177 @@
+@page "/docs/variables-events"
+
+<PageTitle>Variables &amp; Events — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Graph Variables &amp; Events</h1>
+        <p>
+            NodeEditor.Net supports graph-scoped <strong>variables</strong> and <strong>events</strong>
+            that enable shared state and event-driven execution within your graphs.
+        </p>
+
+        <h2>Graph Variables</h2>
+
+        <h3>What They Are</h3>
+        <p>
+            Graph variables are named, typed values scoped to the graph. When you create a variable,
+            the system automatically generates two node types:
+        </p>
+        <ul>
+            <li><strong>Get Variable</strong> — A data node that outputs the variable's current value</li>
+            <li><strong>Set Variable</strong> — A callable node that sets the variable to a new value</li>
+        </ul>
+
+        <h3>Why They Matter</h3>
+        <p>Variables let you share state across distant parts of your graph without threading long connection wires:</p>
+        <ul>
+            <li><strong>Counters and accumulators</strong> — Increment a value across iterations</li>
+            <li><strong>Configuration</strong> — Set parameters that multiple nodes read</li>
+            <li><strong>State machines</strong> — Track the current state of a process</li>
+            <li><strong>Loop variables</strong> — Carry data between iterations</li>
+        </ul>
+
+        <h3>Creating Variables</h3>
+        <p>
+            <strong>Through the UI:</strong> Open the <strong>Variables Panel</strong> in the editor sidebar,
+            click "Add Variable", and specify a name and type.
+        </p>
+        <p><strong>Programmatically:</strong></p>
+        <pre><code>editorState.AddVariable(new GraphVariable
+{
+    Id = Guid.NewGuid().ToString(),
+    Name = "Score",
+    TypeName = "double",
+    DefaultValue = new SocketValue(0.0)
+});</code></pre>
+
+        <h3>Auto-Generated Nodes</h3>
+        <p>When you create a variable named "Score" of type <code>double</code>, two node definitions are registered:</p>
+        <table class="docs-table">
+            <thead><tr><th>Node</th><th>Definition ID</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Get Score</strong></td><td><code>variable.get.{variableId}</code></td><td>Outputs the current value of Score</td></tr>
+                <tr><td><strong>Set Score</strong></td><td><code>variable.set.{variableId}</code></td><td>Sets Score to a new value (callable)</td></tr>
+            </tbody>
+        </table>
+        <p>These nodes appear in the context menu under the "Variables" category.</p>
+
+        <h3>How Variables Work During Execution</h3>
+        <ol>
+            <li><strong>Seeding:</strong> Before execution begins, <code>VariableNodeExecutor.SeedVariables()</code> initializes all variables to their default values</li>
+            <li><strong>Get nodes:</strong> When a Get node executes, it reads the variable's current value from the execution context</li>
+            <li><strong>Set nodes:</strong> When a Set node executes, it writes a new value to the execution context</li>
+            <li><strong>Synchronization:</strong> All Get/Set nodes for the same variable share the same storage, so changes are immediately visible</li>
+        </ol>
+
+        <h3>Variable Factory</h3>
+        <pre><code>// This happens automatically when variables are added to state
+var factory = serviceProvider.GetRequiredService&lt;VariableNodeFactory&gt;();
+var (getterDef, setterDef) = factory.CreateDefinitions(variable);
+registry.RegisterDefinitions(new[] { getterDef, setterDef });</code></pre>
+
+        <h2>Graph Events</h2>
+
+        <h3>What They Are</h3>
+        <p>
+            Graph events provide an event-driven execution model. When you create an event,
+            the system generates two node types:
+        </p>
+        <ul>
+            <li><strong>Trigger Event</strong> — Fires the event, starting execution on all listeners</li>
+            <li><strong>Custom Event (Listener)</strong> — Begins execution when the event is fired</li>
+        </ul>
+
+        <h3>Why They Matter</h3>
+        <p>Events decouple parts of your graph:</p>
+        <ul>
+            <li><strong>Modularize:</strong> Trigger events from one graph section, handle them in another</li>
+            <li><strong>React:</strong> Build reactive flows where actions trigger cascading responses</li>
+            <li><strong>Organize:</strong> Keep event triggers near the cause and listeners near the effect</li>
+        </ul>
+
+        <h3>Creating Events</h3>
+        <p>
+            <strong>Through the UI:</strong> Open the <strong>Events Panel</strong> in the editor sidebar,
+            click "Add Event", and specify a name.
+        </p>
+        <p><strong>Programmatically:</strong></p>
+        <pre><code>editorState.AddEvent(new GraphEvent
+{
+    Id = Guid.NewGuid().ToString(),
+    Name = "OnPlayerHit"
+});</code></pre>
+
+        <h3>Auto-Generated Nodes</h3>
+        <table class="docs-table">
+            <thead><tr><th>Node</th><th>Definition ID</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Trigger OnPlayerHit</strong></td><td><code>event.trigger.{eventId}</code></td><td>Fires the event (callable)</td></tr>
+                <tr><td><strong>OnPlayerHit</strong></td><td><code>event.listener.{eventId}</code></td><td>Starts execution when the event fires</td></tr>
+            </tbody>
+        </table>
+
+        <h3>How Events Work During Execution</h3>
+        <ol>
+            <li><strong>Trigger node executes:</strong> When a Trigger Event node runs, it signals the event</li>
+            <li><strong>Listeners activate:</strong> All Listener nodes for that event begin their execution chains</li>
+            <li><strong>Independent execution:</strong> Each listener runs its own execution chain independently</li>
+        </ol>
+
+        <h3>Event Factory</h3>
+        <pre><code>var factory = serviceProvider.GetRequiredService&lt;EventNodeFactory&gt;();
+var (triggerDef, listenerDef) = factory.CreateDefinitions(graphEvent);
+registry.RegisterDefinitions(new[] { triggerDef, listenerDef });</code></pre>
+
+        <h2>Serialization</h2>
+        <p>Both variables and events are serialized as part of the <code>GraphData</code> model:</p>
+        <pre><code>{
+  "version": 1,
+  "nodes": [...],
+  "connections": [...],
+  "variables": [
+    {
+      "id": "var-1",
+      "name": "Score",
+      "typeName": "double",
+      "defaultValue": { "value": 0.0 }
+    }
+  ],
+  "events": [
+    {
+      "id": "evt-1",
+      "name": "OnPlayerHit"
+    }
+  ]
+}</code></pre>
+
+        <h2>MCP Integration</h2>
+        <table class="docs-table">
+            <thead><tr><th>Ability</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>graph.variable_list</code></td><td>List all variables in the graph</td></tr>
+                <tr><td><code>graph.variable_add</code></td><td>Add a new variable</td></tr>
+                <tr><td><code>graph.variable_remove</code></td><td>Remove a variable</td></tr>
+                <tr><td><code>graph.event_list</code></td><td>List all events in the graph</td></tr>
+                <tr><td><code>graph.event_add</code></td><td>Add a new event</td></tr>
+                <tr><td><code>graph.event_remove</code></td><td>Remove an event</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Namespaces</h2>
+        <table class="docs-table">
+            <thead><tr><th>Type</th><th>Namespace</th></tr></thead>
+            <tbody>
+                <tr><td><code>GraphVariable</code></td><td><code>NodeEditor.Net.Models</code></td></tr>
+                <tr><td><code>GraphEvent</code></td><td><code>NodeEditor.Net.Models</code></td></tr>
+                <tr><td><code>VariableNodeFactory</code></td><td><code>NodeEditor.Net.Services</code></td></tr>
+                <tr><td><code>EventNodeFactory</code></td><td><code>NodeEditor.Net.Services</code></td></tr>
+                <tr><td><code>VariableNodeExecutor</code></td><td><code>NodeEditor.Net.Services</code></td></tr>
+            </tbody>
+        </table>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,144 @@
+@using System.Globalization
+@inject NodeEditor.Net.Services.SocketTypeResolver TypeResolver
+
+<div class="ne-editor-numberupdown">
+    <button class="ne-editor-button ne-editor-button--step" @onclick="Decrease"
+            @onpointerdown:stopPropagation @onclick:stopPropagation>-</button>
+    <input class="ne-editor-input ne-editor-number"
+           type="number"
+           value="@CurrentValue"
+           min="@MinValue"
+           max="@MaxValue"
+           step="@StepValue"
+           @oninput="OnInput"
+           @onpointerdown:stopPropagation
+           @onclick:stopPropagation />
+    <button class="ne-editor-button ne-editor-button--step" @onclick="Increase"
+            @onpointerdown:stopPropagation @onclick:stopPropagation>+</button>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public SocketEditorContext Context { get; set; } = null!;
+
+    private string CurrentValue => Context.Value?.ToString() ?? string.Empty;
+
+    private string? MinValue => FormatNumber(Context.Socket.Data.EditorHint?.Min);
+
+    private string? MaxValue => FormatNumber(Context.Socket.Data.EditorHint?.Max);
+
+    private string StepValue => FormatNumber(Context.Socket.Data.EditorHint?.Step) ?? "1";
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        var input = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            Context.SetValueTyped<object?>(null);
+            return;
+        }
+
+        if (TryConvertInput(input, out var value))
+        {
+            Context.SetValueTyped(value);
+        }
+    }
+
+    private void Increase() => AdjustStep(1);
+
+    private void Decrease() => AdjustStep(-1);
+
+    private void AdjustStep(int direction)
+    {
+        var step = Context.Socket.Data.EditorHint?.Step ?? 1d;
+        var current = GetCurrentDouble();
+        var next = current + (step * direction);
+
+        var min = Context.Socket.Data.EditorHint?.Min;
+        if (min.HasValue && next < min.Value)
+        {
+            next = min.Value;
+        }
+
+        var max = Context.Socket.Data.EditorHint?.Max;
+        if (max.HasValue && next > max.Value)
+        {
+            next = max.Value;
+        }
+
+        var converted = ConvertFromDouble(next);
+        Context.SetValueTyped(converted);
+    }
+
+    private bool TryConvertInput(string input, out object? value)
+    {
+        value = null;
+
+        var resolvedType = TypeResolver.Resolve(Context.Socket.Data.TypeName);
+        if (resolvedType is null)
+        {
+            if (double.TryParse(input, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+
+            return false;
+        }
+
+        if (resolvedType.IsEnum)
+        {
+            return false;
+        }
+
+        try
+        {
+            value = Convert.ChangeType(input, resolvedType, CultureInfo.InvariantCulture);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private double GetCurrentDouble()
+    {
+        if (Context.Value is null)
+        {
+            return 0d;
+        }
+
+        try
+        {
+            return Convert.ToDouble(Context.Value, CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            return 0d;
+        }
+    }
+
+    private object? ConvertFromDouble(double value)
+    {
+        var resolvedType = TypeResolver.Resolve(Context.Socket.Data.TypeName);
+        if (resolvedType is null)
+        {
+            return value;
+        }
+
+        if (resolvedType.IsEnum)
+        {
+            return Enum.ToObject(resolvedType, Convert.ToInt32(value, CultureInfo.InvariantCulture));
+        }
+
+        return Convert.ChangeType(value, resolvedType, CultureInfo.InvariantCulture);
+    }
+
+    private static string? FormatNumber(double? value)
+    {
+        return value.HasValue
+            ? value.Value.ToString(CultureInfo.InvariantCulture)
+            : null;
+    }
+}

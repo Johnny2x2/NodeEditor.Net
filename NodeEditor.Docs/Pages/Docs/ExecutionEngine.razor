@@ -1,0 +1,281 @@
+@page "/docs/execution-engine"
+
+<PageTitle>Execution Engine — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Execution Engine — Deep Dive</h1>
+        <p>
+            A comprehensive guide to how NodeEditor.Net discovers, plans, and executes node graphs at runtime.
+            The execution engine transforms a visual node graph into a runnable computation, bridging the UI layer
+            and the runtime layer.
+        </p>
+
+        <h2>Architecture Overview</h2>
+        <p>The execution engine is composed of several key services:</p>
+        <pre><code>UI Layer (Blazor)
+├── NodeEditorCanvas, NodeComponent, SocketComponent, ConnectionPath
+
+State Management
+├── NodeEditorState, NodeViewModel, SocketViewModel, ConnectionViewModel
+
+Execution Engine
+├── NodeExecutionService — orchestrates execution
+├── ExecutionPlanner — Kahn's topological sort
+├── NodeMethodInvoker — reflection-based method dispatch
+├── VariableNodeExecutor — handles Get/Set variable nodes
+└── NodeExecutionContext — thread-safe value storage
+
+Discovery &amp; Registry
+├── NodeDiscoveryService — scans assemblies for [Node] methods
+├── NodeRegistryService — stores node definitions
+├── PluginLoader — loads plugin assemblies
+└── NodeContextRegistry — maps definitions to INodeContext instances</code></pre>
+
+        <h3>Key Architectural Principles</h3>
+        <table class="docs-table">
+            <thead><tr><th>Principle</th><th>Implementation</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Immutable Models</strong></td><td><code>NodeData</code>, <code>SocketData</code>, <code>ConnectionData</code> are sealed record classes</td></tr>
+                <tr><td><strong>Mutable ViewModels</strong></td><td><code>NodeViewModel</code>, <code>SocketViewModel</code> wrap models with <code>INotifyPropertyChanged</code></td></tr>
+                <tr><td><strong>Event-Driven UI</strong></td><td>Components subscribe to <code>NodeEditorState</code> events, not poll</td></tr>
+                <tr><td><strong>Thread-Safe Context</strong></td><td><code>NodeExecutionContext</code> uses <code>ConcurrentDictionary</code></td></tr>
+                <tr><td><strong>Reflection Dispatch</strong></td><td><code>NodeMethodInvoker</code> resolves and invokes C# methods via <code>[Node]</code> attributes</td></tr>
+                <tr><td><strong>Plugin Isolation</strong></td><td>Each plugin loads in its own <code>AssemblyLoadContext</code></td></tr>
+            </tbody>
+        </table>
+
+        <h2>Data Model Foundation</h2>
+        <p>
+            All execution operates on immutable <strong>record</strong> types that snapshot the graph at the
+            moment execution begins.
+        </p>
+        <pre><code>NodeData (record)
+├── Id, Name, Callable, ExecInit, DefinitionId
+├── Inputs: IReadOnlyList&lt;SocketData&gt;
+└── Outputs: IReadOnlyList&lt;SocketData&gt;
+
+SocketData (record)
+├── Name, TypeName, IsInput, IsExecution
+├── Value: SocketValue?
+└── EditorHint: SocketEditorHint?
+
+ConnectionData (record)
+├── OutputNodeId, InputNodeId
+├── OutputSocketName, InputSocketName
+└── IsExecution (data vs control flow)
+
+GraphData (record)
+├── Nodes, Connections, Variables
+└── SchemaVersion</code></pre>
+        <p>
+            Connections are <strong>always</strong> directional: Output → Input. The <code>IsExecution</code> flag
+            separates data flow wires (value propagation) from control flow wires (execution order).
+        </p>
+
+        <h2>Node Definition &amp; Discovery</h2>
+        <p>
+            Nodes are plain C# methods decorated with <code>[Node]</code> on classes implementing <code>INodeContext</code>.
+            The discovery process:
+        </p>
+        <ol>
+            <li><code>NodeRegistryService.EnsureInitialized()</code> is called at startup</li>
+            <li><code>NodeDiscoveryService</code> scans assemblies for <code>INodeContext</code> types</li>
+            <li>For each type, it finds methods with <code>[Node]</code> attributes</li>
+            <li>Parameters become sockets: regular params → Input, <code>out</code> params → Output, <code>CancellationToken</code> → injected, <code>ExecutionPath</code> → execution sockets</li>
+            <li>A unique <code>DefinitionId</code> is generated: <code>TypeFullName.Method(ParamTypes)</code></li>
+        </ol>
+
+        <h3>Node Types</h3>
+        <table class="docs-table">
+            <thead><tr><th>Property</th><th>Effect</th><th>Entry Sockets</th></tr></thead>
+            <tbody>
+                <tr><td><code>ExecInit = true</code></td><td>Execution starts here automatically</td><td>No Enter (only Exit)</td></tr>
+                <tr><td><code>Callable = true</code></td><td>Has explicit control-flow sockets</td><td>Enter + Exit</td></tr>
+                <tr><td>Neither</td><td>Pure data-flow node</td><td>No execution sockets</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Execution Modes</h2>
+        <p>
+            The engine supports three distinct execution strategies, selected via <code>NodeExecutionOptions</code>:
+        </p>
+        <table class="docs-table">
+            <thead><tr><th>Mode</th><th>Algorithm</th><th>Use Case</th><th>Concurrency</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Sequential</strong></td><td>Queue walk following exec connections; fallback to topological</td><td>Imperative graphs with branching</td><td>None</td></tr>
+                <tr><td><strong>Parallel</strong></td><td>Kahn's topological sort → layer-by-layer</td><td>Maximum throughput</td><td><code>SemaphoreSlim</code> throttled</td></tr>
+                <tr><td><strong>DataFlow</strong></td><td>Same as Parallel (planner-based)</td><td>Pure computational graphs</td><td>Layer-sequential</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Execution Planning (Topological Sort)</h2>
+        <p>The <code>ExecutionPlanner</code> implements <strong>Kahn's algorithm</strong> to organize nodes into dependency layers:</p>
+        <ol>
+            <li><strong>Build Adjacency:</strong> For each connection, map edges and count incoming connections per node</li>
+            <li><strong>Initialize Ready Set:</strong> Nodes with zero incoming edges are ready first</li>
+            <li><strong>Process Layers:</strong> Pull all ready nodes into a layer, then decrement targets' incoming counts; add newly-ready nodes</li>
+            <li><strong>Handle Cycles:</strong> Any remaining nodes go to a fallback layer</li>
+        </ol>
+
+        <h3>Example: Layer Assignment</h3>
+        <table class="docs-table">
+            <thead><tr><th>Layer</th><th>Nodes</th><th>Reason</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Layer 0</strong></td><td>A, B</td><td>Zero incoming edges</td></tr>
+                <tr><td><strong>Layer 1</strong></td><td>C, D</td><td>All dependencies in Layer 0</td></tr>
+                <tr><td><strong>Layer 2</strong></td><td>E</td><td>All dependencies in Layer 1</td></tr>
+            </tbody>
+        </table>
+        <p>
+            A <code>SortedSet&lt;string&gt;</code> ensures <strong>deterministic</strong> ordering within each layer.
+        </p>
+
+        <h2>Sequential Execution</h2>
+        <p>Sequential mode is designed for <strong>imperative, control-flow-driven</strong> graphs:</p>
+        <ol>
+            <li>Find entry nodes (ExecInit → Callable → fallback to topological)</li>
+            <li>Enqueue entry nodes</li>
+            <li>Loop: dequeue node → check cancellation → execute → find next execution node → enqueue</li>
+            <li>If no entry nodes found, fall back to full topological execution</li>
+        </ol>
+
+        <h2>Parallel / DataFlow Execution</h2>
+        <p>Both modes use the <code>ExecutionPlanner</code> to organize nodes into layers:</p>
+        <ol>
+            <li>Build execution plan (topological layers)</li>
+            <li>For each layer: check cancellation → fire LayerStarted event</li>
+            <li><strong>Sequential/DataFlow:</strong> Execute each node in the layer one by one</li>
+            <li><strong>Parallel:</strong> Execute all nodes in the layer concurrently via <code>Task.WhenAll</code>, throttled by <code>SemaphoreSlim</code></li>
+            <li>Fire LayerCompleted event → next layer</li>
+        </ol>
+
+        <h2>Per-Node Execution Lifecycle</h2>
+        <p>Every node goes through the same lifecycle in <code>ExecuteNodeAsync()</code>:</p>
+        <ol>
+            <li>Fire <code>NodeStarted</code> event</li>
+            <li>Set <code>CurrentProcessingNode</code> on feedback context</li>
+            <li>Call <code>ResolveInputsAsync()</code> — resolve all input values from upstream nodes</li>
+            <li>Check if variable node → use <code>VariableNodeExecutor</code></li>
+            <li>Otherwise → resolve method via <code>NodeMethodInvoker</code> → invoke via reflection</li>
+            <li>Fire <code>NodeCompleted</code> (or <code>NodeFailed</code> on exception)</li>
+        </ol>
+
+        <h2>Input Resolution &amp; Lazy Upstream Execution</h2>
+        <p>
+            <code>ResolveInputsAsync()</code> uses <strong>recursive DFS</strong> with cycle detection.
+            For each non-execution input socket:
+        </p>
+        <ol>
+            <li>Find inbound data connections</li>
+            <li>For each connection, locate the source node</li>
+            <li>Recursively resolve the source node's inputs (DFS)</li>
+            <li>If the source hasn't executed yet (and is not Callable), execute it <strong>lazily</strong></li>
+            <li>Copy the output value from source to target input</li>
+        </ol>
+        <p>
+            <strong>Key insight:</strong> In sequential mode, data-flow nodes are executed <strong>on-demand</strong>
+            when a downstream node needs their output. Nodes without connections to the execution chain may never run.
+        </p>
+
+        <h2>Method Invocation (Reflection)</h2>
+        <p>
+            <code>NodeMethodInvoker</code> maps <code>NodeData</code> to actual C# methods and invokes them via reflection:
+        </p>
+        <ol>
+            <li><strong>Resolution:</strong> Match by <code>DefinitionId</code> first, then by name</li>
+            <li><strong>Parameter mapping:</strong> For each method parameter:
+                <ul>
+                    <li><code>CancellationToken</code> → inject the token</li>
+                    <li><code>out</code>/<code>ref</code> → initialize as default, track as output</li>
+                    <li>Regular → read from <code>ExecutionContext</code> or <code>SocketData.Value</code></li>
+                </ul>
+            </li>
+            <li><strong>Invoke:</strong> Call <code>Method.Invoke(target, args)</code></li>
+            <li><strong>Collect outputs:</strong> Store all <code>out</code>/<code>ref</code> values back in context</li>
+            <li>Mark node as executed</li>
+        </ol>
+
+        <h3>Value Conversion Chain</h3>
+        <ol>
+            <li>Check <code>ExecutionContext</code> for stored value → <code>Convert.ChangeType()</code></li>
+            <li>Check <code>SocketData.Value</code> → <code>JsonElement.Deserialize(type)</code></li>
+            <li>If <code>ExecutionPath</code> → <code>new ExecutionPath()</code></li>
+            <li>If value type → <code>Activator.CreateInstance()</code></li>
+            <li>Otherwise → <code>null</code></li>
+        </ol>
+
+        <h2>Execution Flow Branching</h2>
+        <p>
+            In sequential mode, after each node executes, <code>SelectNextExecutionNode()</code>
+            determines the next node by checking:
+        </p>
+        <ol>
+            <li>Any output <code>ExecutionPath</code> socket with <code>IsSignaled == true</code> → follow that path (branching)</li>
+            <li>Connection from the "Exit" socket → follow default flow</li>
+            <li>Any execution connection → follow first available</li>
+            <li>No connections → execution chain ends</li>
+        </ol>
+        <p>
+            The Branch node's method calls <code>executionPath.Signal()</code> on either the "True" or "False"
+            output <code>ExecutionPath</code>. The engine detects which path was signaled and follows it.
+        </p>
+
+        <h2>Variable Nodes</h2>
+        <p>
+            Graph-level variables are handled by <code>VariableNodeExecutor</code> — a static helper that bypasses
+            method invocation entirely:
+        </p>
+        <ul>
+            <li><strong>Seeding:</strong> Before execution, <code>SeedVariables()</code> initializes all variables to defaults</li>
+            <li><strong>Get Variable:</strong> Reads value from context, writes to output socket</li>
+            <li><strong>Set Variable:</strong> Reads input socket, stores in context, passes through to output, signals Exit</li>
+        </ul>
+        <table class="docs-table">
+            <thead><tr><th>Node Type</th><th>DefinitionId Pattern</th></tr></thead>
+            <tbody>
+                <tr><td>Get Variable</td><td><code>variable.get.&lt;variableId&gt;</code></td></tr>
+                <tr><td>Set Variable</td><td><code>variable.set.&lt;variableId&gt;</code></td></tr>
+            </tbody>
+        </table>
+
+        <h2>Background Execution Queue</h2>
+        <p>
+            For non-blocking execution, the engine provides a channel-based job queue using
+            <code>Channel&lt;ExecutionJob&gt;</code>. The <code>ExecutionQueueWorker</code> consumes
+            jobs asynchronously and executes them via <code>ExecutePlannedAsync()</code>.
+        </p>
+
+        <h2>State Management &amp; UI Feedback</h2>
+        <p>
+            <code>NodeEditorState</code> is the single source of truth, bridging execution results back to the UI:
+        </p>
+        <ol>
+            <li>User clicks "Execute" → <code>BuildExecutionNodes()</code> creates immutable snapshots</li>
+            <li>During execution, <code>NodeStarted</code>/<code>NodeCompleted</code> events update node visuals (glow/spinner)</li>
+            <li>On failure, <code>NodeFailed</code> shows error state on the node</li>
+            <li>After execution, <code>ApplyExecutionContext()</code> pushes values to <code>SocketViewModel.SetValue()</code></li>
+            <li><code>SocketValuesChanged</code> event triggers UI to show results in socket editors</li>
+        </ol>
+
+        <h2>Error Handling &amp; Cycle Detection</h2>
+        <ul>
+            <li><strong>Cycle detection:</strong> <code>ResolveInputsAsync()</code> tracks a visiting stack; if a node appears twice, it throws with a path description</li>
+            <li><strong>Missing bindings:</strong> If <code>NodeMethodInvoker.Resolve()</code> returns null, an <code>InvalidOperationException</code> is thrown</li>
+            <li><strong>Node failures:</strong> Caught per-node, fire <code>NodeFailed</code> event, then re-thrown</li>
+            <li><strong>Cancellation:</strong> Checked between nodes; <code>CancellationToken</code> is injected into node methods</li>
+            <li><strong>Fallback layer:</strong> Nodes remaining after topological sort (potential cycles) are placed in a fallback layer</li>
+        </ul>
+
+        <h2>Plugin Integration</h2>
+        <p>
+            Plugins extend the execution engine by providing additional <code>INodeContext</code> implementations.
+            Each plugin loads in an isolated <code>AssemblyLoadContext</code>, registers its nodes via
+            <code>NodeRegistryService</code>, and can contribute custom abilities via <code>IPluginAbilityContributor</code>.
+        </p>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

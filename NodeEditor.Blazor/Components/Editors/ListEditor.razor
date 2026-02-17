@@ -1,0 +1,20 @@
+@using NodeEditor.Net.Models
+@using NodeEditor.Blazor.Services.Editors
+
+<div class="ne-editor-list" @onpointerdown:stopPropagation @onclick:stopPropagation>
+    <span class="ne-editor-list-label">List (@ItemCount items)</span>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public SocketEditorContext Context { get; set; } = null!;
+
+    private int ItemCount
+    {
+        get
+        {
+            var list = Context.Socket.Data.Value?.ToObject<SerializableList>();
+            return list?.Count ?? 0;
+        }
+    }
+}

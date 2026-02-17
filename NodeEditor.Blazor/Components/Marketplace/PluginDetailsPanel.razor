@@ -1,0 +1,342 @@
+@namespace NodeEditor.Blazor.Components.Marketplace
+@using NodeEditor.Net.Services.Plugins.Marketplace.Models
+
+<div class="ne-plugin-details">
+    <div class="ne-plugin-details-header">
+        <div class="ne-plugin-details-icon">
+            @if (!string.IsNullOrEmpty(Plugin.IconUrl))
+            {
+                <img src="@Plugin.IconUrl" alt="@Plugin.Name" />
+            }
+            else
+            {
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z" />
+                </svg>
+            }
+        </div>
+
+        <div class="ne-plugin-details-title-section">
+            <h3 class="ne-plugin-details-name">@Plugin.Name</h3>
+            <div class="ne-plugin-details-meta">
+                <span class="ne-plugin-details-version">v@Plugin.Version</span>
+                @if (!string.IsNullOrEmpty(Plugin.Author))
+                {
+                    <span class="ne-plugin-details-author">by @Plugin.Author</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="ne-plugin-details-actions">
+        @if (IsInstalled)
+        {
+            @if (HasUpdate)
+            {
+                <button class="ne-plugin-details-btn ne-plugin-details-btn--primary"
+                        disabled="@IsInstalling"
+                        @onclick="OnUpdate">
+                    @if (IsInstalling)
+                    {
+                        <span class="ne-plugin-details-spinner"></span>
+                        <span>Updating...</span>
+                    }
+                    else
+                    {
+                        <span>Update to v@Plugin.Version</span>
+                    }
+                </button>
+            }
+
+            <button class="ne-plugin-details-btn ne-plugin-details-btn--danger"
+                    disabled="@IsUninstalling"
+                    @onclick="OnUninstall">
+                @if (IsUninstalling)
+                {
+                    <span class="ne-plugin-details-spinner"></span>
+                    <span>Uninstalling...</span>
+                }
+                else
+                {
+                    <span>Uninstall</span>
+                }
+            </button>
+
+            @if (IsRepositoryPlugin)
+            {
+                <button class="ne-plugin-details-btn ne-plugin-details-btn--danger-soft"
+                        disabled="@IsDeletingRepository"
+                        @onclick="ToggleDeleteOptions">
+                    @if (IsDeletingRepository)
+                    {
+                        <span class="ne-plugin-details-spinner"></span>
+                        <span>Deleting...</span>
+                    }
+                    else
+                    {
+                        <span>Delete from Repository...</span>
+                    }
+                </button>
+            }
+
+            @if (InstalledInfo is not null)
+            {
+                <div class="ne-plugin-details-installed-info">
+                    <span>Installed: v@InstalledInfo.Version</span>
+                    @if (InstalledInfo.InstalledAt != default)
+                    {
+                        <span>on @InstalledInfo.InstalledAt.ToString("MMM d, yyyy")</span>
+                    }
+                </div>
+            }
+        }
+        else
+        {
+            <button class="ne-plugin-details-btn ne-plugin-details-btn--primary"
+                    disabled="@IsInstalling"
+                    @onclick="OnInstall">
+                @if (IsInstalling)
+                {
+                    <span class="ne-plugin-details-spinner"></span>
+                    <span>Installing...</span>
+                }
+                else
+                {
+                    <span>Install</span>
+                }
+            </button>
+
+            @if (IsRepositoryPlugin)
+            {
+                <button class="ne-plugin-details-btn ne-plugin-details-btn--danger-soft"
+                        disabled="@IsDeletingRepository"
+                        @onclick="ToggleDeleteOptions">
+                    @if (IsDeletingRepository)
+                    {
+                        <span class="ne-plugin-details-spinner"></span>
+                        <span>Deleting...</span>
+                    }
+                    else
+                    {
+                        <span>Delete from Repository...</span>
+                    }
+                </button>
+            }
+        }
+    </div>
+
+    @if (_showDeleteOptions && IsRepositoryPlugin)
+    {
+        <div class="ne-plugin-details-delete-options">
+            <span class="ne-plugin-details-delete-label">Choose delete action:</span>
+            <button class="ne-plugin-details-btn ne-plugin-details-btn--danger-soft"
+                    disabled="@IsDeletingRepository"
+                    @onclick="DeleteRepositoryOnly">
+                Delete repository copy only
+            </button>
+            <button class="ne-plugin-details-btn ne-plugin-details-btn--danger"
+                    disabled="@IsDeletingRepository"
+                    @onclick="DeleteAndUninstall">
+                Delete + Uninstall
+            </button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Plugin.Description))
+    {
+        <div class="ne-plugin-details-section">
+            <h4>Description</h4>
+            <p>@Plugin.Description</p>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Plugin.LongDescription))
+    {
+        <div class="ne-plugin-details-section ne-plugin-details-readme">
+            <h4>README</h4>
+            <div class="ne-plugin-details-markdown">
+                <pre>@Plugin.LongDescription</pre>
+            </div>
+        </div>
+    }
+
+    @if (Plugin.Tags.Count > 0)
+    {
+        <div class="ne-plugin-details-section">
+            <h4>Tags</h4>
+            <div class="ne-plugin-details-tags">
+                @foreach (var tag in Plugin.Tags)
+                {
+                    <span class="ne-plugin-details-tag">@tag</span>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="ne-plugin-details-section">
+        <h4>Information</h4>
+        <div class="ne-plugin-details-info-grid">
+            @if (!string.IsNullOrEmpty(Plugin.Category))
+            {
+                <div class="ne-plugin-details-info-item">
+                    <span class="ne-plugin-details-info-label">Category</span>
+                    <span class="ne-plugin-details-info-value">@Plugin.Category</span>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(Plugin.License))
+            {
+                <div class="ne-plugin-details-info-item">
+                    <span class="ne-plugin-details-info-label">License</span>
+                    <span class="ne-plugin-details-info-value">@Plugin.License</span>
+                </div>
+            }
+
+            @if (Plugin.PackageSizeBytes.HasValue)
+            {
+                <div class="ne-plugin-details-info-item">
+                    <span class="ne-plugin-details-info-label">Size</span>
+                    <span class="ne-plugin-details-info-value">@FormatSize(Plugin.PackageSizeBytes.Value)</span>
+                </div>
+            }
+
+            @if (Plugin.LastUpdatedAt.HasValue)
+            {
+                <div class="ne-plugin-details-info-item">
+                    <span class="ne-plugin-details-info-label">Last Updated</span>
+                    <span class="ne-plugin-details-info-value">@Plugin.LastUpdatedAt.Value.ToString("MMM d, yyyy")</span>
+                </div>
+            }
+
+            <div class="ne-plugin-details-info-item">
+                <span class="ne-plugin-details-info-label">Min API Version</span>
+                <span class="ne-plugin-details-info-value">@Plugin.MinApiVersion</span>
+            </div>
+
+            @if (Plugin.DownloadCount > 0)
+            {
+                <div class="ne-plugin-details-info-item">
+                    <span class="ne-plugin-details-info-label">Downloads</span>
+                    <span class="ne-plugin-details-info-value">@Plugin.DownloadCount.ToString("N0")</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Plugin.HomepageUrl) || !string.IsNullOrEmpty(Plugin.RepositoryUrl))
+    {
+        <div class="ne-plugin-details-section">
+            <h4>Links</h4>
+            <div class="ne-plugin-details-links">
+                @if (!string.IsNullOrEmpty(Plugin.HomepageUrl))
+                {
+                    <a href="@Plugin.HomepageUrl" target="_blank" rel="noopener noreferrer"
+                       class="ne-plugin-details-link">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.5-6.923c-.67.204-1.335.82-1.887 1.855A7.97 7.97 0 0 0 5.145 4H7.5V1.077zM4.09 4a9.267 9.267 0 0 1 .64-1.539 6.7 6.7 0 0 1 .597-.933A7.025 7.025 0 0 0 2.255 4H4.09zm-.582 3.5c.03-.877.138-1.718.312-2.5H1.674a6.958 6.958 0 0 0-.656 2.5h2.49z" />
+                        </svg>
+                        Homepage
+                    </a>
+                }
+                @if (!string.IsNullOrEmpty(Plugin.RepositoryUrl))
+                {
+                    <a href="@Plugin.RepositoryUrl" target="_blank" rel="noopener noreferrer"
+                       class="ne-plugin-details-link">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+                        </svg>
+                        Repository
+                    </a>
+                }
+            </div>
+        </div>
+    }
+
+    @if (Plugin.AvailableVersions.Count > 1)
+    {
+        <div class="ne-plugin-details-section">
+            <h4>Version History</h4>
+            <div class="ne-plugin-details-versions">
+                @foreach (var version in Plugin.AvailableVersions.Take(5))
+                {
+                    <div class="ne-plugin-details-version-item">
+                        <span class="ne-plugin-details-version-number">v@version.Version</span>
+                        @if (version.ReleasedAt.HasValue)
+                        {
+                            <span class="ne-plugin-details-version-date">
+                                @version.ReleasedAt.Value.ToString("MMM d, yyyy")
+                            </span>
+                        }
+                        @if (!string.IsNullOrEmpty(version.ReleaseNotes))
+                        {
+                            <p class="ne-plugin-details-version-notes">@version.ReleaseNotes</p>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public MarketplacePluginInfo Plugin { get; set; } = null!;
+
+    [Parameter] public bool IsInstalled { get; set; }
+    [Parameter] public InstalledPluginInfo? InstalledInfo { get; set; }
+    [Parameter] public bool IsInstalling { get; set; }
+    [Parameter] public bool IsUninstalling { get; set; }
+    [Parameter] public bool IsRepositoryPlugin { get; set; }
+    [Parameter] public bool IsDeletingRepository { get; set; }
+
+    [Parameter] public EventCallback OnInstall { get; set; }
+    [Parameter] public EventCallback OnUninstall { get; set; }
+    [Parameter] public EventCallback OnUpdate { get; set; }
+    [Parameter] public EventCallback OnDeleteRepository { get; set; }
+    [Parameter] public EventCallback OnDeleteRepositoryAndUninstall { get; set; }
+
+    private bool _showDeleteOptions;
+    private string? _deleteMenuPluginId;
+
+    protected override void OnParametersSet()
+    {
+        if (!string.Equals(_deleteMenuPluginId, Plugin.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            _showDeleteOptions = false;
+            _deleteMenuPluginId = Plugin.Id;
+        }
+    }
+
+    private bool HasUpdate => IsInstalled && InstalledInfo is not null
+        && Version.TryParse(InstalledInfo.Version, out var installed)
+        && Version.TryParse(Plugin.Version, out var available)
+        && available > installed;
+
+    private static string FormatSize(long bytes)
+    {
+        return bytes switch
+        {
+            >= 1_073_741_824 => $"{bytes / 1_073_741_824.0:0.##} GB",
+            >= 1_048_576 => $"{bytes / 1_048_576.0:0.##} MB",
+            >= 1_024 => $"{bytes / 1_024.0:0.##} KB",
+            _ => $"{bytes} B"
+        };
+    }
+
+    private void ToggleDeleteOptions()
+    {
+        _showDeleteOptions = !_showDeleteOptions;
+    }
+
+    private async Task DeleteRepositoryOnly()
+    {
+        _showDeleteOptions = false;
+        await OnDeleteRepository.InvokeAsync();
+    }
+
+    private async Task DeleteAndUninstall()
+    {
+        _showDeleteOptions = false;
+        await OnDeleteRepositoryAndUninstall.InvokeAsync();
+    }
+}

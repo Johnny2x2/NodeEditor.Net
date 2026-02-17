@@ -1,0 +1,179 @@
+@using NodeEditor.Net.Models
+@using NodeEditor.Net.ViewModels
+@using System.Collections.ObjectModel
+
+<path class="ne-connection @ConnectionClassModifiers"
+      d="@PathData"
+      stroke="@StrokeColor"
+      stroke-width="@StrokeWidth"
+      fill="none"
+      stroke-linecap="round"
+      data-output-node="@Connection.OutputNodeId"
+      data-output-socket="@Connection.OutputSocketName"
+      data-input-node="@Connection.InputNodeId"
+    data-input-socket="@Connection.InputSocketName"
+    @onpointerdown="OnPointerDown"
+    @onpointerdown:stopPropagation="true" />
+
+@code {
+    [Parameter, EditorRequired]
+    public ConnectionData Connection { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public ObservableCollection<NodeViewModel> Nodes { get; set; } = null!;
+
+    [Parameter]
+    public bool IsPending { get; set; }
+
+    [Parameter]
+    public bool IsSelected { get; set; }
+
+    [Parameter]
+    public EventCallback<ConnectionData> OnSelected { get; set; }
+
+    [Parameter]
+    public Point2D? PendingEndPoint { get; set; }
+
+    private string ConnectionClassModifiers
+    {
+        get
+        {
+            var classes = new List<string>();
+            
+            if (Connection.IsExecution)
+                classes.Add("ne-connection--execution");
+            else
+                classes.Add("ne-connection--data");
+                
+            if (IsPending)
+                classes.Add("ne-connection--pending");
+
+            if (IsSelected)
+                classes.Add("ne-connection--selected");
+                
+            return string.Join(" ", classes);
+        }
+    }
+
+    private string StrokeColor => Connection.IsExecution ? "#ffffff" : "#88cc88";
+    
+    private string StrokeWidth => IsPending ? "2" : "3";
+
+    private async Task OnPointerDown(PointerEventArgs e)
+    {
+        if (IsPending || !OnSelected.HasDelegate)
+        {
+            return;
+        }
+
+        await OnSelected.InvokeAsync(Connection);
+    }
+
+    private string PathData
+    {
+        get
+        {
+            var (start, end) = GetConnectionEndpoints();
+            return ComputeBezierPath(start, end);
+        }
+    }
+
+    private (Point2D start, Point2D end) GetConnectionEndpoints()
+    {
+        var startNode = Nodes.FirstOrDefault(n => n.Data.Id == Connection.OutputNodeId);
+        var endNode = Nodes.FirstOrDefault(n => n.Data.Id == Connection.InputNodeId);
+
+        Point2D start = Point2D.Zero;
+        Point2D end = PendingEndPoint ?? Point2D.Zero;
+
+        if (startNode is not null)
+        {
+            // Find the output socket and calculate its position
+            var outputSocket = startNode.Outputs
+                .FirstOrDefault(s => s.Data.Name == Connection.OutputSocketName);
+            
+            if (outputSocket is not null)
+            {
+                if (outputSocket.Position != Point2D.Zero)
+                {
+                    start = outputSocket.Position;
+                }
+                else
+                {
+                    // Socket position is relative to node
+                    // Output sockets are on the right side
+                    start = new Point2D(
+                        startNode.Position.X + startNode.Size.Width - SocketDotCenterOffsetX,
+                        startNode.Position.Y + CalculateSocketYOffset(startNode, outputSocket, isInput: false));
+                }
+            }
+        }
+
+        if (endNode is not null && !IsPending)
+        {
+            var inputSocket = endNode.Inputs
+                .FirstOrDefault(s => s.Data.Name == Connection.InputSocketName);
+            
+            if (inputSocket is not null)
+            {
+                if (inputSocket.Position != Point2D.Zero)
+                {
+                    end = inputSocket.Position;
+                }
+                else
+                {
+                    // Input sockets are on the left side
+                    end = new Point2D(
+                        endNode.Position.X + SocketDotCenterOffsetX,
+                        endNode.Position.Y + CalculateSocketYOffset(endNode, inputSocket, isInput: true));
+                }
+            }
+        }
+
+        return (start, end);
+    }
+
+    private double CalculateSocketYOffset(NodeViewModel node, SocketViewModel socket, bool isInput)
+    {
+        // Match layout metrics from node-editor.css
+        const double headerHeight = 28;
+        const double bodyPaddingTop = 8;
+        const double socketPadding = 2;
+        const double socketHeight = 12;
+        const double socketGap = 4;
+        const double socketSpacing = socketHeight + (socketPadding * 2) + socketGap;
+        const double firstSocketOffset = headerHeight + bodyPaddingTop + socketPadding + (socketHeight / 2);
+
+        var sockets = isInput ? node.Inputs : node.Outputs;
+        var index = 0;
+        
+        for (var i = 0; i < sockets.Count; i++)
+        {
+            if (sockets[i].Data.Name == socket.Data.Name)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        return firstSocketOffset + (index * socketSpacing);
+    }
+
+    private static string ComputeBezierPath(Point2D start, Point2D end)
+    {
+        // Compute control points for a smooth bezier curve
+        var dx = Math.Abs(end.X - start.X);
+        var controlOffset = Math.Max(50, dx * 0.5);
+
+        var cp1 = new Point2D(start.X + controlOffset, start.Y);
+        var cp2 = new Point2D(end.X - controlOffset, end.Y);
+
+        return $"M {F(start.X)} {F(start.Y)} C {F(cp1.X)} {F(cp1.Y)}, {F(cp2.X)} {F(cp2.Y)}, {F(end.X)} {F(end.Y)}";
+    }
+
+    private const double SocketDotOuterRadius = 6;
+    private const double SocketDotCenterOffsetX = 8 + SocketDotOuterRadius;
+
+    // Format double for SVG (invariant culture, no trailing zeros)
+    private static string F(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+}

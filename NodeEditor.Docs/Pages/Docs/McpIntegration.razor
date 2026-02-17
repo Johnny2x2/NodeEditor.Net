@@ -1,0 +1,163 @@
+@page "/docs/mcp-integration"
+
+<PageTitle>MCP Integration — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>MCP Integration</h1>
+        <p>
+            Model Context Protocol (MCP) server for NodeEditor.Net. This server exposes NodeEditor abilities
+            and tools over MCP, supporting both <strong>stdio</strong> (standalone) and <strong>HTTP/SSE</strong>
+            (embedded in WebHost) transports.
+        </p>
+
+        <h2>What This Server Does</h2>
+        <ul>
+            <li>Exposes a discovery-based ability system (nodes, connections, graph, execution, plugins, logging, overlays, catalog)</li>
+            <li>Provides three MCP tools that let clients explore and invoke abilities</li>
+            <li><strong>Standalone mode:</strong> runs headless over stdio, hosting its own <code>NodeEditorState</code> in-process</li>
+            <li><strong>Embedded mode:</strong> runs inside the Blazor WebHost over HTTP/SSE, bridging to the live editor session</li>
+        </ul>
+
+        <h2>Transport Modes</h2>
+
+        <h3>1. Stdio (Standalone)</h3>
+        <p>Run the MCP server as its own process. Changes are local to the server process.</p>
+        <pre><code>dotnet run --project NodeEditor.Mcp/NodeEditor.Mcp.csproj</code></pre>
+        <p>Client configuration:</p>
+        <pre><code>{
+  "mcpServers": {
+    "nodeeditormax": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "NodeEditor.Mcp/NodeEditor.Mcp.csproj"
+      ]
+    }
+  }
+}</code></pre>
+
+        <h3>2. HTTP/SSE (Embedded in WebHost)</h3>
+        <p>
+            When enabled, the MCP server runs inside the Blazor WebHost and operates on the
+            <strong>live editor session</strong>. MCP commands update the canvas the user sees in the browser.
+        </p>
+        <p>Enable in <code>appsettings.json</code>:</p>
+        <pre><code>{
+  "Mcp": {
+    "Enabled": true,
+    "RoutePattern": "/mcp"
+  }
+}</code></pre>
+        <p>Generate an API key from <strong>Settings → MCP Settings</strong> in the editor UI.</p>
+        <p>Client configuration:</p>
+        <pre><code>{
+  "mcpServers": {
+    "nodeeditormax": {
+      "url": "http://localhost:5000/mcp",
+      "headers": {
+        "X-API-Key": "&lt;your-api-key&gt;"
+      }
+    }
+  }
+}</code></pre>
+        <blockquote>
+            <strong>Important:</strong> The HTTP transport uses a state bridge to reach the active Blazor circuit.
+            Open the Node Editor in the browser before issuing MCP commands.
+        </blockquote>
+
+        <h2>Core MCP Tools</h2>
+        <table class="docs-table">
+            <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>discover_abilities</code></td><td>Lists available abilities and categories. Optional filters: <code>category</code>, <code>search</code>, <code>includePlugins</code></td></tr>
+                <tr><td><code>get_ability_info</code></td><td>Returns full details for a specific ability ID, including parameters and usage</td></tr>
+                <tr><td><code>execute_ability</code></td><td>Executes an ability by ID with a JSON object of parameters</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Standard Usage Flow</h3>
+        <ol>
+            <li><strong>Discover:</strong> call <code>discover_abilities</code> (optionally with a category)</li>
+            <li><strong>Inspect:</strong> call <code>get_ability_info</code> for the ability you want</li>
+            <li><strong>Execute:</strong> call <code>execute_ability</code> with the ability ID and parameters JSON</li>
+        </ol>
+
+        <h2>Ability Catalog</h2>
+
+        <h3>Catalog</h3>
+        <p><code>catalog.list</code>, <code>catalog.categories</code>, <code>catalog.get</code></p>
+
+        <h3>Nodes</h3>
+        <p><code>node.add</code>, <code>node.remove</code>, <code>node.list</code>, <code>node.get</code>, <code>node.move</code>, <code>node.select</code>, <code>node.select_all</code>, <code>node.clear_selection</code>, <code>node.remove_selected</code>, <code>node.set_socket_value</code></p>
+
+        <h3>Connections</h3>
+        <p><code>connection.add</code>, <code>connection.remove</code>, <code>connection.list</code>, <code>connection.list_for_node</code>, <code>connection.remove_all_for_node</code></p>
+
+        <h3>Graph</h3>
+        <p><code>graph.save</code>, <code>graph.load</code>, <code>graph.export_json</code>, <code>graph.import_json</code>, <code>graph.clear</code>, <code>graph.summary</code>, <code>graph.variable_list</code>, <code>graph.variable_add</code>, <code>graph.variable_remove</code>, <code>graph.event_list</code>, <code>graph.event_add</code>, <code>graph.event_remove</code></p>
+
+        <h3>Organization (Overlays)</h3>
+        <p><code>overlay.add</code>, <code>overlay.remove</code>, <code>overlay.list</code>, <code>overlay.get</code>, <code>overlay.select</code>, <code>overlay.remove_selected</code></p>
+
+        <h3>Execution</h3>
+        <p><code>execution.run</code>, <code>execution.run_json</code>, <code>execution.stop</code>, <code>execution.status</code>, <code>execution.pause</code>, <code>execution.resume</code>, <code>execution.step</code></p>
+
+        <h3>Plugins</h3>
+        <p><code>plugin.list_loaded</code>, <code>plugin.list_installed</code>, <code>plugin.install</code>, <code>plugin.uninstall</code>, <code>plugin.enable</code>, <code>plugin.disable</code>, <code>plugin.reload</code></p>
+
+        <h3>Logging</h3>
+        <p><code>log.get</code>, <code>log.get_all</code>, <code>log.clear</code>, <code>log.channels</code></p>
+
+        <h2>Architecture (HTTP Mode)</h2>
+        <pre><code>Browser (Blazor circuit)
+  └─ NodeEditorState (scoped)
+       ▲
+       │ Attach / Detach
+       ▼
+  INodeEditorStateBridge (singleton)
+       ▲
+       │ Delegates via Current
+       ▼
+  BridgedNodeEditorState
+       ▲
+       │ Used by
+       ▼
+  MCP Ability Providers
+       ▲
+       │ Called by
+       ▼
+  MCP HTTP endpoint (/mcp)
+       ▲
+       │ X-API-Key auth
+       ▼
+  MCP Client (Claude, etc.)</code></pre>
+
+        <h2>Security</h2>
+        <ul>
+            <li>API keys are generated cryptographically (32 random bytes, URL-safe Base64)</li>
+            <li>Keys are stored on disk at <code>%LocalAppData%/NodeEditor/mcp-api-key.dat</code></li>
+            <li>Validation uses <code>CryptographicOperations.FixedTimeEquals</code> to prevent timing attacks</li>
+            <li>Keys can be revoked and regenerated from the Settings panel</li>
+        </ul>
+
+        <h2>Plugin Abilities</h2>
+        <p>
+            Plugins can contribute abilities by implementing <code>IPluginAbilityContributor</code>.
+            When <code>discover_abilities</code> is called with <code>includePlugins = true</code>,
+            the server scans loaded plugins and registers any contributors found.
+        </p>
+
+        <h2>Troubleshooting</h2>
+        <ul>
+            <li><strong>Ability not found:</strong> call <code>discover_abilities</code> and check the ability ID spelling</li>
+            <li><strong>Missing parameters:</strong> call <code>get_ability_info</code> for required fields</li>
+            <li><strong>Plugin abilities not showing:</strong> ensure plugins are loaded, then call <code>discover_abilities</code> with <code>includePlugins = true</code></li>
+        </ul>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

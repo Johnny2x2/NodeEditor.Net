@@ -1,0 +1,13 @@
+{
+  "author": "NodeEditor",
+  "description": "Minimal test plugin with integer add and string upper nodes.",
+  "longDescription": "# Test B Plugin\n\nProvides a simple integer add node and a string upper-case node for marketplace testing.",
+  "category": "Test",
+  "tags": ["test", "sample", "string"],
+  "homepageUrl": "https://github.com/Johnny2x2/NodeEditor",
+  "repositoryUrl": "https://github.com/Johnny2x2/NodeEditor",
+  "license": "MIT",
+  "releaseNotes": "Initial test plugin for local marketplace verification.",
+  "publishedAt": "2026-02-04T00:00:00Z",
+  "lastUpdatedAt": "2026-02-04T00:00:00Z"
+}

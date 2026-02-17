@@ -1,0 +1,167 @@
+@page "/docs/plugin-customization"
+
+<PageTitle>Plugin Customization — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Plugin Customization Guide</h1>
+        <p>
+            This guide describes everything a plugin can currently customize in NodeEditor.Net.
+        </p>
+
+        <h2>1. Custom Nodes</h2>
+        <p>
+            Plugins define node logic by creating classes that implement <code>INodeContext</code> and
+            decorating methods with <code>[Node]</code>. Each decorated method becomes a node in the editor.
+        </p>
+
+        <h3>[Node] Attribute Properties</h3>
+        <table class="docs-table">
+            <thead><tr><th>Property</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>Name</code></td><td><code>string</code></td><td><code>"Node"</code></td><td>Display name in the editor</td></tr>
+                <tr><td><code>Menu</code></td><td><code>string</code></td><td><code>""</code></td><td>Submenu path for the node picker</td></tr>
+                <tr><td><code>Category</code></td><td><code>string</code></td><td><code>"General"</code></td><td>Grouping category</td></tr>
+                <tr><td><code>Description</code></td><td><code>string</code></td><td><code>"Some node."</code></td><td>Tooltip / description text</td></tr>
+                <tr><td><code>IsCallable</code></td><td><code>bool</code></td><td><code>true</code></td><td>Whether the node has execution flow sockets</td></tr>
+                <tr><td><code>IsExecutionInitiator</code></td><td><code>bool</code></td><td><code>false</code></td><td>Whether the node can start an execution chain</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Socket Discovery</h3>
+        <ul>
+            <li><strong>Regular parameters</strong> → input sockets</li>
+            <li><strong><code>out</code> parameters</strong> → output sockets</li>
+            <li><strong><code>ExecutionPath</code> type</strong> → execution flow sockets</li>
+        </ul>
+
+        <h3>Example</h3>
+        <pre><code>public sealed class MyContext : INodeContext
+{
+    [Node("Echo String", category: "Utilities",
+          description: "Echoes a string", isCallable: false)]
+    public void Echo(string Input, out string Output)
+    {
+        Output = Input;
+    }
+
+    [Node("Start", category: "Flow",
+          isCallable: true, isExecutionInitiator: true)]
+    public void Start(out ExecutionPath Exit)
+    {
+        Exit = new ExecutionPath();
+        Exit.Signal();
+    }
+}</code></pre>
+
+        <h2>2. Node Registration</h2>
+        <p>In the <code>Register(INodeRegistryService registry)</code> method, plugins register their nodes:</p>
+        <ul>
+            <li><strong>Auto-discovery:</strong> <code>registry.RegisterFromAssembly(typeof(MyPlugin).Assembly)</code></li>
+            <li><strong>Manual:</strong> <code>registry.RegisterDefinitions(...)</code> for fine-grained control</li>
+        </ul>
+        <p>The registry also supports <code>RemoveDefinitions</code>, <code>RemoveDefinitionsFromAssembly</code>, and <code>GetCatalog()</code>.</p>
+
+        <h2>3. Dependency Injection</h2>
+        <p>Plugins can register their own services:</p>
+        <pre><code>public void ConfigureServices(IServiceCollection services)
+{
+    services.AddSingleton&lt;IMyService, MyService&gt;();
+}</code></pre>
+        <p>
+            These services are scoped per-plugin through <code>IPluginServiceRegistry</code> and available
+            during <code>OnInitializeAsync</code> via the provided <code>IServiceProvider</code>.
+        </p>
+
+        <h2>4. Custom Socket Editors</h2>
+        <p>Plugins can provide custom Blazor UI for editing socket values by implementing <code>INodeCustomEditor</code>:</p>
+        <pre><code>public interface INodeCustomEditor
+{
+    bool CanEdit(SocketData socket);
+    RenderFragment Render(SocketEditorContext context);
+}</code></pre>
+        <ul>
+            <li><strong><code>CanEdit</code></strong> — Inspects the socket to decide if this editor handles it</li>
+            <li><strong><code>Render</code></strong> — Returns a Blazor <code>RenderFragment</code> for the custom editor UI</li>
+        </ul>
+        <p>Custom editors are <strong>auto-discovered</strong> from the plugin assembly — no manual registration needed.</p>
+
+        <h2>5. Custom Log Channels</h2>
+        <p>Plugins implementing <code>ILogChannelAware</code> can register named log channels:</p>
+        <pre><code>public sealed class MyPlugin : INodePlugin, ILogChannelAware
+{
+    public void RegisterChannels(ILogChannelRegistry registry)
+    {
+        registry.RegisterChannel("My Plugin Output", pluginId: Id);
+    }
+}</code></pre>
+
+        <h2>6. Event Subscriptions</h2>
+        <p>Plugins can subscribe to editor events through <code>IPluginEventBus</code>:</p>
+        <table class="docs-table">
+            <thead><tr><th>Event</th><th>Subscribe Method</th></tr></thead>
+            <tbody>
+                <tr><td>Node added</td><td><code>SubscribeNodeAdded</code></td></tr>
+                <tr><td>Node removed</td><td><code>SubscribeNodeRemoved</code></td></tr>
+                <tr><td>Connection added</td><td><code>SubscribeConnectionAdded</code></td></tr>
+                <tr><td>Connection removed</td><td><code>SubscribeConnectionRemoved</code></td></tr>
+                <tr><td>Selection changed</td><td><code>SubscribeSelectionChanged</code></td></tr>
+                <tr><td>Viewport changed</td><td><code>SubscribeViewportChanged</code></td></tr>
+                <tr><td>Zoom changed</td><td><code>SubscribeZoomChanged</code></td></tr>
+                <tr><td>Socket values changed</td><td><code>SubscribeSocketValuesChanged</code></td></tr>
+                <tr><td>Node execution state</td><td><code>SubscribeNodeExecutionStateChanged</code></td></tr>
+                <tr><td>Log message</td><td><code>SubscribeLogMessage</code></td></tr>
+            </tbody>
+        </table>
+        <p>All <code>Subscribe*</code> methods return <code>IDisposable</code> for clean unsubscription.</p>
+
+        <h2>7. Lifecycle Hooks</h2>
+        <table class="docs-table">
+            <thead><tr><th>Hook</th><th>When It Fires</th></tr></thead>
+            <tbody>
+                <tr><td><code>Register</code></td><td>During plugin loading — register nodes here</td></tr>
+                <tr><td><code>ConfigureServices</code></td><td>After registration — add DI services</td></tr>
+                <tr><td><code>OnLoadAsync</code></td><td>After assembly is loaded</td></tr>
+                <tr><td><code>OnInitializeAsync</code></td><td>After DI container is built; full <code>IServiceProvider</code> available</td></tr>
+                <tr><td><code>OnUnloadAsync</code></td><td>Before plugin is unloaded</td></tr>
+                <tr><td><code>OnError</code></td><td>On unhandled plugin exception</td></tr>
+                <tr><td><code>Unload</code></td><td>Synchronous final cleanup</td></tr>
+            </tbody>
+        </table>
+
+        <h2>8. Plugin Manifest</h2>
+        <pre><code>{
+    "Id": "com.nodeeditormax.myplugin",
+    "Name": "My Plugin",
+    "Version": "1.0.0",
+    "MinApiVersion": "1.0.0",
+    "EntryAssembly": "MyPlugin.dll",
+    "Category": "Utilities"
+}</code></pre>
+        <table class="docs-table">
+            <thead><tr><th>Field</th><th>Required</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>Id</code></td><td>Yes</td><td>Unique plugin identifier (reverse-domain convention)</td></tr>
+                <tr><td><code>Name</code></td><td>Yes</td><td>Human-readable display name</td></tr>
+                <tr><td><code>Version</code></td><td>Yes</td><td>Plugin version (semver)</td></tr>
+                <tr><td><code>MinApiVersion</code></td><td>Yes</td><td>Minimum host API version required</td></tr>
+                <tr><td><code>EntryAssembly</code></td><td>No</td><td>DLL filename containing the <code>INodePlugin</code></td></tr>
+                <tr><td><code>Category</code></td><td>No</td><td>Plugin category for marketplace/organization</td></tr>
+            </tbody>
+        </table>
+
+        <h2>What Plugins Cannot Customize</h2>
+        <ul>
+            <li>Canvas themes or visual styling</li>
+            <li>Toolbar items or menus</li>
+            <li>Context menu entries</li>
+            <li>Connection rendering rules or styles</li>
+            <li>Keyboard shortcuts</li>
+            <li>Panel/dock layout</li>
+        </ul>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

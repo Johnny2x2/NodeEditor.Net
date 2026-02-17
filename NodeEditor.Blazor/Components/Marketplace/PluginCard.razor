@@ -1,0 +1,131 @@
+@namespace NodeEditor.Blazor.Components.Marketplace
+@using NodeEditor.Net.Services.Plugins.Marketplace.Models
+
+<div class="ne-plugin-card @(IsSelected ? "ne-plugin-card--selected" : "") @(IsInstalled ? "ne-plugin-card--installed" : "")"
+     @onclick="OnCardClick">
+    <div class="ne-plugin-card-icon">
+        @if (!string.IsNullOrEmpty(Plugin.IconUrl))
+        {
+            <img src="@Plugin.IconUrl" alt="@Plugin.Name" />
+        }
+        else
+        {
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z" />
+            </svg>
+        }
+    </div>
+
+    <div class="ne-plugin-card-info">
+        <div class="ne-plugin-card-header">
+            <span class="ne-plugin-card-name">@Plugin.Name</span>
+            <span class="ne-plugin-card-version">v@Plugin.Version</span>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Plugin.Author))
+        {
+            <div class="ne-plugin-card-author">by @Plugin.Author</div>
+        }
+
+        @if (!string.IsNullOrEmpty(Plugin.Description))
+        {
+            <div class="ne-plugin-card-description">@TruncateDescription(Plugin.Description)</div>
+        }
+
+        <div class="ne-plugin-card-meta">
+            @if (!string.IsNullOrEmpty(Plugin.Category))
+            {
+                <span class="ne-plugin-card-category">@Plugin.Category</span>
+            }
+            @if (Plugin.DownloadCount > 0)
+            {
+                <span class="ne-plugin-card-downloads">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                        <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" />
+                    </svg>
+                    @FormatDownloadCount(Plugin.DownloadCount)
+                </span>
+            }
+        </div>
+    </div>
+
+    <div class="ne-plugin-card-actions" @onclick:stopPropagation="true">
+        @if (IsInstalled)
+        {
+            @if (HasUpdate)
+            {
+                <button class="ne-plugin-card-btn ne-plugin-card-btn--update"
+                        @onclick="OnUpdateClick"
+                        title="Update available">
+                    Update
+                </button>
+            }
+            else
+            {
+                <span class="ne-plugin-card-installed-badge">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z" />
+                    </svg>
+                    Installed
+                </span>
+            }
+        }
+        else
+        {
+            <button class="ne-plugin-card-btn ne-plugin-card-btn--install"
+                    @onclick="OnInstallClick">
+                Install
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public MarketplacePluginInfo Plugin { get; set; } = null!;
+
+    [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public bool IsInstalled { get; set; }
+    [Parameter] public string? InstalledVersion { get; set; }
+
+    [Parameter] public EventCallback OnSelect { get; set; }
+    [Parameter] public EventCallback OnInstall { get; set; }
+    [Parameter] public EventCallback OnUninstall { get; set; }
+
+    private bool HasUpdate => IsInstalled && !string.IsNullOrEmpty(InstalledVersion)
+        && Version.TryParse(InstalledVersion, out var installed)
+        && Version.TryParse(Plugin.Version, out var available)
+        && available > installed;
+
+    private async Task OnCardClick()
+    {
+        await OnSelect.InvokeAsync();
+    }
+
+    private async Task OnInstallClick()
+    {
+        await OnInstall.InvokeAsync();
+    }
+
+    private async Task OnUpdateClick()
+    {
+        await OnInstall.InvokeAsync();
+    }
+
+    private static string TruncateDescription(string description, int maxLength = 100)
+    {
+        if (description.Length <= maxLength) return description;
+        return description[..(maxLength - 3)] + "...";
+    }
+
+    private static string FormatDownloadCount(int count)
+    {
+        return count switch
+        {
+            >= 1_000_000 => $"{count / 1_000_000.0:0.#}M",
+            >= 1_000 => $"{count / 1_000.0:0.#}K",
+            _ => count.ToString()
+        };
+    }
+}

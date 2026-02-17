@@ -1,0 +1,159 @@
+@page "/docs/marketplace"
+
+<PageTitle>Marketplace — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Plugin Marketplace</h1>
+        <p>
+            The marketplace system lets users browse, search, install, update, and uninstall plugins
+            from both local and remote repositories through a built-in UI.
+        </p>
+
+        <h2>Overview</h2>
+        <ul>
+            <li><strong>Browse</strong> available plugins from local or remote repositories</li>
+            <li><strong>Search</strong> by name, category, or tags</li>
+            <li><strong>Install</strong> plugins with one click</li>
+            <li><strong>Upload ZIP packages</strong> via drag/drop or file picker</li>
+            <li><strong>Uninstall</strong> plugins cleanly</li>
+            <li><strong>View details</strong> including description, version, author, and release notes</li>
+            <li><strong>Configure</strong> marketplace sources</li>
+        </ul>
+
+        <h2>Architecture</h2>
+        <pre><code>PluginManagerDialog (UI)
+├── PluginSearchBar — filter plugins
+├── PluginCard — display card per plugin
+├── PluginDetailsPanel — detailed view
+└── MarketplaceSettingsPanel — source config
+
+IPluginInstallationService (scoped)
+├── Install / Uninstall operations
+├── Version compatibility checks
+└── File system operations
+
+AggregatedPluginMarketplaceSource
+├── LocalPluginMarketplaceSource — scans local directories
+└── RemotePluginMarketplaceSource — HTTP-based remote repos
+
+IPluginMarketplaceCache (singleton)
+└── FileBasedMarketplaceCache — on-disk metadata cache</code></pre>
+
+        <h2>Marketplace Sources</h2>
+
+        <h3>Local Source</h3>
+        <p>The <code>LocalPluginMarketplaceSource</code> scans a directory for plugin manifests:</p>
+        <pre><code>plugin-repository/
+├── MyPlugin/
+│   ├── plugin.json                 # Required
+│   ├── plugin-marketplace.json     # Optional
+│   ├── MyPlugin.dll
+│   └── MyPlugin.deps.json
+└── AnotherPlugin/
+    ├── plugin.json
+    └── AnotherPlugin.dll</code></pre>
+
+        <h3>Remote Source</h3>
+        <p>
+            The <code>RemotePluginMarketplaceSource</code> fetches plugin metadata over HTTP.
+            Supports token-based authentication for private repositories.
+        </p>
+
+        <h3>Aggregated Source</h3>
+        <p>Combines multiple sources (local + remote) into a single unified catalog.</p>
+
+        <h2>Plugin Manifest Files</h2>
+
+        <h3>plugin.json (Required)</h3>
+        <pre><code>{
+  "Id": "com.example.myplugin",
+  "Name": "My Plugin",
+  "Version": "1.0.0",
+  "MinApiVersion": "1.0.0",
+  "EntryAssembly": "MyPlugin.dll",
+  "Category": "Utilities"
+}</code></pre>
+
+        <h3>plugin-marketplace.json (Optional)</h3>
+        <pre><code>{
+  "Id": "com.example.myplugin",
+  "DisplayName": "My Awesome Plugin",
+  "Description": "A collection of useful utility nodes",
+  "Author": "Your Name",
+  "AuthorUrl": "https://github.com/yourname",
+  "Tags": ["utilities", "data", "processing"],
+  "IconUrl": "https://example.com/icon.png",
+  "ReleaseNotes": "v1.0.0: Initial release with 5 nodes",
+  "License": "MIT"
+}</code></pre>
+
+        <h2>Installation Service</h2>
+        <pre><code>// Install a plugin from the marketplace
+var result = await installationService.InstallAsync(pluginInfo, cancellationToken);
+
+if (result.Success)
+    Console.WriteLine($"Installed {result.PluginName} v{result.Version}");
+else
+    Console.WriteLine($"Failed: {result.ErrorMessage}");
+
+// Uninstall a plugin
+var uninstallResult = await installationService.UninstallAsync(pluginId, cancellationToken);</code></pre>
+
+        <h3>ZIP Upload Flow</h3>
+        <ol>
+            <li>The package is validated as a <code>.zip</code> and checked for <code>plugin.json</code></li>
+            <li>The package is copied into <code>MarketplaceOptions.LocalRepositoryPath</code></li>
+            <li>Existing entries for the same plugin ID are replaced</li>
+            <li>The package is installed immediately</li>
+            <li>The plugin remains available for future reinstall after uninstall</li>
+        </ol>
+
+        <h2>Publishing Plugins</h2>
+        <pre><code># Publish a single plugin to the local repository
+./publish-plugin.ps1 -PluginProject path/to/YourPlugin.csproj
+
+# Publish all plugin projects in the solution
+./publish-all-plugins.ps1</code></pre>
+        <p>The publish script builds, copies DLLs and manifests, generates default metadata if missing, and creates a ZIP archive.</p>
+
+        <h2>Configuration</h2>
+        <pre><code>public class MarketplaceOptions
+{
+    public string LocalRepositoryPath { get; set; } = "plugin-repository";
+    public string? RemoteApiUrl { get; set; }
+    public List&lt;string&gt; EnabledSources { get; set; } = ["local", "remote"];
+    public long MaxUploadSizeBytes { get; set; } = 500L * 1024L * 1024L;
+}</code></pre>
+
+        <h2>UI Components</h2>
+        <table class="docs-table">
+            <thead><tr><th>Component</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>PluginManagerDialog</code></td><td>Full-screen dialog for browsing and managing plugins</td></tr>
+                <tr><td><code>PluginCard</code></td><td>Card view showing plugin name, author, version, install button</td></tr>
+                <tr><td><code>PluginDetailsPanel</code></td><td>Detailed view with description, tags, release notes</td></tr>
+                <tr><td><code>PluginSearchBar</code></td><td>Search and filter controls</td></tr>
+                <tr><td><code>MarketplaceSettingsPanel</code></td><td>Configure marketplace sources</td></tr>
+            </tbody>
+        </table>
+
+        <h2>MCP Integration</h2>
+        <table class="docs-table">
+            <thead><tr><th>Ability</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>plugin.list_loaded</code></td><td>List all currently loaded plugins</td></tr>
+                <tr><td><code>plugin.list_installed</code></td><td>List all installed plugins</td></tr>
+                <tr><td><code>plugin.install</code></td><td>Install a plugin from the marketplace</td></tr>
+                <tr><td><code>plugin.uninstall</code></td><td>Uninstall a plugin</td></tr>
+                <tr><td><code>plugin.enable</code></td><td>Enable a disabled plugin</td></tr>
+                <tr><td><code>plugin.disable</code></td><td>Disable a plugin without uninstalling</td></tr>
+                <tr><td><code>plugin.reload</code></td><td>Reload a plugin (unload + load)</td></tr>
+            </tbody>
+        </table>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

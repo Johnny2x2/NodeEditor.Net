@@ -1,0 +1,151 @@
+@page "/docs/troubleshooting"
+
+<PageTitle>Troubleshooting — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Troubleshooting Guide</h1>
+        <p>Common issues and step-by-step solutions for NodeEditor.Net.</p>
+
+        <h2>Nodes Don't Appear in Context Menu</h2>
+        <h3>Symptoms</h3>
+        <ul>
+            <li>Right-clicking shows empty or incomplete context menu</li>
+            <li>Specific node types are missing</li>
+        </ul>
+        <h3>Solutions</h3>
+        <ol>
+            <li>Verify node context registration:
+                <pre><code>Registry.EnsureInitialized(new[] { typeof(MyNodes).Assembly });</code></pre>
+            </li>
+            <li>Check that methods have the <code>[Node]</code> attribute</li>
+            <li>Ensure methods are <code>public</code> and have at least one parameter</li>
+            <li>Check browser console for registration errors</li>
+        </ol>
+
+        <h2>Connections Don't Validate Types</h2>
+        <h3>Symptoms</h3>
+        <ul>
+            <li>Can't connect sockets that should be compatible</li>
+            <li>Can connect sockets that shouldn't be compatible</li>
+        </ul>
+        <h3>Solutions</h3>
+        <ol>
+            <li>Verify <code>SocketTypeResolver</code> knows the types involved</li>
+            <li>Check that socket type names match exactly (case-sensitive)</li>
+            <li>Execution sockets can only connect to execution sockets</li>
+            <li>Data sockets can only connect to data sockets</li>
+        </ol>
+
+        <h2>Events Fire But UI Doesn't Update</h2>
+        <h3>Symptoms</h3>
+        <ul>
+            <li>State changes happen but components don't re-render</li>
+            <li>Data appears stale in the UI</li>
+        </ul>
+        <h3>Solutions</h3>
+        <ol>
+            <li>Call <code>StateHasChanged()</code> in event handlers</li>
+            <li>Use <code>EditorState.AddNode()</code> instead of <code>EditorState.Nodes.Add()</code></li>
+            <li>For cross-thread updates, wrap in <code>InvokeAsync()</code></li>
+            <li>Verify you're subscribed to the correct events</li>
+        </ol>
+
+        <h2>Plugin Loading Fails</h2>
+        <h3>Symptoms</h3>
+        <ul>
+            <li>Plugin doesn't appear in the loaded plugins list</li>
+            <li>Error messages about assembly loading</li>
+        </ul>
+        <h3>Solutions</h3>
+        <ol>
+            <li>Check that the plugin directory contains the DLL</li>
+            <li>Verify <code>plugin.json</code> is present and valid</li>
+            <li>Ensure <code>MinApiVersion</code> is compatible with the host</li>
+            <li>Check the Plugins log channel for detailed error messages</li>
+            <li>On iOS/WASM: dynamic plugins are not supported — register at compile time instead</li>
+        </ol>
+
+        <h2>Plugin Loading Fails on iOS / WebAssembly</h2>
+        <p>These platforms don't support <code>AssemblyLoadContext</code>. Register plugins at compile time:</p>
+        <pre><code>var registry = serviceProvider.GetRequiredService&lt;NodeRegistryService&gt;();
+registry.RegisterFromAssembly(typeof(MyPlugin).Assembly);</code></pre>
+
+        <h2>Serialization Version Mismatch</h2>
+        <h3>Symptoms</h3>
+        <ul>
+            <li>Graphs saved with older versions won't load</li>
+            <li>Data is missing or corrupted after loading</li>
+        </ul>
+        <h3>Solutions</h3>
+        <ol>
+            <li>Check <code>GraphSchemaMigrator</code> supports the graph's schema version</li>
+            <li>Use <code>serializer.Import()</code> which handles migration automatically</li>
+            <li>Check <code>ImportResult.Warnings</code> for migration notes</li>
+        </ol>
+
+        <h2>Performance Issues with Large Graphs</h2>
+        <h3>Symptoms</h3>
+        <ul>
+            <li>Canvas becomes sluggish with many nodes</li>
+            <li>Zooming and panning lag</li>
+        </ul>
+        <h3>Solutions</h3>
+        <ol>
+            <li>Ensure <code>ViewportCuller</code> is registered (included by default via <code>AddNodeEditor()</code>)</li>
+            <li>Subscribe only to events that affect your component (selective re-rendering)</li>
+            <li>Use overlays to organize and group nodes visually</li>
+            <li>Consider splitting complex graphs into sub-graphs with group nodes</li>
+        </ol>
+
+        <h2>Custom Socket Editors Not Appearing</h2>
+        <h3>Symptoms</h3>
+        <ul>
+            <li>Default editor renders instead of your custom one</li>
+        </ul>
+        <h3>Solutions</h3>
+        <ol>
+            <li>Verify <code>INodeCustomEditor.CanEdit()</code> returns <code>true</code> for the target socket</li>
+            <li>Check that the editor class is in the plugin assembly (auto-discovered)</li>
+            <li>Ensure the Razor component referenced in <code>Render()</code> is accessible</li>
+        </ol>
+
+        <h2>JavaScript Interop Errors</h2>
+        <h3>Symptoms</h3>
+        <ul>
+            <li>JS interop exceptions in the browser console</li>
+            <li>Canvas fails to render</li>
+        </ul>
+        <h3>Solutions</h3>
+        <ol>
+            <li>Ensure the NodeEditor.Blazor static files are served: check <code>app.UseStaticFiles()</code></li>
+            <li>Verify the <code>_content/NodeEditor.Blazor</code> path is accessible</li>
+            <li>Clear browser cache and hard-reload</li>
+        </ol>
+
+        <h2>Zoom/Pan Not Working</h2>
+        <h3>Symptoms</h3>
+        <ul>
+            <li>Scroll wheel doesn't zoom</li>
+            <li>Middle-click doesn't pan</li>
+        </ul>
+        <h3>Solutions</h3>
+        <ol>
+            <li>Check that the canvas container has <code>position: relative</code> and explicit dimensions</li>
+            <li>Verify no parent element is capturing scroll events</li>
+            <li>Check <code>MinZoom</code> and <code>MaxZoom</code> parameters on <code>NodeEditorCanvas</code></li>
+        </ol>
+
+        <h2>MCP Commands Return "No Active Session"</h2>
+        <h3>Solutions</h3>
+        <ol>
+            <li>Open the Node Editor in a browser tab <strong>before</strong> issuing MCP commands</li>
+            <li>Verify <code>Mcp.Enabled = true</code> in <code>appsettings.json</code></li>
+            <li>Check that the API key matches the one generated in Settings → MCP Settings</li>
+        </ol>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

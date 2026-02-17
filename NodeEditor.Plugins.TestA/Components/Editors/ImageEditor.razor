@@ -1,0 +1,151 @@
+@using NodeEditor.Blazor.Services.Editors
+@using NodeEditor.Net.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+
+<div class="ne-editor-image">
+    <InputFile OnChange="OnFileSelected" 
+               accept="image/*" 
+               id="@_fileInputId"
+               style="display: none;" />
+    
+    <button class="ne-editor-button"
+            type="button"
+            @onclick="TriggerFileInput"
+            @onclick:stopPropagation
+            @onpointerdown:stopPropagation>
+        📁 Load Image
+    </button>
+    
+    @if (!string.IsNullOrEmpty(CurrentPath))
+    {
+        <div class="ne-editor-image-path" title="@CurrentPath">
+            @DisplayName
+        </div>
+    }
+    
+    @if (PreviewDataUrl != null)
+    {
+        <div class="ne-editor-image-preview">
+            <img src="@PreviewDataUrl" alt="Preview" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public SocketEditorContext Context { get; set; } = null!;
+
+    private string _fileInputId = $"file-input-{Guid.NewGuid():N}";
+    private IJSObjectReference? _jsModule;
+    private string? CurrentPath => Context.GetStringValue();
+    private string DisplayName =>
+        string.IsNullOrWhiteSpace(CurrentPath)
+            ? string.Empty
+            : (CurrentPath.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)
+                ? "Loaded image"
+                : System.IO.Path.GetFileName(CurrentPath));
+    private string? PreviewDataUrl { get; set; }
+
+    private async Task TriggerFileInput()
+    {
+        _jsModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/NodeEditor.Blazor/nodeEditorCanvas.js");
+        await _jsModule.InvokeVoidAsync("triggerClick", _fileInputId);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await base.OnParametersSetAsync();
+        
+        // Load preview if path exists
+        if (!string.IsNullOrEmpty(CurrentPath))
+        {
+            await LoadPreview(CurrentPath);
+        }
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Read file content for preview
+            const long maxFileSize = 10 * 1024 * 1024; // 10 MB limit
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var ms = new System.IO.MemoryStream();
+            await stream.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+            
+            var base64 = Convert.ToBase64String(bytes);
+            var mimeType = file.ContentType;
+            if (string.IsNullOrEmpty(mimeType))
+            {
+                var ext = System.IO.Path.GetExtension(file.Name).ToLowerInvariant();
+                mimeType = ext switch
+                {
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".png" => "image/png",
+                    ".gif" => "image/gif",
+                    ".bmp" => "image/bmp",
+                    ".webp" => "image/webp",
+                    _ => "image/png"
+                };
+            }
+            
+            PreviewDataUrl = $"data:{mimeType};base64,{base64}";
+            
+            // Store data URL directly so execution can pass through without file system access
+            Context.SetValueTyped(PreviewDataUrl);
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading image: {ex.Message}");
+            PreviewDataUrl = null;
+        }
+    }
+
+    private async Task LoadPreview(string path)
+    {
+        try
+        {
+            // Check if it's already a data URL
+            if (path.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+            {
+                PreviewDataUrl = path;
+                return;
+            }
+
+            // Try to load from file system (server-side only)
+            if (System.IO.File.Exists(path))
+            {
+                var bytes = await System.IO.File.ReadAllBytesAsync(path);
+                var base64 = Convert.ToBase64String(bytes);
+                var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+                var mimeType = ext switch
+                {
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".png" => "image/png",
+                    ".gif" => "image/gif",
+                    ".bmp" => "image/bmp",
+                    ".webp" => "image/webp",
+                    _ => "image/png"
+                };
+                PreviewDataUrl = $"data:{mimeType};base64,{base64}";
+            }
+        }
+        catch
+        {
+            // Ignore errors loading preview
+            PreviewDataUrl = null;
+        }
+    }
+}

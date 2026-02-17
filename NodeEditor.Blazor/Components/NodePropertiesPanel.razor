@@ -1,0 +1,198 @@
+@using NodeEditor.Net.Models
+@using NodeEditor.Blazor.Services.Editors
+@using NodeEditor.Net.ViewModels
+@implements IDisposable
+@inject NodeEditorCustomEditorRegistry EditorRegistry
+
+<div class="ne-properties-panel"
+     style="@PanelStyle"
+    @onmousemove="OnPanelMouseMove"
+    @onmouseup="OnPanelMouseUp"
+    @onmouseleave="OnPanelMouseUp">
+    <div class="ne-properties-header ne-panel-drag-handle"
+        @onmousedown="OnPanelMouseDown"
+        @onmousedown:preventDefault
+        @onmousedown:stopPropagation>
+        Properties
+    </div>
+
+    @if (_selectedNode is null)
+    {
+        <div class="ne-properties-empty">Select a node to edit its inputs.</div>
+    }
+    else
+    {
+        <div class="ne-properties-section">
+            <div class="ne-properties-title">@_selectedNode.Data.Name</div>
+        </div>
+
+        <div class="ne-properties-section">
+            <div class="ne-properties-subtitle">Inputs</div>
+
+            @{ var inputSockets = _selectedNode.Inputs.Where(i => !i.Data.IsExecution).ToList(); }
+
+            @if (inputSockets.Count == 0)
+            {
+                <div class="ne-properties-empty">No inputs.</div>
+            }
+            else
+            {
+                @foreach (var input in inputSockets)
+                {
+                    var editor = EditorRegistry.GetEditor(input.Data);
+                    if (editor is null)
+                    {
+                        continue;
+                    }
+
+                    var isConnected = IsInputConnected(input);
+                    <div class="ne-properties-row">
+                        <div class="ne-properties-label">
+                            @input.Data.Name
+                            @if (isConnected)
+                            {
+                                <span class="ne-properties-badge">connected</span>
+                            }
+                        </div>
+                        <div class="ne-properties-editor">
+                            @RenderEditor(input, editor)
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+        <div class="ne-properties-section">
+            <div class="ne-properties-subtitle">Outputs</div>
+
+            @{ var outputSockets = _selectedNode.Outputs.Where(o => !o.Data.IsExecution).ToList(); }
+
+            @if (outputSockets.Count == 0)
+            {
+                <div class="ne-properties-empty">No outputs.</div>
+            }
+            else
+            {
+                @foreach (var output in outputSockets)
+                {
+                    <div class="ne-properties-row">
+                        <div class="ne-properties-label">@output.Data.Name</div>
+                        <div class="ne-properties-value">@GetSocketValueText(output)</div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public INodeEditorState State { get; set; } = null!;
+
+    private NodeViewModel? _selectedNode;
+
+    private bool _isDraggingPanel;
+    private bool _panelDragMoved;
+    private Point2D _panelDragStartScreen = Point2D.Zero;
+    private Point2D _panelDragStartOffset = Point2D.Zero;
+    private Point2D _panelDragOffset = Point2D.Zero;
+
+    private string PanelStyle => $"transform: translate({_panelDragOffset.X}px, {_panelDragOffset.Y}px);";
+
+    protected override void OnInitialized()
+    {
+        SyncSelectedNode();
+
+        State.SelectionChanged += OnStateChanged;
+        State.NodeAdded += OnStateChanged;
+        State.NodeRemoved += OnStateChanged;
+        State.SocketValuesChanged += OnStateChanged;
+    }
+
+    public void Dispose()
+    {
+        State.SelectionChanged -= OnStateChanged;
+        State.NodeAdded -= OnStateChanged;
+        State.NodeRemoved -= OnStateChanged;
+        State.SocketValuesChanged -= OnStateChanged;
+    }
+
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        SyncSelectedNode();
+        StateHasChanged();
+    }
+
+    private void SyncSelectedNode()
+    {
+        var selectedId = State.SelectedNodeIds.LastOrDefault();
+        _selectedNode = selectedId is null
+            ? null
+            : State.Nodes.FirstOrDefault(n => n.Data.Id == selectedId);
+    }
+
+    private void OnPanelMouseDown(MouseEventArgs e)
+    {
+        _isDraggingPanel = true;
+        _panelDragMoved = false;
+        _panelDragStartScreen = new Point2D(e.ClientX, e.ClientY);
+        _panelDragStartOffset = _panelDragOffset;
+    }
+
+    private void OnPanelMouseMove(MouseEventArgs e)
+    {
+        if (!_isDraggingPanel)
+        {
+            return;
+        }
+
+        var delta = new Point2D(e.ClientX - _panelDragStartScreen.X, e.ClientY - _panelDragStartScreen.Y);
+        _panelDragMoved = _panelDragMoved || Math.Abs(delta.X) > 2 || Math.Abs(delta.Y) > 2;
+        _panelDragOffset = new Point2D(_panelDragStartOffset.X + delta.X, _panelDragStartOffset.Y + delta.Y);
+        StateHasChanged();
+    }
+
+    private void OnPanelMouseUp(MouseEventArgs e)
+    {
+        _isDraggingPanel = false;
+    }
+
+    private RenderFragment RenderEditor(SocketViewModel socket, INodeCustomEditor editor)
+    {
+        if (_selectedNode is null)
+        {
+            return builder => { };
+        }
+
+        var context = new SocketEditorContext
+        {
+            Socket = socket,
+            Node = _selectedNode,
+            SetValue = value =>
+            {
+                socket.SetValue(value);
+                StateHasChanged();
+            }
+        };
+
+        return editor.Render(context);
+    }
+
+    private bool IsInputConnected(SocketViewModel socket)
+    {
+        if (_selectedNode is null)
+        {
+            return false;
+        }
+
+        return State.Connections.Any(c =>
+            c.InputNodeId == _selectedNode.Data.Id &&
+            c.InputSocketName == socket.Data.Name);
+    }
+
+    private static string GetSocketValueText(SocketViewModel socket)
+    {
+        var value = socket.Data.Value?.ToObject<object>();
+        return value?.ToString() ?? "—";
+    }
+}

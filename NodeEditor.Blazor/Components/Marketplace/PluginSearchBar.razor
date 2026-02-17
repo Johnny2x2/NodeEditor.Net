@@ -1,0 +1,102 @@
+@namespace NodeEditor.Blazor.Components.Marketplace
+@implements IDisposable
+
+<div class="ne-plugin-search">
+    <div class="ne-plugin-search-input-wrapper">
+        <svg class="ne-plugin-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z" />
+        </svg>
+        <input type="text"
+               class="ne-plugin-search-input"
+               placeholder="Search plugins..."
+               value="@SearchText"
+               @oninput="OnSearchInput"
+               @onkeydown="OnKeyDown" />
+        @if (!string.IsNullOrEmpty(SearchText))
+        {
+            <button class="ne-plugin-search-clear" @onclick="ClearSearch" title="Clear search">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z" />
+                </svg>
+            </button>
+        }
+    </div>
+
+    @if (Categories.Count > 0)
+    {
+        <select class="ne-plugin-search-category"
+                value="@SelectedCategory"
+                @onchange="OnCategoryChange">
+            <option value="">All Categories</option>
+            @foreach (var category in Categories)
+            {
+                <option value="@category">@category</option>
+            }
+        </select>
+    }
+</div>
+
+@code {
+    [Parameter] public string SearchText { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> SearchTextChanged { get; set; }
+
+    [Parameter] public string? SelectedCategory { get; set; }
+    [Parameter] public EventCallback<string?> SelectedCategoryChanged { get; set; }
+
+    [Parameter] public List<string> Categories { get; set; } = new();
+    [Parameter] public EventCallback OnSearch { get; set; }
+
+    private System.Timers.Timer? _debounceTimer;
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        SearchText = value;
+        SearchTextChanged.InvokeAsync(value);
+
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Timers.Timer(300)
+        {
+            AutoReset = false
+        };
+        _debounceTimer.Elapsed += async (_, _) =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await OnSearch.InvokeAsync();
+                StateHasChanged();
+            });
+        };
+        _debounceTimer.Start();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _debounceTimer?.Stop();
+            await OnSearch.InvokeAsync();
+        }
+    }
+
+    private async Task ClearSearch()
+    {
+        SearchText = string.Empty;
+        await SearchTextChanged.InvokeAsync(string.Empty);
+        await OnSearch.InvokeAsync();
+    }
+
+    private async Task OnCategoryChange(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        SelectedCategory = string.IsNullOrEmpty(value) ? null : value;
+        await SelectedCategoryChanged.InvokeAsync(SelectedCategory);
+        await OnSearch.InvokeAsync();
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
+    }
+}

@@ -1,0 +1,38 @@
+.page-top {
+    padding-top: 100px;
+}
+
+.feature-detail {
+    margin-bottom: 64px;
+    padding-bottom: 48px;
+    border-bottom: 1px solid rgba(61, 61, 92, 0.25);
+}
+
+.feature-detail:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.feature-detail h2 {
+    font-size: 1.6rem;
+    margin-bottom: 12px;
+}
+
+.feature-detail > p {
+    color: rgba(224, 224, 240, 0.6);
+    font-size: 1rem;
+    max-width: 700px;
+    margin-bottom: 24px;
+    line-height: 1.7;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.feature-detail pre {
+    max-width: 700px;
+}

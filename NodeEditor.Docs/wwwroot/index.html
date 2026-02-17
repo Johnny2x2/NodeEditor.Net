@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NodeEditor.Net — Visual Node Editor for .NET</title>
+    <meta name="description" content="A powerful, event-driven visual node editor for .NET 10. Build interactive graph-based visual programming with execution engine, plugin marketplace, AI integration, and headless execution." />
+    <meta name="theme-color" content="#1e1e2e" />
+    <base href="/" />
+    <link rel="preload" id="webassembly" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="images/logo.png" />
+    <link href="NodeEditor.Docs.styles.css" rel="stylesheet" />
+    <link rel="stylesheet" href="lib/hljs/styles/vs2015.min.css" />
+    <script type="importmap"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="loading-screen">
+            <img src="images/logo.png" alt="NodeEditor.Net" class="loading-logo" />
+            <svg class="loading-progress">
+                <circle r="40%" cx="50%" cy="50%" />
+                <circle r="40%" cx="50%" cy="50%" />
+            </svg>
+            <div class="loading-progress-text"></div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script src="lib/hljs/highlight.min.js"></script>
+    <script src="lib/hljs/languages/csharp.min.js"></script>
+    <script src="lib/hljs/languages/xml.min.js"></script>
+    <script src="lib/hljs/languages/json.min.js"></script>
+    <script src="lib/hljs/languages/bash.min.js"></script>
+    <script>
+        hljs.configure({ ignoreUnescapedHTML: true, cssSelector: 'pre code' });
+        hljs.highlightAll();
+
+        // Re-highlight after Blazor SPA navigation
+        var observer = new MutationObserver(function () {
+            document.querySelectorAll('pre code:not(.hljs)').forEach(function (el) {
+                hljs.highlightElement(el);
+            });
+        });
+        observer.observe(document.getElementById('app'), { childList: true, subtree: true });
+    </script>
+</body>
+
+</html>

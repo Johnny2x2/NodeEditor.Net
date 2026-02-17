@@ -1,0 +1,110 @@
+@page "/docs/architecture-review"
+
+<PageTitle>Architecture Review — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Architecture Review &amp; Improvement Plan</h1>
+        <p>
+            Full code review of <code>NodeEditor.Net</code> core library + <code>NodeEditor.Blazor</code>
+            component library — covering design patterns, state management, headless execution, and modernization roadmap.
+        </p>
+
+        <h2>Project Overview</h2>
+        <p>NodeEditor.Net is a <strong>3-tier .NET architecture</strong> for building visual node-based editors:</p>
+        <pre><code>NodeEditor.Net (pure .NET 10 core library)
+├── Models — immutable record types (NodeData, SocketData, ConnectionData)
+├── ViewModels — mutable wrappers with INotifyPropertyChanged
+├── Services/Core — NodeEditorState, SocketTypeResolver
+├── Services/Execution — execution engine, planner, method invoker
+├── Services/Registry — node discovery and registration
+├── Services/Plugins — plugin loader, marketplace, event bus
+├── Services/Logging — channel-based structured logging
+└── Services/Serialization — JSON save/load with migration
+
+NodeEditor.Blazor (Razor component library)
+├── Components — canvas, nodes, sockets, connections, overlays
+├── Services — DI registration, coordinate conversion, validation
+└── Editors — built-in socket editors
+
+NodeEditor.Blazor.WebHost (runnable Blazor Server demo)</code></pre>
+
+        <h2>Design Patterns in Use</h2>
+        <table class="docs-table">
+            <thead><tr><th>Pattern</th><th>Where Used</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Observer</strong></td><td><code>NodeEditorState</code> events (NodeAdded, SelectionChanged, etc.)</td></tr>
+                <tr><td><strong>MVVM</strong></td><td>Immutable Models → mutable ViewModels → Razor Components</td></tr>
+                <tr><td><strong>Strategy</strong></td><td><code>ISocketTypeResolver</code>, <code>INodeEditorLogger</code>, <code>IPluginMarketplaceSource</code></td></tr>
+                <tr><td><strong>Factory</strong></td><td><code>VariableNodeFactory</code>, <code>EventNodeFactory</code>, <code>NodeContextFactory</code></td></tr>
+                <tr><td><strong>Bridge</strong></td><td><code>INodeEditorStateBridge</code> for MCP integration</td></tr>
+                <tr><td><strong>Adapter</strong></td><td><code>NodeAdapter</code> converts between model and ViewModel layers</td></tr>
+                <tr><td><strong>Plugin</strong></td><td><code>INodePlugin</code>, <code>AssemblyLoadContext</code> isolation</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Swappability Audit</h2>
+
+        <h3>Services WITH Interface Abstractions ✅</h3>
+        <ul>
+            <li><code>INodeEditorState</code> / <code>NodeEditorState</code></li>
+            <li><code>ISocketTypeResolver</code> / <code>SocketTypeResolver</code></li>
+            <li><code>INodeEditorLogger</code> / <code>NodeEditorLogger</code></li>
+            <li><code>ILogChannelRegistry</code> / <code>LogChannelRegistry</code></li>
+            <li><code>IPluginEventBus</code> / <code>PluginEventBus</code></li>
+            <li><code>IPluginServiceRegistry</code> / <code>PluginServiceRegistry</code></li>
+            <li><code>IPluginInstallationService</code> / <code>PluginInstallationService</code></li>
+            <li><code>IPluginMarketplaceSource</code> / <code>AggregatedPluginMarketplaceSource</code></li>
+            <li><code>INodeEditorStateBridge</code> / <code>NodeEditorStateBridge</code></li>
+        </ul>
+
+        <h3>Services WITHOUT Interface Abstractions ❌</h3>
+        <ul>
+            <li><code>NodeRegistryService</code> — concrete class, not mockable</li>
+            <li><code>NodeExecutionService</code> — concrete class</li>
+            <li><code>GraphSerializer</code> — concrete class</li>
+            <li><code>PluginLoader</code> — concrete class</li>
+            <li><code>CoordinateConverter</code> — concrete class</li>
+            <li><code>ConnectionValidator</code> — concrete class</li>
+            <li><code>ViewportCuller</code> — concrete class</li>
+        </ul>
+
+        <h2>State–ViewModel Coupling</h2>
+        <p>
+            <code>NodeEditorState</code> stores <code>NodeViewModel</code> objects directly. This means the
+            state layer depends on ViewModels, which in turn reference Blazor-specific concepts. The core
+            library mitigates this by keeping ViewModels in <code>NodeEditor.Net</code> (no Blazor dependency).
+        </p>
+        <p>For headless execution, <code>HeadlessGraphRunner</code> bypasses ViewModels entirely and works with
+            the model layer (<code>NodeData</code>, <code>ConnectionData</code>, <code>GraphData</code>).</p>
+
+        <h2>Improvement Plan</h2>
+        <table class="docs-table">
+            <thead><tr><th>Phase</th><th>Goal</th><th>Status</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Phase 1</strong></td><td>GraphData model &amp; headless execution path</td><td>✅ Complete</td></tr>
+                <tr><td><strong>Phase 2</strong></td><td>Extract interfaces for core services</td><td>🔄 Partial</td></tr>
+                <tr><td><strong>Phase 3</strong></td><td>Extract interfaces for infrastructure services</td><td>⬜ Planned</td></tr>
+                <tr><td><strong>Phase 4</strong></td><td>Convert static classes to injectable services</td><td>⬜ Planned</td></tr>
+                <tr><td><strong>Phase 5</strong></td><td>DI cleanup &amp; deduplication</td><td>⬜ Planned</td></tr>
+                <tr><td><strong>Phase 6</strong></td><td>Canvas decomposition (optional)</td><td>⬜ Planned</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Scorecard</h2>
+        <table class="docs-table">
+            <thead><tr><th>Category</th><th>Current</th><th>Target</th></tr></thead>
+            <tbody>
+                <tr><td>Interface coverage</td><td>~50%</td><td>90%+</td></tr>
+                <tr><td>Static class usage</td><td>3 static classes</td><td>0</td></tr>
+                <tr><td>Testability</td><td>Medium</td><td>High</td></tr>
+                <tr><td>Headless support</td><td>✅ Full</td><td>✅ Full</td></tr>
+                <tr><td>Plugin isolation</td><td>✅ AssemblyLoadContext</td><td>✅ AssemblyLoadContext</td></tr>
+            </tbody>
+        </table>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>
