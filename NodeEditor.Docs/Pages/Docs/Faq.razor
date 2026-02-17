@@ -1,0 +1,178 @@
+@page "/docs/faq"
+
+<PageTitle>FAQ — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Frequently Asked Questions</h1>
+
+        <h2>General</h2>
+
+        <h3>What is NodeEditor.Net?</h3>
+        <p>
+            NodeEditor.Net is a visual node editor for .NET 10. It lets you build data-processing
+            and logic graphs by connecting "nodes" together in a browser-based canvas. Each node
+            performs a small operation and the editor handles wiring, execution order, and data flow automatically.
+        </p>
+
+        <h3>Who is this for?</h3>
+        <ul>
+            <li><strong>Application developers</strong> who want to add visual programming to their apps</li>
+            <li><strong>Tool builders</strong> creating no-code/low-code automation interfaces</li>
+            <li><strong>Game developers</strong> implementing visual scripting (similar to Unreal Blueprints)</li>
+            <li><strong>Data engineers</strong> building visual data pipelines</li>
+            <li><strong>AI developers</strong> using MCP to let AI assistants build and execute graphs</li>
+        </ul>
+
+        <h3>What platforms does it run on?</h3>
+        <ul>
+            <li><strong>Blazor Server</strong> (recommended, full features including dynamic plugins)</li>
+            <li><strong>MAUI Blazor Hybrid</strong> (Windows, macOS, Android)</li>
+            <li><strong>Blazor WebAssembly</strong> (no dynamic plugin loading)</li>
+            <li><strong>Console/API</strong> (headless execution only, no UI)</li>
+        </ul>
+
+        <h3>Is this open source?</h3>
+        <p>Yes, NodeEditor.Net is released under the MIT License.</p>
+
+        <h2>Setup</h2>
+
+        <h3>What .NET version do I need?</h3>
+        <p>.NET 10 SDK. Download it from <a href="https://dotnet.microsoft.com/download/dotnet/10.0">dotnet.microsoft.com</a>.</p>
+
+        <h3>How do I build the project?</h3>
+        <pre><code>dotnet build NodeEditor.slnx</code></pre>
+
+        <h3>How do I run the demo app?</h3>
+        <pre><code>dotnet run --project NodeEditor.Blazor.WebHost/NodeEditor.Blazor.WebHost.csproj</code></pre>
+
+        <h3>How do I run the tests?</h3>
+        <pre><code>dotnet test NodeEditor.Blazor.Tests/NodeEditor.Blazor.Tests.csproj</code></pre>
+
+        <h2>Architecture</h2>
+
+        <h3>Why are there three projects?</h3>
+        <ol>
+            <li><strong>NodeEditor.Net</strong> — Pure .NET core library with no Blazor dependency. Models, execution engine, plugins, serialization, logging.</li>
+            <li><strong>NodeEditor.Blazor</strong> — Razor component library that provides the UI.</li>
+            <li><strong>NodeEditor.Blazor.WebHost</strong> — A runnable Blazor Server app that wires everything together as a demo.</li>
+        </ol>
+
+        <h3>Can I use NodeEditor.Net without Blazor?</h3>
+        <p>
+            Yes! The <code>NodeEditor.Net</code> library has no Blazor dependency. Use
+            <code>HeadlessGraphRunner</code> to execute graphs in console apps, APIs, or background services.
+            See the <a href="docs/headless-execution">Headless Execution</a> guide.
+        </p>
+
+        <h3>What is the AddNodeEditor() call?</h3>
+        <p>
+            It's a DI extension method in <code>NodeEditor.Blazor.Services</code> that registers all required services
+            with their correct lifetimes. Call it once in <code>Program.cs</code>.
+        </p>
+
+        <h2>Nodes</h2>
+
+        <h3>How do I create a custom node?</h3>
+        <ol>
+            <li>Create a class that implements <code>INodeContext</code></li>
+            <li>Add methods with the <code>[Node]</code> attribute</li>
+            <li>Register the assembly with <code>NodeRegistryService</code></li>
+        </ol>
+        <p>See the <a href="docs/getting-started">Getting Started Guide</a> and <a href="docs/custom-nodes">Custom Nodes Tutorial</a>.</p>
+
+        <h3>What's the difference between callable and non-callable nodes?</h3>
+        <ul>
+            <li><strong>Non-callable</strong> (<code>isCallable: false</code>): Data nodes that compute outputs from inputs. No execution flow. Evaluate lazily.</li>
+            <li><strong>Callable</strong> (<code>isCallable: true</code>): Nodes with execution flow sockets. Run when their execution input is triggered.</li>
+        </ul>
+
+        <h3>What is an execution initiator?</h3>
+        <p>
+            An execution initiator (<code>isExecutionInitiator: true</code>) is a callable node that starts
+            an execution chain. It has no execution input — it's the entry point.
+        </p>
+
+        <h3>Can I use async methods in nodes?</h3>
+        <p>Yes, node methods can return <code>Task</code> for async operations.</p>
+
+        <h2>Plugins</h2>
+
+        <h3>How do I create a plugin?</h3>
+        <ol>
+            <li>Copy the <code>NodeEditor.Plugins.Template</code> project</li>
+            <li>Implement <code>INodePlugin</code> and your <code>INodeContext</code> classes</li>
+            <li>Add a <code>plugin.json</code> manifest</li>
+            <li>Build and publish to the plugin repository</li>
+        </ol>
+        <p>See the <a href="docs/plugin-sdk">Plugin SDK</a>.</p>
+
+        <h3>Why don't plugins load on iOS or WebAssembly?</h3>
+        <p>
+            These platforms don't support dynamic assembly loading (<code>AssemblyLoadContext</code>).
+            On iOS, register plugins at compile time instead:
+        </p>
+        <pre><code>var registry = serviceProvider.GetRequiredService&lt;NodeRegistryService&gt;();
+registry.RegisterFromAssembly(typeof(MyPlugin).Assembly);</code></pre>
+
+        <h2>Execution</h2>
+
+        <h3>How do I execute a graph?</h3>
+        <p>Click the "Execute" button in the editor, or programmatically:</p>
+        <pre><code>var service = serviceProvider.GetRequiredService&lt;NodeExecutionService&gt;();
+await service.ExecuteAsync(nodes, connections, context, nodeContext, options, token);</code></pre>
+
+        <h3>What execution modes are available?</h3>
+        <ul>
+            <li><strong>Sequential</strong> — Follow execution paths through callable nodes</li>
+            <li><strong>Parallel</strong> — Run independent data nodes concurrently</li>
+        </ul>
+
+        <h3>Can I run graphs without a UI?</h3>
+        <p>Yes, use <code>HeadlessGraphRunner</code>. See <a href="docs/headless-execution">Headless Execution</a>.</p>
+
+        <h2>MCP</h2>
+
+        <h3>What is MCP?</h3>
+        <p>
+            The <a href="https://modelcontextprotocol.io/">Model Context Protocol</a> is a standard for
+            connecting AI assistants to external tools. NodeEditor.Net's MCP server lets AI assistants
+            build and execute node graphs programmatically.
+        </p>
+
+        <h3>How do I enable MCP?</h3>
+        <pre><code>{ "Mcp": { "Enabled": true, "RoutePattern": "/mcp" } }</code></pre>
+        <p>Then generate an API key from the Settings panel in the editor.</p>
+
+        <h3>Can AI build graphs in real-time?</h3>
+        <p>
+            Yes! In HTTP/SSE mode, the MCP server uses the State Bridge pattern to control the live canvas.
+            When an AI adds a node via MCP, it appears on the user's screen immediately.
+        </p>
+
+        <h2>Troubleshooting</h2>
+
+        <h3>Nodes don't appear in the context menu</h3>
+        <p>Make sure you've registered the assembly:</p>
+        <pre><code>Registry.EnsureInitialized(new[] { typeof(MyNodes).Assembly });</code></pre>
+
+        <h3>UI doesn't update after state changes</h3>
+        <p>
+            Ensure you call <code>StateHasChanged()</code> in event handlers and always use
+            <code>EditorState.AddNode()</code> instead of directly modifying collections.
+        </p>
+
+        <h3>Plugin loading fails</h3>
+        <ol>
+            <li>Check that the plugin directory exists and contains the DLL</li>
+            <li><code>plugin.json</code> is present and valid</li>
+            <li>The plugin's <code>MinApiVersion</code> is compatible with the host</li>
+            <li>Check console/logs for detailed error messages</li>
+        </ol>
+        <p>For more help, see the <a href="docs/troubleshooting">Troubleshooting Guide</a>.</p>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

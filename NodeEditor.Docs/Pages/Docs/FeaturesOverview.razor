@@ -1,0 +1,189 @@
+@page "/docs/features-overview"
+
+<PageTitle>Features Overview — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Features Overview</h1>
+        <p>
+            A comprehensive guide to every major feature of NodeEditor.Net, explaining what it does,
+            why it matters, and how to use it.
+        </p>
+
+        <h2>Interactive Canvas</h2>
+        <p>
+            The <code>NodeEditorCanvas</code> is the main Blazor component that renders the node graph.
+            It provides a fully interactive workspace with mouse, keyboard, and touch support,
+            while maintaining smooth performance through viewport culling and selective re-rendering.
+        </p>
+        <pre><code>&lt;NodeEditorCanvas State="@@EditorState"
+                  MinZoom="0.1"
+                  MaxZoom="3.0"
+                  ZoomStep="0.1" /&gt;</code></pre>
+        <p>Component hierarchy:</p>
+        <pre><code>NodeEditorCanvas
+├── ContextMenu (right-click node picker with search)
+├── SelectionRectangle (box selection overlay)
+├── ConnectionPath (SVG curves between sockets)
+├── OrganizerOverlay (organizer shapes)
+├── NodeComponent (individual node rendering)
+│   ├── SocketComponent (input/output sockets)
+│   └── Editor (inline value editors)
+├── VariablesPanel, EventsPanel
+├── OutputTerminalPanel
+├── PluginManagerOverlay
+└── McpSettingsPanel</code></pre>
+
+        <h2>Node System</h2>
+        <p>
+            Nodes are the fundamental building blocks. Each node encapsulates a small operation and
+            exposes input and output <strong>sockets</strong> for data and execution flow.
+        </p>
+        <pre><code>public sealed class MathNodes : INodeContext
+{
+    [Node("Add", category: "Math", isCallable: false)]
+    public void Add(double A, double B, out double Result)
+    {
+        Result = A + B;
+    }
+}</code></pre>
+        <table class="docs-table">
+            <thead><tr><th>Node Type</th><th>Has Execution Flow</th><th>Evaluates</th></tr></thead>
+            <tbody>
+                <tr><td>Data node (<code>isCallable: false</code>)</td><td>No</td><td>Lazily, on demand</td></tr>
+                <tr><td>Callable node (<code>isCallable: true</code>)</td><td>Yes (Enter/Exit)</td><td>When execution reaches it</td></tr>
+                <tr><td>Execution initiator</td><td>Yes (Exit only)</td><td>Automatically at start</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Execution Engine</h2>
+        <p>
+            The execution engine transforms a visual node graph into a runnable computation. It supports
+            three execution modes:
+        </p>
+        <table class="docs-table">
+            <thead><tr><th>Mode</th><th>Algorithm</th><th>Use Case</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Sequential</strong></td><td>Queue walk following execution connections</td><td>Imperative graphs with branching</td></tr>
+                <tr><td><strong>Parallel</strong></td><td>Kahn's topological sort → layer-by-layer</td><td>Maximum throughput</td></tr>
+                <tr><td><strong>DataFlow</strong></td><td>Topological sort (sequential layers)</td><td>Pure computational graphs</td></tr>
+            </tbody>
+        </table>
+        <p>See <a href="docs/execution-engine">Execution Engine Deep Dive</a> for full details.</p>
+
+        <h2>Graph Variables</h2>
+        <p>
+            Named, typed values scoped to the graph. When you create a variable, the system
+            automatically generates <strong>Get</strong> and <strong>Set</strong> nodes.
+            Variables let you share state across distant parts of your graph without long wires.
+        </p>
+        <p>See <a href="docs/variables-events">Variables &amp; Events</a>.</p>
+
+        <h2>Graph Events</h2>
+        <p>
+            An event-driven execution model. Creating an event generates <strong>Trigger</strong>
+            and <strong>Listener</strong> nodes. Events decouple parts of your graph, enabling
+            modular and reactive flow designs.
+        </p>
+        <p>See <a href="docs/variables-events">Variables &amp; Events</a>.</p>
+
+        <h2>Overlays</h2>
+        <p>
+            Non-functional visual shapes that sit behind nodes on the canvas. Overlays help you
+            organize and annotate your graph by grouping related nodes into labeled, color-coded regions.
+        </p>
+        <p>See <a href="docs/overlays">Overlays</a>.</p>
+
+        <h2>Serialization</h2>
+        <p>
+            The <code>GraphSerializer</code> service converts graphs to and from JSON. It handles
+            schema versioning, migration, and preserves all graph data including nodes, connections,
+            variables, events, and overlays.
+        </p>
+        <pre><code>// Save
+var dto = serializer.Export(editorState);
+var json = serializer.Serialize(dto);
+
+// Load
+var dto = serializer.Deserialize(json);
+serializer.Import(editorState, dto);</code></pre>
+
+        <h2>Plugin System</h2>
+        <p>
+            Plugins extend NodeEditor.Net with new nodes, services, and custom editors.
+            Each plugin loads in an isolated <code>AssemblyLoadContext</code> with lifecycle hooks:
+        </p>
+        <ul>
+            <li><code>OnLoadAsync</code> → <code>ConfigureServices</code> → <code>Register</code> → <code>OnInitializeAsync</code></li>
+            <li>Auto-discovery of <code>INodeContext</code> classes and <code>INodeCustomEditor</code> implementations</li>
+            <li>Event subscriptions via <code>IPluginEventBus</code></li>
+        </ul>
+        <p>See <a href="docs/plugin-sdk">Plugin SDK</a> and <a href="docs/plugin-customization">Plugin Customization</a>.</p>
+
+        <h2>Plugin Marketplace</h2>
+        <p>
+            Browse, search, install, update, and uninstall plugins from local and remote repositories
+            through a built-in UI. Supports ZIP upload, one-click install, and version compatibility checks.
+        </p>
+        <p>See <a href="docs/marketplace">Marketplace</a>.</p>
+
+        <h2>Custom Socket Editors</h2>
+        <p>
+            Control how socket values are edited inline on nodes using the <code>[SocketEditor]</code>
+            attribute or by implementing <code>INodeCustomEditor</code> for fully custom Blazor UI.
+        </p>
+        <p>Available built-in editor kinds:</p>
+        <ul>
+            <li><code>Text</code>, <code>Number</code>, <code>Bool</code>, <code>Dropdown</code></li>
+            <li><code>Button</code>, <code>Image</code>, <code>NumberUpDown</code>, <code>TextArea</code>, <code>Custom</code></li>
+        </ul>
+
+        <h2>Type System</h2>
+        <p>
+            The <code>SocketTypeResolver</code> maps type name strings to .NET CLR types. It supports
+            all standard types plus custom types registered by plugins. Connection validation uses
+            <code>ConnectionValidator</code> to ensure type-compatible sockets are connected.
+        </p>
+
+        <h2>MCP Integration</h2>
+        <p>
+            Model Context Protocol server exposing a discovery-based ability system. Supports
+            <strong>stdio</strong> (standalone) and <strong>HTTP/SSE</strong> (embedded in WebHost) transports.
+            AI assistants can build and execute graphs programmatically.
+        </p>
+        <p>See <a href="docs/mcp-integration">MCP Integration</a> and <a href="docs/mcp-state-bridge">MCP State Bridge</a>.</p>
+
+        <h2>Headless Execution</h2>
+        <p>
+            Run node graphs without any UI using <code>HeadlessGraphRunner</code>. Supports CI/CD pipelines,
+            API endpoints, background services, unit testing, and batch processing.
+        </p>
+        <p>See <a href="docs/headless-execution">Headless Execution</a>.</p>
+
+        <h2>Logging System</h2>
+        <p>
+            Structured, channel-based logging with <code>INodeEditorLogger</code>. Messages are organized
+            into named channels (Execution, Plugins, Serialization) with configurable retention policies.
+            Plugins can register custom log channels.
+        </p>
+        <p>See <a href="docs/logging">Logging</a>.</p>
+
+        <h2>Built-in Standard Nodes</h2>
+        <p>NodeEditor.Net ships with a comprehensive set of standard nodes:</p>
+        <table class="docs-table">
+            <thead><tr><th>Category</th><th>Nodes</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Math</strong></td><td>Add, Subtract, Multiply, Divide, Modulo, Negate, Absolute, Clamp, Min, Max, Power, Round</td></tr>
+                <tr><td><strong>Strings</strong></td><td>Concat, Format, Length, Contains, Replace, Split, Join, Substring, Trim, ToUpper, ToLower</td></tr>
+                <tr><td><strong>Lists</strong></td><td>Create List, Add Item, Get Item, Remove Item, Count, Contains, Sort, Reverse, Filter</td></tr>
+                <tr><td><strong>Conditions</strong></td><td>Branch, Compare, Equals, Not Equals, Greater Than, Less Than, AND, OR, NOT</td></tr>
+                <tr><td><strong>Flow</strong></td><td>Start, ForEach, While, Delay, Sequence, Select</td></tr>
+                <tr><td><strong>Debug</strong></td><td>Print, Log, Break, Assert</td></tr>
+            </tbody>
+        </table>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

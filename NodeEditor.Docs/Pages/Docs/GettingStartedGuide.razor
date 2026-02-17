@@ -1,0 +1,217 @@
+@page "/docs/getting-started"
+
+<PageTitle>Getting Started — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Getting Started with NodeEditor.Net</h1>
+        <p>
+            This guide walks you through setting up NodeEditor.Net, creating your first node graph, and running it.
+        </p>
+
+        <h2>Prerequisites</h2>
+        <ul>
+            <li><a href="https://dotnet.microsoft.com/download/dotnet/10.0">.NET 10 SDK</a></li>
+            <li>A code editor (Visual Studio, VS Code, Rider, etc.)</li>
+        </ul>
+
+        <h2>Step 1: Create a New Blazor Project</h2>
+        <pre><code>dotnet new blazor -n MyNodeEditor --interactivity Server
+cd MyNodeEditor</code></pre>
+
+        <h2>Step 2: Add NodeEditor.Net References</h2>
+        <p>Add a project reference to <code>NodeEditor.Blazor</code> (which transitively includes <code>NodeEditor.Net</code>):</p>
+        <pre><code>&lt;!-- MyNodeEditor.csproj --&gt;
+&lt;ItemGroup&gt;
+  &lt;ProjectReference Include="../NodeEditor.Blazor/NodeEditor.Blazor.csproj" /&gt;
+&lt;/ItemGroup&gt;</code></pre>
+
+        <h2>Step 3: Register Services</h2>
+        <p>In your <code>Program.cs</code>, register all node editor services with a single call:</p>
+        <pre><code>using NodeEditor.Blazor.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+// Register all node editor services
+builder.Services.AddNodeEditor();
+
+var app = builder.Build();
+app.UseStaticFiles();
+app.UseAntiforgery();
+app.MapRazorComponents&lt;App&gt;()
+    .AddInteractiveServerRenderMode();
+app.Run();</code></pre>
+
+        <h3>Services Registered by AddNodeEditor()</h3>
+        <table class="docs-table">
+            <thead><tr><th>Service</th><th>Lifetime</th><th>Purpose</th></tr></thead>
+            <tbody>
+                <tr><td><code>NodeEditorState</code></td><td>Scoped</td><td>Central state management with events</td></tr>
+                <tr><td><code>NodeExecutionService</code></td><td>Scoped</td><td>Executes node graphs</td></tr>
+                <tr><td><code>GraphSerializer</code></td><td>Scoped</td><td>JSON save/load</td></tr>
+                <tr><td><code>NodeRegistryService</code></td><td>Singleton</td><td>Manages available node definitions</td></tr>
+                <tr><td><code>PluginLoader</code></td><td>Singleton</td><td>Loads plugins from disk</td></tr>
+                <tr><td><code>SocketTypeResolver</code></td><td>Singleton</td><td>Maps type names to .NET types</td></tr>
+                <tr><td><code>ConnectionValidator</code></td><td>Scoped</td><td>Validates socket connections</td></tr>
+                <tr><td><code>INodeEditorLogger</code></td><td>Singleton</td><td>Channel-based logging</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Step 4: Add the Node Editor Canvas</h2>
+        <pre><code>@@page "/editor"
+@@using NodeEditor.Blazor.Components
+@@using NodeEditor.Net.Services
+@@using NodeEditor.Net.Services.Registry
+@@inject NodeEditorState EditorState
+@@inject NodeRegistryService Registry
+
+&lt;PageTitle&gt;Node Editor&lt;/PageTitle&gt;
+
+&lt;div style="width: 100%; height: 100vh; position: relative;"&gt;
+    &lt;NodeEditorCanvas State="@@EditorState" /&gt;
+&lt;/div&gt;
+
+@@code {
+    protected override void OnInitialized()
+    {
+        Registry.EnsureInitialized(new[] { typeof(MyNodes).Assembly });
+    }
+}</code></pre>
+
+        <h2>Step 5: Define Your First Nodes</h2>
+        <pre><code>using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.Services.Execution;
+
+namespace MyNodeEditor;
+
+public sealed class MyNodes : INodeContext
+{
+    // A data node — computes a value from inputs
+    [Node("Add", category: "Math", description: "Adds two numbers",
+          isCallable: false)]
+    public void Add(double A, double B, out double Result)
+    {
+        Result = A + B;
+    }
+
+    // An executable node — has execution flow sockets
+    [Node("Print", category: "Debug", description: "Prints a value",
+          isCallable: true)]
+    public void Print(ExecutionPath Entry, string Message,
+                      out ExecutionPath Exit)
+    {
+        Console.WriteLine(Message);
+        Exit = new ExecutionPath();
+        Exit.Signal();
+    }
+
+    // An execution initiator — starts the execution chain
+    [Node("Start", category: "Flow", description: "Entry point",
+          isCallable: true, isExecutionInitiator: true)]
+    public void Start(out ExecutionPath Exit)
+    {
+        Exit = new ExecutionPath();
+        Exit.Signal();
+    }
+}</code></pre>
+
+        <h2>Step 6: Run Your App</h2>
+        <pre><code>dotnet run</code></pre>
+        <p>Open the browser and navigate to <code>/editor</code>. You should see:</p>
+        <ul>
+            <li>A dark canvas that you can <strong>pan</strong> (middle-click drag) and <strong>zoom</strong> (scroll wheel)</li>
+            <li><strong>Right-click</strong> to open the context menu and add nodes</li>
+            <li><strong>Drag from a socket</strong> to create connections between nodes</li>
+            <li><strong>Click a node</strong> to select it; press <strong>Delete</strong> to remove it</li>
+        </ul>
+
+        <h2>Understanding Node Types</h2>
+
+        <h3>Data Nodes (isCallable: false)</h3>
+        <p>Compute outputs from inputs. No execution flow sockets. Evaluate lazily when outputs are needed.</p>
+        <pre><code>[Node("Multiply", category: "Math", isCallable: false)]
+public void Multiply(double A, double B, out double Result)
+{
+    Result = A * B;
+}</code></pre>
+
+        <h3>Callable Nodes (isCallable: true)</h3>
+        <p>Participate in execution flow. Have <code>ExecutionPath</code> input/output sockets controlling when they run.</p>
+
+        <h3>Execution Initiators (isExecutionInitiator: true)</h3>
+        <p>Start an execution chain. No execution input but produce execution outputs.</p>
+
+        <h3>Branching Nodes</h3>
+        <p>Create conditional execution by signaling different execution paths:</p>
+        <pre><code>[Node("Branch", category: "Flow", isCallable: true)]
+public void Branch(ExecutionPath Entry, bool Condition,
+                   out ExecutionPath True, out ExecutionPath False)
+{
+    True = new ExecutionPath();
+    False = new ExecutionPath();
+
+    if (Condition) True.Signal();
+    else False.Signal();
+}</code></pre>
+
+        <h2>Canvas Interactions</h2>
+        <table class="docs-table">
+            <thead><tr><th>Action</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Right-click</strong> on canvas</td><td>Open context menu to add nodes</td></tr>
+                <tr><td><strong>Left-click + drag</strong> on canvas</td><td>Box selection</td></tr>
+                <tr><td><strong>Left-click + drag</strong> on a node</td><td>Move node (or all selected nodes)</td></tr>
+                <tr><td><strong>Left-click + drag</strong> from a socket</td><td>Create a connection</td></tr>
+                <tr><td><strong>Middle-click + drag</strong></td><td>Pan the canvas</td></tr>
+                <tr><td><strong>Scroll wheel</strong></td><td>Zoom in/out</td></tr>
+                <tr><td><strong>Delete / Backspace</strong></td><td>Delete selected nodes</td></tr>
+                <tr><td><strong>Ctrl+A</strong></td><td>Select all nodes</td></tr>
+                <tr><td><strong>Escape</strong></td><td>Cancel current operation</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Saving and Loading Graphs</h2>
+        <pre><code>@@inject GraphSerializer Serializer
+
+// Save
+var dto = Serializer.Export(EditorState);
+var json = Serializer.Serialize(dto);
+File.WriteAllText("my-graph.json", json);
+
+// Load
+var json = File.ReadAllText("my-graph.json");
+var dto = Serializer.Deserialize(json);
+var result = Serializer.Import(EditorState, dto);</code></pre>
+
+        <h2>Using Socket Editors</h2>
+        <p>Control how socket values are edited using the <code>[SocketEditor]</code> attribute:</p>
+        <pre><code>[Node("Image Loader", category: "Media", isCallable: true)]
+public void LoadImage(
+    ExecutionPath Entry,
+    [SocketEditor(SocketEditorKind.Image, Label = "Image Path")] string ImagePath,
+    [SocketEditor(SocketEditorKind.Dropdown, Options = "PNG,JPEG,BMP")] string Format,
+    [SocketEditor(SocketEditorKind.NumberUpDown, Min = 0, Max = 100)] int Quality,
+    out ExecutionPath Exit)
+{
+    // ...
+    Exit = new ExecutionPath();
+    Exit.Signal();
+}</code></pre>
+        <p>Available editor kinds: <code>Text</code>, <code>Number</code>, <code>Bool</code>, <code>Dropdown</code>, <code>Button</code>, <code>Image</code>, <code>NumberUpDown</code>, <code>TextArea</code>, <code>Custom</code>.</p>
+
+        <h2>Next Steps</h2>
+        <ul>
+            <li><a href="docs/features-overview">Features Overview</a> — Learn about all capabilities</li>
+            <li><a href="docs/custom-nodes">Custom Nodes Tutorial</a> — Advanced node creation patterns</li>
+            <li><a href="docs/plugin-sdk">Plugin SDK</a> — Package your nodes as a reusable plugin</li>
+            <li><a href="docs/execution-engine">Execution Engine</a> — Understand graph planning and execution</li>
+            <li><a href="docs/mcp-integration">MCP Integration</a> — Let AI assistants build graphs</li>
+        </ul>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>
