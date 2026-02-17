@@ -868,6 +868,77 @@ public sealed class ExecutionEngineTests
         Assert.True(context.IsNodeExecuted("listener-marker"));
     }
 
+    [Fact]
+    public async Task EventTrigger_WithTwoListenersEachWithDelay_DoesNotHang()
+    {
+        // Arrange: one trigger event, two listeners; each listener does Delay -> Marker
+        var service = CreateService(out var registry);
+        var graphEvent = GraphEvent.Create("ParallelDelayEvent");
+        var eventId = graphEvent.Id;
+
+        var execType = "NodeEditor.Blazor.Services.Execution.ExecutionPath";
+
+        // Register event definitions via the real NodeEditorState
+        var state = new NodeEditorState();
+        var eventFactory = new EventNodeFactory(registry, state);
+        state.AddEvent(graphEvent);
+
+        var start = NodeFromDef(registry, "Start", "start");
+
+        var triggerNode = new NodeData("trigger", "Trigger Event: ParallelDelayEvent", Callable: true, ExecInit: false,
+            Inputs: new[] { new SocketData("Enter", execType, IsInput: true, IsExecution: true) },
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) },
+            DefinitionId: GraphEvent.TriggerDefinitionPrefix + eventId);
+
+        var listenerA = new NodeData("listener-a", "Custom Event: ParallelDelayEvent", Callable: true, ExecInit: true,
+            Inputs: Array.Empty<SocketData>(),
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) },
+            DefinitionId: GraphEvent.ListenerDefinitionPrefix + eventId);
+
+        var listenerB = new NodeData("listener-b", "Custom Event: ParallelDelayEvent", Callable: true, ExecInit: true,
+            Inputs: Array.Empty<SocketData>(),
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) },
+            DefinitionId: GraphEvent.ListenerDefinitionPrefix + eventId);
+
+        var delayA = NodeFromDef(registry, "Delay", "delay-a", ("DelayMs", 150));
+        var delayB = NodeFromDef(registry, "Delay", "delay-b", ("DelayMs", 200));
+        var markerA = NodeFromDef(registry, "Marker", "marker-a");
+        var markerB = NodeFromDef(registry, "Marker", "marker-b");
+        var triggerExitMarker = NodeFromDef(registry, "Marker", "trigger-exit-marker");
+
+        var nodes = new List<NodeData>
+        {
+            start, triggerNode, listenerA, listenerB, delayA, delayB, markerA, markerB, triggerExitMarker
+        };
+
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "trigger", "Enter"),
+            TestConnections.Exec("trigger", "Exit", "trigger-exit-marker", "Enter"),
+
+            TestConnections.Exec("listener-a", "Exit", "delay-a", "Enter"),
+            TestConnections.Exec("delay-a", "Exit", "marker-a", "Enter"),
+
+            TestConnections.Exec("listener-b", "Exit", "delay-b", "Enter"),
+            TestConnections.Exec("delay-b", "Exit", "marker-b", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+
+        // Act + Assert: should complete and not hang
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, cts.Token);
+
+        Assert.True(context.IsNodeExecuted("trigger"));
+        Assert.True(context.IsNodeExecuted("trigger-exit-marker"));
+        Assert.True(context.IsNodeExecuted("listener-a"));
+        Assert.True(context.IsNodeExecuted("listener-b"));
+        Assert.True(context.IsNodeExecuted("delay-a"));
+        Assert.True(context.IsNodeExecuted("delay-b"));
+        Assert.True(context.IsNodeExecuted("marker-a"));
+        Assert.True(context.IsNodeExecuted("marker-b"));
+    }
+
     // ── Execution-flow cycle validation ──
 
     [Fact]
