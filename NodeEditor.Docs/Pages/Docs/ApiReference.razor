@@ -1,0 +1,131 @@
+@page "/docs/api-reference"
+
+<PageTitle>API Reference — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>API Reference</h1>
+        <p>Complete API reference for NodeEditor.Blazor and NodeEditor.Net libraries.</p>
+
+        <h2>Core Services</h2>
+
+        <h3>NodeEditorState</h3>
+        <p><strong>Namespace:</strong> <code>NodeEditor.Net.Services</code> · <strong>Lifetime:</strong> Scoped</p>
+        <p>Central state management class with event-based architecture.</p>
+        <table class="docs-table">
+            <thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>Nodes</code></td><td><code>ObservableCollection&lt;NodeViewModel&gt;</code></td><td>All nodes in the graph</td></tr>
+                <tr><td><code>Connections</code></td><td><code>ObservableCollection&lt;ConnectionData&gt;</code></td><td>All connections</td></tr>
+                <tr><td><code>SelectedNodeIds</code></td><td><code>HashSet&lt;string&gt;</code></td><td>Selected node IDs</td></tr>
+                <tr><td><code>Zoom</code></td><td><code>double</code></td><td>Current zoom level (1.0 = 100%)</td></tr>
+                <tr><td><code>Viewport</code></td><td><code>Rect2D</code></td><td>Current viewport rectangle</td></tr>
+            </tbody>
+        </table>
+        <p>Key methods: <code>AddNode()</code>, <code>RemoveNode()</code>, <code>AddConnection()</code>, <code>RemoveConnection()</code>, <code>SelectNode()</code>, <code>ClearSelection()</code>, <code>BuildExecutionNodes()</code>, <code>ApplyExecutionContext()</code></p>
+
+        <h3>NodeExecutionService</h3>
+        <p><strong>Namespace:</strong> <code>NodeEditor.Net.Services.Execution</code> · <strong>Lifetime:</strong> Scoped</p>
+        <pre><code>await executionService.ExecuteAsync(
+    nodes, connections, context, nodeContext, options, token);</code></pre>
+
+        <h3>NodeRegistryService</h3>
+        <p><strong>Namespace:</strong> <code>NodeEditor.Net.Services.Registry</code> · <strong>Lifetime:</strong> Singleton</p>
+        <pre><code>registry.EnsureInitialized(new[] { typeof(MyNodes).Assembly });
+var catalog = registry.GetCatalog();</code></pre>
+
+        <h3>GraphSerializer</h3>
+        <p><strong>Namespace:</strong> <code>NodeEditor.Net.Services</code> · <strong>Lifetime:</strong> Scoped</p>
+        <pre><code>// Export
+var dto = serializer.Export(editorState);
+var json = serializer.Serialize(dto);
+
+// Import
+var dto = serializer.Deserialize(json);
+var result = serializer.Import(editorState, dto);</code></pre>
+
+        <h3>Other Services</h3>
+        <table class="docs-table">
+            <thead><tr><th>Service</th><th>Lifetime</th><th>Purpose</th></tr></thead>
+            <tbody>
+                <tr><td><code>CoordinateConverter</code></td><td>Scoped</td><td>Screen ↔ graph coordinate conversion</td></tr>
+                <tr><td><code>ConnectionValidator</code></td><td>Scoped</td><td>Validates socket connections by type</td></tr>
+                <tr><td><code>SocketTypeResolver</code></td><td>Singleton</td><td>Maps type name strings to CLR types</td></tr>
+                <tr><td><code>ViewportCuller</code></td><td>Scoped</td><td>Performance optimization for large graphs</td></tr>
+                <tr><td><code>HeadlessGraphRunner</code></td><td>Scoped</td><td>Execute graphs without UI</td></tr>
+                <tr><td><code>PluginLoader</code></td><td>Singleton</td><td>Loads plugin assemblies dynamically</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Components</h2>
+        <table class="docs-table">
+            <thead><tr><th>Component</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>NodeEditorCanvas</code></td><td>Main canvas component. Parameters: <code>State</code>, <code>MinZoom</code>, <code>MaxZoom</code>, <code>ZoomStep</code></td></tr>
+                <tr><td><code>NodeComponent</code></td><td>Renders individual nodes with sockets, title, and execution state</td></tr>
+                <tr><td><code>SocketComponent</code></td><td>Renders input/output sockets with inline editors</td></tr>
+                <tr><td><code>ConnectionPath</code></td><td>Renders SVG Bézier curves between connected sockets</td></tr>
+                <tr><td><code>ContextMenu</code></td><td>Right-click node picker with category search</td></tr>
+                <tr><td><code>OrganizerOverlay</code></td><td>Renders overlay shapes behind nodes</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Models</h2>
+
+        <h3>NodeData (record)</h3>
+        <pre><code>public sealed record NodeData(
+    string Id, string Name, bool Callable, bool ExecInit,
+    string? DefinitionId,
+    IReadOnlyList&lt;SocketData&gt; Inputs,
+    IReadOnlyList&lt;SocketData&gt; Outputs);</code></pre>
+
+        <h3>SocketData (record)</h3>
+        <pre><code>public sealed record SocketData(
+    string Name, string TypeName, bool IsInput,
+    bool IsExecution, SocketValue? Value,
+    SocketEditorHint? EditorHint);</code></pre>
+
+        <h3>ConnectionData (record)</h3>
+        <pre><code>public sealed record ConnectionData(
+    string OutputNodeId, string InputNodeId,
+    string OutputSocketName, string InputSocketName,
+    bool IsExecution);</code></pre>
+
+        <h3>Geometry Primitives</h3>
+        <pre><code>public record Point2D(double X, double Y);
+public record Size2D(double Width, double Height);
+public record Rect2D(double X, double Y, double Width, double Height);</code></pre>
+
+        <h2>View Models</h2>
+        <table class="docs-table">
+            <thead><tr><th>ViewModel</th><th>Key Members</th></tr></thead>
+            <tbody>
+                <tr><td><code>NodeViewModel</code></td><td><code>Data</code>, <code>Position</code>, <code>IsSelected</code>, <code>IsExecuting</code>, <code>HasError</code>, <code>InputSockets</code>, <code>OutputSockets</code></td></tr>
+                <tr><td><code>SocketViewModel</code></td><td><code>Data</code>, <code>SetValue()</code>, <code>GetValue()</code>, <code>IsConnected</code></td></tr>
+                <tr><td><code>OverlayViewModel</code></td><td><code>Id</code>, <code>Title</code>, <code>Body</code>, <code>Position</code>, <code>Size</code>, <code>Color</code>, <code>Opacity</code></td></tr>
+            </tbody>
+        </table>
+
+        <h2>Interfaces</h2>
+
+        <h3>INodeContext</h3>
+        <p>Base interface for all node context classes. Methods marked with <code>[Node]</code> become nodes.</p>
+
+        <h3>INodePlugin</h3>
+        <p>Plugin lifecycle interface with hooks: <code>Register</code>, <code>ConfigureServices</code>, <code>OnLoadAsync</code>, <code>OnInitializeAsync</code>, <code>OnUnloadAsync</code>, <code>OnError</code>, <code>Unload</code>.</p>
+
+        <h3>INodeCustomEditor</h3>
+        <p>Interface for custom socket editors: <code>CanEdit(SocketData)</code> and <code>Render(SocketEditorContext)</code>.</p>
+
+        <h2>Socket Editor Kinds</h2>
+        <pre><code>public enum SocketEditorKind
+{
+    Text, Number, Bool, Dropdown, Button,
+    Image, NumberUpDown, TextArea, Custom
+}</code></pre>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>

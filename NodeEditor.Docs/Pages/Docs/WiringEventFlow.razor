@@ -1,0 +1,131 @@
+@page "/docs/wiring-event-flow"
+
+<PageTitle>Wiring &amp; Event Flow — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Wiring &amp; Event Flow</h1>
+        <p>
+            Detailed insight into how NodeEditor.Net components are wired together, how events flow
+            through the system, and how the reactive architecture responds to user interactions.
+        </p>
+
+        <h2>Dependency Injection Wiring</h2>
+        <p>Services are registered via <code>AddNodeEditor()</code> with two lifetime scopes:</p>
+        <pre><code>Singleton Services (created once)
+├── PluginLoader — loads plugin assemblies
+├── IPluginServiceRegistry — per-plugin service registration
+├── NodeRegistryService — stores node definitions
+├── NodeDiscoveryService — scans assemblies for [Node] methods
+├── SocketTypeResolver — type name → CLR type mapping
+├── ExecutionPlanner — Kahn's topological sort
+├── GraphSchemaMigrator — versioned schema migration
+└── BackgroundExecutionQueue — channel-based job queue
+
+Scoped Services (per user/circuit)
+├── NodeEditorState — central state with events
+├── IPluginEventBus — plugin event subscriptions
+├── CoordinateConverter — screen ↔ graph coordinates
+├── ConnectionValidator — type-safe connection checks
+├── ViewportCuller — performance optimization
+├── NodeExecutionService — graph execution
+├── GraphSerializer — JSON save/load
+└── BackgroundExecutionWorker — job consumer</code></pre>
+
+        <h2>Component Event Propagation</h2>
+        <p>Events flow from user interaction through components to state and back:</p>
+        <pre><code>User Action → Component (e.g. NodeComponent)
+  → NodeEditorState method (e.g. AddNode, SelectNode)
+    → Event raised (e.g. NodeAdded, SelectionChanged)
+      → Subscribed components call StateHasChanged()
+        → Blazor re-renders affected components</code></pre>
+
+        <h2>Connection Creation Flow</h2>
+        <ol>
+            <li><strong>Mouse down</strong> on output socket → Canvas enters "drawing connection" mode</li>
+            <li><strong>Mouse move</strong> → <code>ConnectionDrawing</code> component renders a temporary curve</li>
+            <li><strong>Mouse up</strong> on input socket → <code>ConnectionValidator.CanConnect()</code> checks compatibility</li>
+            <li>If valid → <code>EditorState.AddConnection()</code> → <code>ConnectionAdded</code> event → <code>ConnectionPath</code> renders</li>
+            <li>If invalid → Connection attempt cancelled, visual feedback shown</li>
+        </ol>
+        <p>Validation checks:</p>
+        <ul>
+            <li>Can't connect a socket to itself</li>
+            <li>Can't connect two inputs or two outputs</li>
+            <li>Execution sockets only connect to execution sockets</li>
+            <li>Data types must be compatible (checked via <code>SocketTypeResolver</code>)</li>
+            <li>One input socket can only have one connection</li>
+        </ul>
+
+        <h2>Node Execution Flow</h2>
+        <ol>
+            <li>User clicks "Execute" button</li>
+            <li><code>EditorState.BuildExecutionNodes()</code> creates immutable <code>NodeData</code> snapshots</li>
+            <li><code>NodeExecutionService.ExecuteAsync()</code> orchestrates the run</li>
+            <li>For each node: <code>NodeStarted</code> → resolve inputs → invoke method → <code>NodeCompleted</code></li>
+            <li><code>EditorState.ApplyExecutionContext()</code> pushes results to <code>SocketViewModel.SetValue()</code></li>
+            <li><code>SocketValuesChanged</code> event → socket editors update to show results</li>
+        </ol>
+
+        <h2>Plugin Loading &amp; Registration Flow</h2>
+        <ol>
+            <li><code>PluginLoader</code> discovers plugin directories at startup</li>
+            <li>For each plugin: load assembly in isolated <code>AssemblyLoadContext</code></li>
+            <li>Find <code>INodePlugin</code> implementation → call lifecycle hooks:
+                <ul>
+                    <li><code>OnLoadAsync</code></li>
+                    <li><code>ConfigureServices</code> (register plugin services)</li>
+                    <li><code>Register</code> (register nodes with registry)</li>
+                    <li><code>OnInitializeAsync</code> (full DI available)</li>
+                </ul>
+            </li>
+            <li>Auto-discover <code>INodeCustomEditor</code> implementations</li>
+            <li>If <code>ILogChannelAware</code>, register custom log channels</li>
+        </ol>
+
+        <h2>Plugin Event Bus</h2>
+        <p>
+            The <code>IPluginEventBus</code> bridges <code>NodeEditorState</code> events to plugin subscribers.
+            When state raises an event, the bus forwards it to all subscribed plugins:
+        </p>
+        <pre><code>NodeEditorState.NodeAdded
+  → PluginEventBus.PublishNodeAdded
+    → Plugin A: SubscribeNodeAdded handler
+    → Plugin B: SubscribeNodeAdded handler</code></pre>
+        <p>All <code>Subscribe*</code> methods return <code>IDisposable</code> for clean unsubscription during plugin unload.</p>
+
+        <h2>Serialization Flow</h2>
+        <h3>Export (Save)</h3>
+        <ol>
+            <li><code>GraphSerializer.Export(state)</code> → creates <code>GraphDto</code> from current state</li>
+            <li>Snapshots all nodes, connections, variables, events, and overlays</li>
+            <li><code>Serialize(dto)</code> → JSON string with schema version</li>
+        </ol>
+        <h3>Import (Load)</h3>
+        <ol>
+            <li><code>Deserialize(json)</code> → <code>GraphDto</code></li>
+            <li><code>GraphSchemaMigrator</code> upgrades schema if needed</li>
+            <li><code>Import(state, dto)</code> → clears state, creates ViewModels, re-registers variable/event nodes</li>
+            <li>Returns <code>ImportResult</code> with any warnings (missing definitions, skipped nodes, etc.)</li>
+        </ol>
+
+        <h2>Viewport &amp; Coordinate Transformation</h2>
+        <p>
+            The <code>CoordinateConverter</code> translates between screen pixels and graph coordinates,
+            accounting for zoom and pan offset:
+        </p>
+        <pre><code>// Screen → Graph
+graphPoint = converter.ScreenToGraph(screenX, screenY);
+
+// Graph → Screen
+screenPoint = converter.GraphToScreen(graphX, graphY);</code></pre>
+        <p>
+            The <code>ViewportCuller</code> determines which nodes are visible in the current viewport
+            and skips rendering for off-screen nodes, improving performance for large graphs.
+        </p>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>
