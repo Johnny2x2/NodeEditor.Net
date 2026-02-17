@@ -71,6 +71,7 @@ public static class NodeEditorServiceExtensions
         services.AddScoped<IPluginMarketplaceSource>(sp => sp.GetRequiredService<RemotePluginMarketplaceSource>());
         services.AddScoped<AggregatedPluginMarketplaceSource>();
         services.AddScoped<IPluginInstallationService, PluginInstallationService>();
+        services.AddScoped<ILocalPluginRepositoryService, LocalPluginRepositoryService>();
 
         // Event bus (bridges state events to plugins)
         services.AddScoped<IPluginEventBus, PluginEventBus>();
@@ -94,7 +95,6 @@ public static class NodeEditorServiceExtensions
         services.AddSingleton<ISocketTypeResolver>(provider =>
         {
             var resolver = new SocketTypeResolver();
-            resolver.Register<ExecutionPath>();
             resolver.Register<SerializableList>();
             return resolver;
         });
@@ -102,10 +102,6 @@ public static class NodeEditorServiceExtensions
         // Node registry & discovery
         services.AddSingleton<NodeDiscoveryService>();
         services.AddSingleton<INodeRegistryService, NodeRegistryService>();
-
-        // Node context factory & registry
-        services.AddSingleton<INodeContextFactory, NodeContextFactory>();
-        services.AddSingleton<INodeContextRegistry, NodeContextRegistry>();
 
         // Adapters
         services.AddSingleton<INodeAdapter, NodeAdapter>();

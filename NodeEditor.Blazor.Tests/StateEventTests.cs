@@ -313,4 +313,24 @@ public sealed class StateEventTests
         Assert.NotNull(raisedArgs);
         Assert.Equal(graphEvent, raisedArgs.Event);
     }
+
+    [Fact]
+    public void Clear_FiresEventRemovedForEachEvent()
+    {
+        var state = new NodeEditorState();
+        var event1 = GraphEvent.Create("OnStart");
+        var event2 = GraphEvent.Create("OnStop");
+        state.AddEvent(event1);
+        state.AddEvent(event2);
+
+        var removedEvents = new List<GraphEvent>();
+        state.EventRemoved += (sender, args) => removedEvents.Add(args.Event);
+
+        state.Clear();
+
+        Assert.Equal(2, removedEvents.Count);
+        Assert.Contains(event1, removedEvents);
+        Assert.Contains(event2, removedEvents);
+        Assert.Empty(state.Events);
+    }
 }

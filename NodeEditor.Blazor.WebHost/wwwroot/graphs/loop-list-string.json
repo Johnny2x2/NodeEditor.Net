@@ -435,7 +435,6 @@
   "connections": [
     { "outputNodeId": "start-loop", "outputSocketName": "Exit", "inputNodeId": "for-loop", "inputSocketName": "Enter", "isExecution": true },
     { "outputNodeId": "for-loop", "outputSocketName": "LoopPath", "inputNodeId": "consume-loop", "inputSocketName": "Enter", "isExecution": true },
-    { "outputNodeId": "consume-loop", "outputSocketName": "Exit", "inputNodeId": "for-loop", "inputSocketName": "Enter", "isExecution": true },
     { "outputNodeId": "for-loop", "outputSocketName": "Exit", "inputNodeId": "marker-loop", "inputSocketName": "Enter", "isExecution": true },
     { "outputNodeId": "for-loop", "outputSocketName": "Index", "inputNodeId": "consume-loop", "inputSocketName": "Value", "isExecution": false },
 

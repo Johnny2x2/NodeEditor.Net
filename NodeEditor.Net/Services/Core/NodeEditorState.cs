@@ -298,7 +298,7 @@ public class NodeEditorState : INodeEditorState
     /// Updates socket values from an execution context and raises <see cref="SocketValuesChanged"/>.
     /// </summary>
     public void ApplyExecutionContext(
-        INodeExecutionContext context,
+        INodeRuntimeStorage context,
         bool includeInputs = true,
         bool includeOutputs = true,
         bool includeExecutionSockets = false)
@@ -1148,6 +1148,12 @@ public class NodeEditorState : INodeEditorState
         ClearOverlaySelectionInternal();
         ClearConnectionSelection();
         Variables.Clear();
+
+        var eventsToRemove = Events.ToList();
+        foreach (var graphEvent in eventsToRemove)
+        {
+            EventRemoved?.Invoke(this, new GraphEventEventArgs(graphEvent));
+        }
         Events.Clear();
         Viewport = new Rect2D(0, 0, 0, 0);
         Zoom = 1.0;

@@ -1,6 +1,7 @@
 @using NodeEditor.Blazor.Services.Editors
 @using NodeEditor.Net.Models
 @using Microsoft.AspNetCore.Components.Forms
+@inject IJSRuntime JSRuntime
 
 <div class="ne-editor-image">
     <InputFile OnChange="OnFileSelected" 
@@ -8,12 +9,13 @@
                id="@_fileInputId"
                style="display: none;" />
     
-    <label class="ne-editor-button"
-           for="@_fileInputId"
-           @onpointerdown:stopPropagation
-           @onclick:stopPropagation>
+    <button class="ne-editor-button"
+            type="button"
+            @onclick="TriggerFileInput"
+            @onclick:stopPropagation
+            @onpointerdown:stopPropagation>
         📁 Load Image
-    </label>
+    </button>
     
     @if (!string.IsNullOrEmpty(CurrentPath))
     {
@@ -35,6 +37,7 @@
     public SocketEditorContext Context { get; set; } = null!;
 
     private string _fileInputId = $"file-input-{Guid.NewGuid():N}";
+    private IJSObjectReference? _jsModule;
     private string? CurrentPath => Context.GetStringValue();
     private string DisplayName =>
         string.IsNullOrWhiteSpace(CurrentPath)
@@ -43,6 +46,13 @@
                 ? "Loaded image"
                 : System.IO.Path.GetFileName(CurrentPath));
     private string? PreviewDataUrl { get; set; }
+
+    private async Task TriggerFileInput()
+    {
+        _jsModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/NodeEditor.Blazor/nodeEditorCanvas.js");
+        await _jsModule.InvokeVoidAsync("triggerClick", _fileInputId);
+    }
 
     protected override async Task OnParametersSetAsync()
     {

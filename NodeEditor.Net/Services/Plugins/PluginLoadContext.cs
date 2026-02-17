@@ -9,6 +9,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext
     private readonly AssemblyDependencyResolver _resolver;
 
     public PluginLoadContext(string pluginPath)
+        : base(name: $"Plugin:{Path.GetFileNameWithoutExtension(pluginPath)}:{Guid.NewGuid():N}", isCollectible: true)
     {
         _resolver = new AssemblyDependencyResolver(pluginPath);
     }

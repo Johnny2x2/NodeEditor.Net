@@ -1,5 +1,6 @@
 using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Execution.StandardNodes;
 using NodeEditor.Net.Services.Registry;
 
 namespace NodeEditor.Blazor.Tests;
@@ -7,34 +8,50 @@ namespace NodeEditor.Blazor.Tests;
 public sealed class NodeRegistryTests
 {
     [Fact]
-    public void NodeDiscoveryService_FindsAnnotatedNodes()
+    public void Discovery_FindsNodeBaseSubclasses()
     {
-        var discovery = new NodeDiscoveryService();
-        var definitions = discovery.DiscoverFromAssemblies(new[] { typeof(RegistryTestContext).Assembly });
+        var service = new NodeDiscoveryService();
+        var defs = service.DiscoverFromAssemblies(new[] { typeof(StartNode).Assembly });
 
-        Assert.Contains(definitions, d => d.Name == "Start");
-        Assert.Contains(definitions, d => d.Name == "Add");
-        Assert.Contains(definitions, d => d.Name == "Const");
+        Assert.Contains(defs, d => d.Name == "Start");
+        Assert.Contains(defs, d => d.Name == "For Loop");
+        Assert.Contains(defs, d => d.Name == "Branch");
     }
 
     [Fact]
-    public void NodeDiscoveryService_BuildsExecutionSockets()
+    public void Discovery_BuildsCorrectExecutionSockets()
     {
-        var discovery = new NodeDiscoveryService();
-        var definitions = discovery.DiscoverFromAssemblies(new[] { typeof(RegistryTestContext).Assembly });
-        var start = Assert.Single(definitions.Where(d => d.Id.Contains(nameof(RegistryTestContext)) && d.Name == "Start"));
-        var add = Assert.Single(definitions.Where(d => d.Id.Contains(nameof(RegistryTestContext)) && d.Name == "Add"));
+        var service = new NodeDiscoveryService();
+        var defs = service.DiscoverFromAssemblies(new[] { typeof(StartNode).Assembly });
 
+        var start = Assert.Single(defs, d => d.NodeType == typeof(StartNode));
+        var branch = Assert.Single(defs, d => d.NodeType == typeof(BranchNode));
+
+        // StartNode: execution initiator — no Enter input, has Exit output
         Assert.DoesNotContain(start.Inputs, s => s.Name == "Enter");
         Assert.Contains(start.Outputs, s => s.Name == "Exit" && s.IsExecution);
 
-        Assert.Contains(add.Inputs, s => s.Name == "Enter" && s.IsExecution);
-        Assert.Contains(add.Inputs, s => s.Name == "A" && !s.IsExecution);
-        Assert.Contains(add.Inputs, s => s.Name == "B" && !s.IsExecution);
-        Assert.Contains(add.Outputs, s => s.Name == "Sum" && !s.IsExecution);
-        Assert.Contains(add.Outputs, s => s.Name == "Exit" && s.IsExecution);
-        Assert.Equal(1, add.Inputs.Count(s => s.Name == "Enter"));
-        Assert.Equal(1, add.Outputs.Count(s => s.Name == "Exit"));
+        // BranchNode: has Start execution input, Cond data input, True/False execution outputs
+        Assert.Contains(branch.Inputs, s => s.Name == "Start" && s.IsExecution);
+        Assert.Contains(branch.Inputs, s => s.Name == "Cond" && !s.IsExecution);
+        Assert.Contains(branch.Outputs, s => s.Name == "True" && s.IsExecution);
+        Assert.Contains(branch.Outputs, s => s.Name == "False" && s.IsExecution);
+    }
+
+    [Fact]
+    public void NodeBuilder_CreatesValidDefinition()
+    {
+        var def = NodeBuilder.Create("Test")
+            .Category("Tests")
+            .Input<int>("Value")
+            .Output<string>("Result")
+            .OnExecute(async (ctx, ct) => ctx.SetOutput("Result", ctx.GetInput<int>("Value").ToString()))
+            .Build();
+
+        Assert.Equal("Test", def.Name);
+        Assert.Single(def.Inputs);
+        Assert.Single(def.Outputs);
+        Assert.NotNull(def.InlineExecutor);
     }
 
     [Fact]
@@ -42,7 +59,7 @@ public sealed class NodeRegistryTests
     {
         var discovery = new NodeDiscoveryService();
         var registry = new NodeRegistryService(discovery);
-        var assembly = typeof(RegistryTestContext).Assembly;
+        var assembly = typeof(StartNode).Assembly;
 
         registry.RegisterFromAssembly(assembly);
         var firstCount = registry.Definitions.Count;
@@ -58,12 +75,12 @@ public sealed class NodeRegistryTests
     {
         var discovery = new NodeDiscoveryService();
         var registry = new NodeRegistryService(discovery);
-        registry.RegisterFromAssembly(typeof(RegistryTestContext).Assembly);
+        registry.RegisterFromAssembly(typeof(StartNode).Assembly);
 
-        var catalog = registry.GetCatalog("Add");
+        var catalog = registry.GetCatalog("Branch");
 
-        Assert.Contains(catalog.All, d => d.Name == "Add" && d.Category == "Math" && d.Description == "Adds");
-        Assert.Contains(catalog.Categories, c => c.Name == "Math");
+        Assert.Contains(catalog.All, d => d.Name == "Branch");
+        Assert.Contains(catalog.Categories, c => c.Name == "Conditions");
     }
 
     [Fact]
@@ -72,30 +89,8 @@ public sealed class NodeRegistryTests
         var discovery = new NodeDiscoveryService();
         var registry = new NodeRegistryService(discovery);
 
-        registry.RegisterPluginAssembly(typeof(RegistryTestContext).Assembly);
+        registry.RegisterPluginAssembly(typeof(StartNode).Assembly);
 
         Assert.Contains(registry.Definitions, d => d.Name == "Start");
-    }
-
-    private sealed class RegistryTestContext : INodeContext
-    {
-        [Node("Start", category: "Flow", description: "Start", isCallable: true, isExecutionInitiator: true)]
-        public void Start(out ExecutionPath Exit)
-        {
-            Exit = new ExecutionPath();
-        }
-
-        [Node("Add", category: "Math", description: "Adds", isCallable: true)]
-        public void Add(ExecutionPath Enter, int A, int B, out int Sum, out ExecutionPath Exit)
-        {
-            Sum = A + B;
-            Exit = new ExecutionPath();
-        }
-
-        [Node("Const", category: "Math", description: "Const", isCallable: false)]
-        public void Const(out int Value)
-        {
-            Value = 1;
-        }
     }
 }

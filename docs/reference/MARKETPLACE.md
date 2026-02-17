@@ -8,7 +8,10 @@ The plugin marketplace provides a complete plugin management experience:
 - **Browse** available plugins from local or remote repositories
 - **Search** by name, category, or tags
 - **Install** plugins with one click
+- **Upload ZIP packages** via drag/drop or file picker in Plugin Manager
+- **Persist uploaded packages** into the local repository for future reinstall
 - **Uninstall** plugins cleanly
+- **Delete local repository content** (repository-only or repository+uninstall)
 - **View details** including description, version, author, and release notes
 - **Configure** marketplace sources
 
@@ -119,6 +122,20 @@ else
 var uninstallResult = await installationService.UninstallAsync(pluginId, cancellationToken);
 ```
 
+### ZIP Upload + Local Repository Flow
+
+When a ZIP package is uploaded from the Plugin Manager:
+
+1. The package is validated as a `.zip` and checked for `plugin.json`
+2. The package is copied into `MarketplaceOptions.LocalRepositoryPath`
+3. Existing local repository entries for the same plugin id are replaced
+4. The package is installed immediately from the stored repository path
+5. The plugin remains available for future reinstall after uninstall
+
+Repository delete actions are available from plugin details for local-source plugins:
+- **Delete repository copy only**
+- **Delete + Uninstall**
+
 ### Installation Flow
 
 1. **Download**: Plugin files are downloaded from the source
@@ -177,9 +194,9 @@ services.Configure<MarketplaceOptions>(options =>
 public class MarketplaceOptions
 {
     public string LocalRepositoryPath { get; set; } = "plugin-repository";
-    public string? RemoteRepositoryUrl { get; set; }
-    public string? AuthToken { get; set; }
-    public string InstalledPluginsPath { get; set; } = "plugins";
+    public string? RemoteApiUrl { get; set; }
+    public List<string> EnabledSources { get; set; } = ["local", "remote"];
+    public long MaxUploadSizeBytes { get; set; } = 500L * 1024L * 1024L;
 }
 ```
 

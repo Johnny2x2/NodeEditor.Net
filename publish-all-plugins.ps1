@@ -22,6 +22,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Find all plugin projects (projects with plugin.json)
 $PluginProjects = @(
     "NodeEditor.Plugins.Template\NodeEditor.Plugins.Template.csproj",
+    "NodeEditor.Plugins.LLMTornado\NodeEditor.Plugins.LLMTornado.csproj",
     "NodeEditor.Plugins.TestA\NodeEditor.Plugins.TestA.csproj",
     "NodeEditor.Plugins.TestB\NodeEditor.Plugins.TestB.csproj"
 )

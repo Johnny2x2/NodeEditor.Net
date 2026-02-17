@@ -76,3 +76,4 @@ artifacts/
 
 .fake
 TestResults/
+plugin-repository/

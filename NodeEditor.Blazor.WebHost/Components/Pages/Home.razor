@@ -9,6 +9,7 @@
 @using NodeEditor.Net.Services.Registry
 @using NodeEditor.Net.ViewModels
 @using NodeEditor.Net.Services.Execution
+@using NodeEditor.Net.Services.Execution.StandardNodes
 @using NodeEditor.Net.Services.Logging
 @using NodeEditor.Net.Services.Serialization
 @inject INodeEditorState EditorState
@@ -106,14 +107,20 @@
 	private bool _isPaused;
 	private bool _isTerminalVisible;
 	private string _executionStatus = "Idle";
-	private CompositeNodeContext? _nodeContext;
+	private object? _nodeContext;
 	private string? _loadStatus;
 	private bool _isPluginManagerOpen;
-	private string _selectedPreset = "graphs/loop-list-string.json";
+	private string _selectedPreset = "graphs/hello-world.json";
 	private IJSObjectReference? _jsModule;
 	private List<string> _savedGraphNames = new();
 	private readonly List<GraphPreset> _presets = new()
 	{
+		new GraphPreset("Hello World", "graphs/hello-world.json"),
+		new GraphPreset("Math & Branching", "graphs/math-and-branching.json"),
+		new GraphPreset("FizzBuzz", "graphs/fizzbuzz.json"),
+		new GraphPreset("List + ForEach + Greeting", "graphs/list-foreach-greeting.json"),
+		new GraphPreset("Variables & Flow Control", "graphs/variables-and-flow.json"),
+		new GraphPreset("Error Handling & Dict", "graphs/error-handling-and-dict.json"),
 		new GraphPreset("Loop + Lists + Strings", "graphs/loop-list-string.json"),
 		new GraphPreset("Parallel Execution", "graphs/parallel.json"),
 		new GraphPreset("Events: Basic Trigger", "graphs/event-basic.json"),
@@ -157,8 +164,9 @@
 		// Pass InvokeAsync so the bridge can dispatch mutations onto the Blazor circuit thread
 		StateBridge.Attach(EditorState, InvokeAsync);
 
-		Registry.RegisterFromAssembly(typeof(StandardNodeContext).Assembly);
-		_nodeContext = new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
+		Registry.RegisterFromAssembly(typeof(StandardNodeRegistration).Assembly);
+		Registry.RegisterDefinitions(StandardNodeRegistration.GetInlineDefinitions());
+		_nodeContext = new object();
 
 		// Ensure the VariableNodeFactory is initialized (subscribes to state events)
 		_ = VariableNodeFactory;
@@ -193,7 +201,7 @@
 	{
 		_isPluginManagerOpen = false;
 		// Refresh node context to pick up newly installed plugins
-		_nodeContext = new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
+		_nodeContext = new object();
 	}
 
 	public void Dispose()
@@ -231,7 +239,7 @@
 			return;
 		}
 
-		_nodeContext ??= new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
+		_nodeContext ??= new object();
 
 		_isExecuting = true;
 		_executionStatus = "Running";
@@ -244,7 +252,7 @@
 		_executionCts?.Dispose();
 		_executionCts = new CancellationTokenSource();
 
-		var context = new NodeExecutionContext();
+		var context = new NodeRuntimeStorage();
 
 		// Seed graph variables into the execution context
 		VariableNodeExecutor.SeedVariables(context, EditorState.Variables, SocketTypeResolver);
@@ -328,7 +336,7 @@
 	{
 		if (_isExecuting) return;
 
-		_nodeContext ??= new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
+		_nodeContext ??= new object();
 
 		_isExecuting = true;
 		_isPaused = true;
@@ -338,7 +346,7 @@
 		_executionCts?.Dispose();
 		_executionCts = new CancellationTokenSource();
 
-		var context = new NodeExecutionContext();
+		var context = new NodeRuntimeStorage();
 		VariableNodeExecutor.SeedVariables(context, EditorState.Variables, SocketTypeResolver);
 		var executionNodes = EditorState.BuildExecutionNodes();
 
@@ -459,7 +467,7 @@
 		else
 		{
 			// Fallback: create a Start node manually
-			var execType = typeof(ExecutionPath).FullName ?? "ExecutionPath";
+			var execType = ExecutionSocket.TypeName;
 			startNode = new NodeViewModel(new NodeData(
 				Id: Guid.NewGuid().ToString(),
 				Name: "Start",
@@ -655,7 +663,7 @@
 
 	private void CreateSampleGraph()
 	{
-		var execType = typeof(ExecutionPath).FullName ?? "ExecutionPath";
+		var execType = ExecutionSocket.TypeName;
 		var listType = typeof(SerializableList).FullName ?? "SerializableList";
 		var intType = typeof(int).FullName ?? "System.Int32";
 		var stringType = typeof(string).FullName ?? "System.String";

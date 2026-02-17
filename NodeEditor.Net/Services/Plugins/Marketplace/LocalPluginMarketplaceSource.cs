@@ -198,8 +198,9 @@ public sealed class LocalPluginMarketplaceSource : IPluginMarketplaceSource
         else if (path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
         {
             using var archive = ZipFile.OpenRead(path);
-            var manifestEntry = archive.GetEntry(_options.ManifestFileName)
-                ?? archive.GetEntry($"{Path.GetFileNameWithoutExtension(path)}/{_options.ManifestFileName}");
+            var manifestEntry = archive.Entries.FirstOrDefault(e =>
+                string.Equals(Path.GetFileName(e.FullName), _options.ManifestFileName, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(e.Name));
 
             if (manifestEntry is not null)
             {

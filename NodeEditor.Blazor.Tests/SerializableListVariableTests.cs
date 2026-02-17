@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Linq;
 using NodeEditor.Net.Models;
 using NodeEditor.Net.Services;
@@ -16,9 +16,9 @@ namespace NodeEditor.Blazor.Tests;
 /// </summary>
 public sealed class SerializableListVariableTests
 {
-    // ════════════════════════════════════════════════════════════════════
-    //  1. SerializableListJsonConverter — round-trip
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //  1. SerializableListJsonConverter â€” round-trip
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     [Fact]
     public void JsonConverter_EmptyList_RoundTrips()
@@ -81,7 +81,7 @@ public sealed class SerializableListVariableTests
     [Fact]
     public void JsonConverter_LegacyEmptyObject_DeserializesAsEmptyList()
     {
-        // Before the converter, SerializableList serialized as "{}" — handle gracefully
+        // Before the converter, SerializableList serialized as "{}" â€” handle gracefully
         var json = "{}";
         var restored = JsonSerializer.Deserialize<SerializableList>(json)!;
 
@@ -102,9 +102,9 @@ public sealed class SerializableListVariableTests
         Assert.Equal("test", items[1]);
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    //  2. SocketValue — SerializableList round-trip
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //  2. SocketValue â€” SerializableList round-trip
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     [Fact]
     public void SocketValue_FromObject_SerializesListCorrectly()
@@ -149,9 +149,9 @@ public sealed class SerializableListVariableTests
         Assert.Equal(0, restored!.Count);
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    //  3. SeedVariables — type-aware deserialization
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //  3. SeedVariables â€” type-aware deserialization
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     [Fact]
     public void SeedVariables_WithTypeResolver_SeedsSerializableList()
@@ -169,7 +169,7 @@ public sealed class SerializableListVariableTests
         var resolver = new SocketTypeResolver();
         resolver.Register<SerializableList>();
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         VariableNodeExecutor.SeedVariables(context, new[] { variable }, resolver);
 
         var value = context.GetVariable("var1");
@@ -194,8 +194,8 @@ public sealed class SerializableListVariableTests
             typeof(SerializableList).FullName!,
             SocketValue.FromObject(list));
 
-        var context = new NodeExecutionContext();
-        // No resolver — should still work via Type.GetType fallback since
+        var context = new NodeRuntimeStorage();
+        // No resolver â€” should still work via Type.GetType fallback since
         // SerializableList has the [JsonConverter] attribute
         VariableNodeExecutor.SeedVariables(context, new[] { variable });
 
@@ -214,7 +214,7 @@ public sealed class SerializableListVariableTests
             typeof(SerializableList).FullName!,
             null);
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         VariableNodeExecutor.SeedVariables(context, new[] { variable });
 
         Assert.Null(context.GetVariable("var3"));
@@ -244,7 +244,7 @@ public sealed class SerializableListVariableTests
         var resolver = new SocketTypeResolver();
         resolver.Register<SerializableList>();
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         VariableNodeExecutor.SeedVariables(context, new[] { listVar, intVar, strVar }, resolver);
 
         Assert.IsType<SerializableList>(context.GetVariable("v1"));
@@ -252,9 +252,9 @@ public sealed class SerializableListVariableTests
         Assert.Equal("hello", context.GetVariable("v3"));
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    //  4. SocketTypeResolver — registration
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //  4. SocketTypeResolver â€” registration
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     [Fact]
     public void SocketTypeResolver_ResolveSerializableList()
@@ -268,9 +268,9 @@ public sealed class SerializableListVariableTests
         Assert.Equal(typeof(SerializableList), resolved);
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    //  5. EditorRegistry — List editor selection
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //  5. EditorRegistry â€” List editor selection
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     [Fact]
     public void EditorRegistry_SelectsListEditorForSerializableList()
@@ -324,9 +324,9 @@ public sealed class SerializableListVariableTests
             typeof(SerializableList).FullName!, true, true)));
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    //  6. VariableNodeFactory — builds correct definitions for List vars
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //  6. VariableNodeFactory â€” builds correct definitions for List vars
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     [Fact]
     public void VariablesPanel_GetDefaultValueForListType_ReturnsEmptyList()
@@ -410,9 +410,9 @@ public sealed class SerializableListVariableTests
         Assert.Equal(typeof(SerializableList).FullName, updatedDef!.Outputs[0].TypeName);
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    //  7. VariableNodeExecutor — Get/Set execute with SerializableList
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //  7. VariableNodeExecutor â€” Get/Set execute with SerializableList
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     [Fact]
     public void VariableNodeExecutor_GetNode_ReturnsSeededList()
@@ -422,7 +422,7 @@ public sealed class SerializableListVariableTests
         list.Add("a");
         list.Add("b");
 
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         context.SetVariable(variable.Id, list);
 
         var getNode = new NodeData(
@@ -445,7 +445,7 @@ public sealed class SerializableListVariableTests
     public void VariableNodeExecutor_SetNode_UpdatesVariable()
     {
         var variable = GraphVariable.Create("Items", typeof(SerializableList).FullName!);
-        var context = new NodeExecutionContext();
+        var context = new NodeRuntimeStorage();
         context.SetVariable(variable.Id, new SerializableList());
 
         var newList = new SerializableList();
@@ -461,12 +461,12 @@ public sealed class SerializableListVariableTests
             ExecInit: false,
             Inputs: new[]
             {
-                new SocketData("Enter", typeof(ExecutionPath).FullName!, true, true),
+                new SocketData("Enter", ExecutionSocket.TypeName, true, true),
                 new SocketData("Value", typeof(SerializableList).FullName!, true, false)
             },
             Outputs: new[]
             {
-                new SocketData("Exit", typeof(ExecutionPath).FullName!, false, true),
+                new SocketData("Exit", ExecutionSocket.TypeName, false, true),
                 new SocketData("Value", typeof(SerializableList).FullName!, false, false)
             },
             DefinitionId: variable.SetDefinitionId);
@@ -479,9 +479,9 @@ public sealed class SerializableListVariableTests
         Assert.Equal("updated", ((SerializableList)stored).Snapshot()[0]);
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    //  8. Graph serialization — round-trip with list variables
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //  8. Graph serialization â€” round-trip with list variables
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     [Fact]
     public void GraphSerializer_RoundTrips_ListVariable()
@@ -523,9 +523,9 @@ public sealed class SerializableListVariableTests
         Assert.Equal("one", restoredList.Snapshot()[0]);
     }
 
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  9. Helper display methods (from VariablesPanel)
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     [Theory]
     [InlineData("NodeEditor.Net.Models.SerializableList", "List")]
@@ -576,9 +576,9 @@ public sealed class SerializableListVariableTests
         _ => "unknown"
     };
 
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  Private helpers
-    // ════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private static NodeEditor.Net.Services.Serialization.GraphSerializer CreateSerializer()
     {

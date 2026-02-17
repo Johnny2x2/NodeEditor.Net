@@ -17,11 +17,19 @@ public sealed class TemplatePlugin : INodePlugin
     }
 }
 
-public sealed class TemplatePluginContext : INodeContext
+public sealed class EchoNode : NodeBase
 {
-    [Node("Echo", category: "SDK", description: "Pass input to output", isCallable: false)]
-    public void Echo(string Input, out string Output)
+    public override void Configure(INodeBuilder builder)
     {
-        Output = Input;
+        builder.Name("Echo").Category("SDK")
+            .Description("Pass input to output")
+            .Input<string>("Input", "")
+            .Output<string>("Output");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Output", context.GetInput<string>("Input"));
+        return Task.CompletedTask;
     }
 }

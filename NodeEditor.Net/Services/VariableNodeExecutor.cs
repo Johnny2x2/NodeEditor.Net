@@ -59,7 +59,7 @@ public static class VariableNodeExecutor
     /// <summary>
     /// Executes a variable node: reads from or writes to the execution context's variable store.
     /// </summary>
-    public static void Execute(NodeData node, INodeExecutionContext context)
+    public static void Execute(NodeData node, INodeRuntimeStorage context)
     {
         var variableId = GetVariableId(node)
             ?? throw new InvalidOperationException($"Cannot extract variable ID from node '{node.Name}'.");
@@ -79,10 +79,9 @@ public static class VariableNodeExecutor
             // Pass-through: also write to output "Value" socket so downstream data-flow works
             context.SetSocketValue(node.Id, "Value", value);
 
-            // Signal execution path
-            var exit = new ExecutionPath();
-            exit.Signal();
-            context.SetSocketValue(node.Id, "Exit", exit);
+            // Signal execution path (boolean marker — the execution engine follows
+            // connections via GetExecutionTargets, not socket values)
+            context.SetSocketValue(node.Id, "Exit", true);
         }
 
         context.MarkNodeExecuted(node.Id);
@@ -92,7 +91,7 @@ public static class VariableNodeExecutor
     /// Seeds the execution context with default values from all graph variables.
     /// Should be called before execution starts.
     /// </summary>
-    public static void SeedVariables(INodeExecutionContext context, IEnumerable<GraphVariable> variables, ISocketTypeResolver? typeResolver = null)
+    public static void SeedVariables(INodeRuntimeStorage context, IEnumerable<GraphVariable> variables, ISocketTypeResolver? typeResolver = null)
     {
         foreach (var variable in variables)
         {

@@ -24,6 +24,7 @@
     <!-- Core library -->
     <ProjectReference Include="..\NodeEditor.Net\NodeEditor.Net.csproj" />
     <ProjectReference Include="..\NodeEditor.Blazor\NodeEditor.Blazor.csproj" />
+    <ProjectReference Include="..\NodeEditor.Plugins.LLMTornado\NodeEditor.Plugins.LLMTornado.csproj" />
 
     <!-- MCP tools library -->
     <ProjectReference Include="..\NodeEditor.Mcp\NodeEditor.Mcp.csproj" />

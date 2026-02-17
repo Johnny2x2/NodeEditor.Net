@@ -1,0 +1,274 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "start",
+      "typeId": null,
+      "name": "Start",
+      "callable": true,
+      "execInit": true,
+      "x": 60,
+      "y": 120,
+      "width": 180,
+      "height": 60,
+      "inputs": [],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "num-a",
+      "typeId": null,
+      "name": "Number",
+      "callable": false,
+      "execInit": false,
+      "x": 60,
+      "y": 280,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "Value", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 25.0 } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.Double", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "num-b",
+      "typeId": null,
+      "name": "Number",
+      "callable": false,
+      "execInit": false,
+      "x": 60,
+      "y": 380,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "Value", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 7.0 } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.Double", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "add",
+      "typeId": null,
+      "name": "Add",
+      "callable": false,
+      "execInit": false,
+      "x": 280,
+      "y": 260,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "A", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } },
+        { "name": "B", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.Double", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "multiply",
+      "typeId": null,
+      "name": "Multiply",
+      "callable": false,
+      "execInit": false,
+      "x": 280,
+      "y": 380,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "A", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } },
+        { "name": "B", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.Double", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "subtract",
+      "typeId": null,
+      "name": "Subtract",
+      "callable": false,
+      "execInit": false,
+      "x": 500,
+      "y": 300,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "A", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } },
+        { "name": "B", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.Double", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "to-string",
+      "typeId": null,
+      "name": "To String",
+      "callable": false,
+      "execInit": false,
+      "x": 720,
+      "y": 300,
+      "width": 160,
+      "height": 60,
+      "inputs": [
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "str-label",
+      "typeId": null,
+      "name": "String",
+      "callable": false,
+      "execInit": false,
+      "x": 720,
+      "y": 180,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Value", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "(25+7) - (25*7) = " } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "concat",
+      "typeId": null,
+      "name": "String Concat",
+      "callable": false,
+      "execInit": false,
+      "x": 960,
+      "y": 240,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "A", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "" } },
+        { "name": "B", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "" } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.String", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "debug-result",
+      "typeId": null,
+      "name": "Debug Print",
+      "callable": true,
+      "execInit": false,
+      "x": 1200,
+      "y": 100,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Label", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Calculation" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "gt-check",
+      "typeId": null,
+      "name": "Greater Than",
+      "callable": false,
+      "execInit": false,
+      "x": 500,
+      "y": 460,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "A", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 0.0 } },
+        { "name": "B", "typeName": "System.Double", "isInput": true, "isExecution": false, "value": { "typeName": "System.Double", "json": 100.0 } }
+      ],
+      "outputs": [
+        { "name": "Result", "typeName": "System.Boolean", "isInput": false, "isExecution": false, "value": null }
+      ]
+    },
+    {
+      "id": "branch",
+      "typeId": null,
+      "name": "Branch",
+      "callable": true,
+      "execInit": false,
+      "x": 1200,
+      "y": 300,
+      "width": 180,
+      "height": 60,
+      "inputs": [
+        { "name": "Start", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Cond", "typeName": "System.Boolean", "isInput": true, "isExecution": false, "value": null }
+      ],
+      "outputs": [
+        { "name": "True", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null },
+        { "name": "False", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "debug-big",
+      "typeId": null,
+      "name": "Debug Print",
+      "callable": true,
+      "execInit": false,
+      "x": 1460,
+      "y": 260,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Label", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Result" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Product > 100!" } }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    },
+    {
+      "id": "debug-small",
+      "typeId": null,
+      "name": "Debug Print",
+      "callable": true,
+      "execInit": false,
+      "x": 1460,
+      "y": 400,
+      "width": 200,
+      "height": 60,
+      "inputs": [
+        { "name": "Enter", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": true, "isExecution": true, "value": null },
+        { "name": "Label", "typeName": "System.String", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Result" } },
+        { "name": "Value", "typeName": "System.Object", "isInput": true, "isExecution": false, "value": { "typeName": "System.String", "json": "Product <= 100" } }
+      ],
+      "outputs": [
+        { "name": "Exit", "typeName": "NodeEditor.Net.Services.Execution.ExecutionSocket", "isInput": false, "isExecution": true, "value": null }
+      ]
+    }
+  ],
+  "connections": [
+    { "outputNodeId": "num-a", "outputSocketName": "Result", "inputNodeId": "add", "inputSocketName": "A", "isExecution": false },
+    { "outputNodeId": "num-b", "outputSocketName": "Result", "inputNodeId": "add", "inputSocketName": "B", "isExecution": false },
+    { "outputNodeId": "num-a", "outputSocketName": "Result", "inputNodeId": "multiply", "inputSocketName": "A", "isExecution": false },
+    { "outputNodeId": "num-b", "outputSocketName": "Result", "inputNodeId": "multiply", "inputSocketName": "B", "isExecution": false },
+    { "outputNodeId": "add", "outputSocketName": "Result", "inputNodeId": "subtract", "inputSocketName": "A", "isExecution": false },
+    { "outputNodeId": "multiply", "outputSocketName": "Result", "inputNodeId": "subtract", "inputSocketName": "B", "isExecution": false },
+    { "outputNodeId": "subtract", "outputSocketName": "Result", "inputNodeId": "to-string", "inputSocketName": "Value", "isExecution": false },
+    { "outputNodeId": "str-label", "outputSocketName": "Result", "inputNodeId": "concat", "inputSocketName": "A", "isExecution": false },
+    { "outputNodeId": "to-string", "outputSocketName": "Result", "inputNodeId": "concat", "inputSocketName": "B", "isExecution": false },
+    { "outputNodeId": "concat", "outputSocketName": "Result", "inputNodeId": "debug-result", "inputSocketName": "Value", "isExecution": false },
+    { "outputNodeId": "start", "outputSocketName": "Exit", "inputNodeId": "debug-result", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "debug-result", "outputSocketName": "Exit", "inputNodeId": "branch", "inputSocketName": "Start", "isExecution": true },
+    { "outputNodeId": "multiply", "outputSocketName": "Result", "inputNodeId": "gt-check", "inputSocketName": "A", "isExecution": false },
+    { "outputNodeId": "gt-check", "outputSocketName": "Result", "inputNodeId": "branch", "inputSocketName": "Cond", "isExecution": false },
+    { "outputNodeId": "branch", "outputSocketName": "True", "inputNodeId": "debug-big", "inputSocketName": "Enter", "isExecution": true },
+    { "outputNodeId": "branch", "outputSocketName": "False", "inputNodeId": "debug-small", "inputSocketName": "Enter", "isExecution": true }
+  ],
+  "viewport": { "x": 0, "y": 0, "width": 1800, "height": 600, "zoom": 1 },
+  "selectedNodeIds": []
+}

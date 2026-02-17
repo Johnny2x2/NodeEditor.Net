@@ -1,0 +1,14 @@
+{
+  "id": "com.nodeeditormax.llmtornado",
+  "name": "LLMTornado Plugin",
+  "version": "2.0.0",
+  "author": "NodeEditor.Net",
+  "description": "Provider-agnostic LLM nodes powered by LlmTornado (chat, embeddings, models).",
+  "tags": [
+    "llm",
+    "ai",
+    "chat",
+    "embeddings",
+    "tornado"
+  ]
+}

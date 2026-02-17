@@ -1,5 +1,6 @@
 using System.Reflection;
 using NodeEditor.Net.Services;
+using NodeEditor.Net.Services.Execution.StandardNodes;
 
 namespace NodeEditor.Net.Services.Registry;
 
@@ -38,6 +39,7 @@ public class NodeRegistryService : INodeRegistryService
             var scanAssemblies = assemblies?.ToArray() ?? AppDomain.CurrentDomain.GetAssemblies();
             var discovered = _discovery.DiscoverFromAssemblies(scanAssemblies);
             MergeDefinitions(discovered);
+            RegisterDefinitions(StandardNodeRegistration.GetInlineDefinitions());
             _initialized = true;
         }
     }
@@ -50,8 +52,7 @@ public class NodeRegistryService : INodeRegistryService
         }
 
         var discovered = _discovery.DiscoverFromAssemblies(new[] { assembly });
-        MergeDefinitions(discovered);
-        _initialized = true;
+        RegisterDefinitions(discovered);
     }
 
     public void RegisterPluginAssembly(Assembly assembly)

@@ -1,37 +1,67 @@
+using NodeEditor.Net.Models;
+
 namespace NodeEditor.Net.Services.Execution;
 
 /// <summary>
-/// Abstraction for node execution storage and state.
+/// The execution context passed to NodeBase.ExecuteAsync().
+/// Provides high-level APIs for reading inputs, writing outputs,
+/// triggering downstream execution paths, and streaming items.
 /// </summary>
 public interface INodeExecutionContext
 {
-    bool TryGetSocketValue(string nodeId, string socketName, out object? value);
-    object? GetSocketValue(string nodeId, string socketName);
-    void SetSocketValue(string nodeId, string socketName, object? value);
+    /// <summary>The identity of the currently executing node.</summary>
+    NodeData Node { get; }
 
-    bool IsNodeExecuted(string nodeId);
-    void MarkNodeExecuted(string nodeId);
-    void ClearNodeExecuted(string nodeId);
+    /// <summary>DI service provider for resolving services during execution.</summary>
+    IServiceProvider Services { get; }
+
+    /// <summary>Cancellation token for the current execution run.</summary>
+    CancellationToken CancellationToken { get; }
+
+    // ── Data I/O ──
+
+    T GetInput<T>(string socketName);
+    object? GetInput(string socketName);
+    bool TryGetInput<T>(string socketName, out T value);
+    void SetOutput<T>(string socketName, T value);
+    void SetOutput(string socketName, object? value);
+
+    // ── Execution flow ──
+
+    /// <summary>
+    /// Triggers a named execution output socket. Suspends this node,
+    /// executes all connected downstream callable nodes to completion,
+    /// then resumes this node.
+    /// </summary>
+    Task TriggerAsync(string executionOutputName);
+
+    /// <summary>
+    /// Triggers a named execution output socket using a scoped storage layer.
+    /// Downstream nodes read/write to the provided scope, enabling parallel
+    /// iterations to run without interfering with each other's values.
+    /// </summary>
+    Task TriggerScopedAsync(string executionOutputName, INodeRuntimeStorage scope);
+
+    // ── Streaming ──
+
+    Task EmitAsync<T>(string streamItemSocket, T item);
+    Task EmitAsync(string streamItemSocket, object? item);
+
+    // ── Variables ──
 
     object? GetVariable(string key);
     void SetVariable(string key, object? value);
 
-    // Loop iteration state (scoped to an execution run)
-    bool TryGetLoopState<T>(string key, out T value);
-    void SetLoopState(string key, object value);
-    void ClearLoopState(string key);
+    // ── Feedback ──
 
-    // Iteration generation for loop scoping (prevents stale IsNodeExecuted in loop bodies)
-    int CurrentGeneration { get; }
-    void PushGeneration();
-    void PopGeneration();
-    void ClearExecutedForNodes(IEnumerable<string> nodeIds);
+    void EmitFeedback(string message, ExecutionFeedbackType type = ExecutionFeedbackType.DebugPrint,
+        object? tag = null);
 
-    INodeExecutionContext CreateChild(string scopeName, bool inheritVariables = true);
+    // ── Event bus ──
 
-    /// <summary>
-    /// Gets the event bus for the current execution run.
-    /// Used by Custom Event and Trigger Event nodes.
-    /// </summary>
     ExecutionEventBus EventBus { get; }
+
+    // ── Advanced ──
+
+    INodeRuntimeStorage RuntimeStorage { get; }
 }

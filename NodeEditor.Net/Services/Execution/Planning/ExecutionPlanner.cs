@@ -1,543 +1,231 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using NodeEditor.Net.Models;
 
 namespace NodeEditor.Net.Services.Execution;
 
-public sealed record ExecutionLayer(IReadOnlyList<NodeData> Nodes);
-
-public sealed record ExecutionPlan(IReadOnlyList<ExecutionLayer> Layers);
-
 public sealed class ExecutionPlanner
 {
-    // Known loop output sockets that signal "continue looping"
-    private static readonly HashSet<string> LoopPathNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "LoopPath"
-    };
-
-    // Known loop output sockets that signal "exit loop"
-    private static readonly HashSet<string> ExitPathNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Exit"
-    };
-
-    // Known loop node names
-    private static readonly HashSet<string> LoopNodeNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "For Loop", "For Loop Step", "ForEach Loop", "While Loop", "Do While Loop", "Repeat Until"
-    };
-
-    /// <summary>
-    /// Legacy flat plan for backward compatibility (used by BackgroundExecutionQueue).
-    /// </summary>
-    public ExecutionPlan BuildPlan(IReadOnlyList<NodeData> nodes, IReadOnlyList<ConnectionData> connections)
-    {
-        var hierarchical = BuildHierarchicalPlan(nodes, connections);
-        return FlattenToLegacy(hierarchical, nodes);
-    }
-
-    /// <summary>
-    /// Build a hierarchical plan that supports loops, branches, and parallel layers.
-    /// Detects back-edges, extracts loop regions, and topologically sorts the rest.
-    /// </summary>
-    public HierarchicalPlan BuildHierarchicalPlan(
+    public GraphValidationResult ValidateGraph(
         IReadOnlyList<NodeData> nodes,
         IReadOnlyList<ConnectionData> connections)
     {
+        var result = new GraphValidationResult();
+        ValidateDataFlowAcyclicity(nodes, connections, result);
+        ValidateExecutionFlowCycles(nodes, connections, result);
+        ValidateConnectedInputs(nodes, connections, result);
+        ValidateReachability(nodes, connections, result);
+        return result;
+    }
+
+    private static void ValidateDataFlowAcyclicity(
+        IReadOnlyList<NodeData> nodes,
+        IReadOnlyList<ConnectionData> connections,
+        GraphValidationResult result)
+    {
         if (nodes.Count == 0)
-            return new HierarchicalPlan(Array.Empty<IExecutionStep>());
+            return;
 
         var nodeMap = nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
+        var edges = nodes.ToDictionary(n => n.Id, _ => new HashSet<string>(StringComparer.Ordinal), StringComparer.Ordinal);
+        var indegree = nodes.ToDictionary(n => n.Id, _ => 0, StringComparer.Ordinal);
 
-        // Build forward adjacency (excluding back-edges we detect)
-        var forwardEdges = nodes.ToDictionary(
-            n => n.Id,
-            _ => new HashSet<string>(StringComparer.Ordinal),
-            StringComparer.Ordinal);
-
-        // Build reverse adjacency for loop body detection
-        var reverseEdges = nodes.ToDictionary(
-            n => n.Id,
-            _ => new HashSet<string>(StringComparer.Ordinal),
-            StringComparer.Ordinal);
-
-        // Track which connections are back-edges (loop returns)
-        var backEdges = new HashSet<(string From, string To)>();
-
-        // First pass: identify loop header nodes and their back-edge sources
-        var loopHeaders = DetectLoopHeaders(nodes, connections, nodeMap);
-
-        // Build edges, separating back-edges from forward edges
-        foreach (var connection in connections)
+        foreach (var connection in connections.Where(c => !c.IsExecution))
         {
             if (!nodeMap.ContainsKey(connection.OutputNodeId) || !nodeMap.ContainsKey(connection.InputNodeId))
                 continue;
 
-            // A back-edge is: any connection targeting a loop header from a downstream node
-            // that forms a cycle. We detect this by checking if the connection's output socket
-            // is "LoopPath" on a loop node (self-loop) or if the target is a known loop header
-            // and the source is in the loop body.
-            var isBackEdge = false;
-
-            // Self-loop: LoopPath -> own Enter (e.g., loop node wired to itself)
-            if (connection.OutputNodeId == connection.InputNodeId)
+            if (edges[connection.OutputNodeId].Add(connection.InputNodeId))
             {
-                isBackEdge = true;
-            }
-            // Connection from downstream body node back to loop header
-            else if (loopHeaders.ContainsKey(connection.InputNodeId) &&
-                     IsBodyToHeaderBackEdge(connection, loopHeaders, nodeMap, connections))
-            {
-                isBackEdge = true;
-            }
-
-            if (isBackEdge)
-            {
-                backEdges.Add((connection.OutputNodeId, connection.InputNodeId));
-            }
-            else
-            {
-                forwardEdges[connection.OutputNodeId].Add(connection.InputNodeId);
-                reverseEdges[connection.InputNodeId].Add(connection.OutputNodeId);
+                indegree[connection.InputNodeId]++;
             }
         }
 
-        // Detect loop body nodes for each loop header
-        var loopBodies = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        foreach (var (headerId, info) in loopHeaders)
-        {
-            var bodyNodes = FindLoopBodyNodes(headerId, info.LoopPathTargets, info.ExitPathTargets, forwardEdges, nodeMap);
-            loopBodies[headerId] = bodyNodes;
-        }
+        var nodesWithDataEdges = new HashSet<string>(
+            edges.Where(kvp => kvp.Value.Count > 0).Select(kvp => kvp.Key)
+                .Concat(indegree.Where(kvp => kvp.Value > 0).Select(kvp => kvp.Key)),
+            StringComparer.Ordinal);
 
-        // Remove loop body nodes from the main graph and create LoopSteps
-        var excludedFromMain = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (headerId, body) in loopBodies)
-        {
-            excludedFromMain.Add(headerId);
-            foreach (var id in body)
-                excludedFromMain.Add(id);
-        }
+        if (nodesWithDataEdges.Count == 0)
+            return;
 
-        // Build steps: topologically sort non-loop nodes into layers,
-        // inserting LoopSteps at the right position.
-        // Exit targets of loops must wait until after the loop completes,
-        // so we add virtual dependencies from loop headers to their exit targets.
-        var loopExitDependencies = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        foreach (var (headerId, info) in loopHeaders)
-        {
-            foreach (var exitTarget in info.ExitPathTargets)
-            {
-                if (!loopExitDependencies.TryGetValue(exitTarget, out var deps))
-                {
-                    deps = new HashSet<string>(StringComparer.Ordinal);
-                    loopExitDependencies[exitTarget] = deps;
-                }
-                deps.Add(headerId);
-            }
-        }
-
-        var steps = BuildSteps(nodes, connections, nodeMap, forwardEdges, loopHeaders, loopBodies, excludedFromMain, loopExitDependencies);
-
-        return new HierarchicalPlan(steps);
-    }
-
-    private record LoopHeaderInfo(
-        List<string> LoopPathTargets,
-        List<string> ExitPathTargets,
-        string LoopPathSocket,
-        string ExitPathSocket);
-
-    private Dictionary<string, LoopHeaderInfo> DetectLoopHeaders(
-        IReadOnlyList<NodeData> nodes,
-        IReadOnlyList<ConnectionData> connections,
-        Dictionary<string, NodeData> nodeMap)
-    {
-        var headers = new Dictionary<string, LoopHeaderInfo>(StringComparer.Ordinal);
-
-        foreach (var node in nodes)
-        {
-            if (!IsLoopNode(node)) continue;
-
-            var loopPathSocket = node.Outputs
-                .FirstOrDefault(s => LoopPathNames.Contains(s.Name))?.Name ?? "LoopPath";
-            var exitPathSocket = node.Outputs
-                .FirstOrDefault(s => ExitPathNames.Contains(s.Name))?.Name ?? "Exit";
-
-            var loopTargets = connections
-                .Where(c => c.OutputNodeId == node.Id &&
-                           c.OutputSocketName.Equals(loopPathSocket, StringComparison.OrdinalIgnoreCase) &&
-                           c.InputNodeId != node.Id) // exclude self-loops
-                .Select(c => c.InputNodeId)
-                .Where(id => nodeMap.ContainsKey(id))
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
-            var exitTargets = connections
-                .Where(c => c.OutputNodeId == node.Id &&
-                           c.OutputSocketName.Equals(exitPathSocket, StringComparison.OrdinalIgnoreCase))
-                .Select(c => c.InputNodeId)
-                .Where(id => nodeMap.ContainsKey(id))
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
-            headers[node.Id] = new LoopHeaderInfo(loopTargets, exitTargets, loopPathSocket, exitPathSocket);
-        }
-
-        return headers;
-    }
-
-    private static bool IsLoopNode(NodeData node)
-    {
-        return LoopNodeNames.Contains(node.Name);
-    }
-
-    private static bool IsBodyToHeaderBackEdge(
-        ConnectionData connection,
-        Dictionary<string, LoopHeaderInfo> loopHeaders,
-        Dictionary<string, NodeData> nodeMap,
-        IReadOnlyList<ConnectionData> allConnections)
-    {
-        // If the target is a loop header and the source is reachable from
-        // the loop header's LoopPath (meaning it's in the body), this is a back-edge
-        if (!loopHeaders.TryGetValue(connection.InputNodeId, out var info))
-            return false;
-
-        // Simple heuristic: if the connection goes to the Enter socket of a loop header
-        // and doesn't come from a node that's "before" the loop, it's likely a back-edge.
-        // We check if the source node is reachable from the loop's LoopPath targets.
-        if (connection.IsExecution &&
-            connection.InputSocketName.Equals("Enter", StringComparison.OrdinalIgnoreCase))
-        {
-            // If the source is one of the loop body entry points or reachable from them,
-            // this is a back-edge. For now, use a simpler check: if the source is not
-            // an ExecInit or Start node, and the target is a loop header, treat exec
-            // connections to loop Enter as potential back-edges.
-            var sourceNode = nodeMap[connection.OutputNodeId];
-            if (!sourceNode.ExecInit && sourceNode.Id != connection.InputNodeId)
-            {
-                // Check if there's already a forward path from before the loop to the source
-                // For simplicity, check if source is listed as a LoopPath target's descendant
-                return info.LoopPathTargets.Count > 0;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Finds all nodes in the loop body by following forward edges from LoopPath targets,
-    /// stopping at nodes that are exit targets or outside the loop.
-    /// </summary>
-    private static HashSet<string> FindLoopBodyNodes(
-        string headerId,
-        List<string> loopPathTargets,
-        List<string> exitPathTargets,
-        Dictionary<string, HashSet<string>> forwardEdges,
-        Dictionary<string, NodeData> nodeMap)
-    {
-        var body = new HashSet<string>(StringComparer.Ordinal);
-        var exitSet = new HashSet<string>(exitPathTargets, StringComparer.Ordinal);
-        var queue = new Queue<string>(loopPathTargets);
+        var queue = new Queue<string>(nodesWithDataEdges.Where(id => indegree[id] == 0));
+        var processed = 0;
 
         while (queue.Count > 0)
         {
-            var nodeId = queue.Dequeue();
-            if (nodeId == headerId) continue; // don't include header in body
-            if (exitSet.Contains(nodeId)) continue; // stop at exit targets
-            if (!body.Add(nodeId)) continue; // already visited
+            var id = queue.Dequeue();
+            processed++;
 
-            if (forwardEdges.TryGetValue(nodeId, out var targets))
+            foreach (var target in edges[id])
             {
-                foreach (var target in targets)
-                {
-                    if (target != headerId && !exitSet.Contains(target))
-                        queue.Enqueue(target);
-                }
+                indegree[target]--;
+                if (indegree[target] == 0)
+                    queue.Enqueue(target);
             }
         }
 
-        return body;
+        if (processed != nodesWithDataEdges.Count)
+        {
+            var cycleNodes = nodesWithDataEdges.Where(id => indegree[id] > 0).ToList();
+            var cycleNames = string.Join(", ", cycleNodes.Select(id =>
+                nodeMap.TryGetValue(id, out var node) ? $"{node.Name} ({id})" : id));
+
+            result.Messages.Add(new GraphValidationMessage(
+                ValidationSeverity.Error,
+                $"Data-flow cycle detected involving nodes: {cycleNames}"));
+        }
     }
 
-    private IReadOnlyList<IExecutionStep> BuildSteps(
-        IReadOnlyList<NodeData> allNodes,
-        IReadOnlyList<ConnectionData> allConnections,
-        Dictionary<string, NodeData> nodeMap,
-        Dictionary<string, HashSet<string>> forwardEdges,
-        Dictionary<string, LoopHeaderInfo> loopHeaders,
-        Dictionary<string, HashSet<string>> loopBodies,
-        HashSet<string> excludedFromMain,
-        Dictionary<string, HashSet<string>> loopExitDependencies)
+    private static void ValidateConnectedInputs(
+        IReadOnlyList<NodeData> nodes,
+        IReadOnlyList<ConnectionData> connections,
+        GraphValidationResult result)
     {
-        // Topological sort of non-excluded nodes
-        var mainNodes = allNodes.Where(n => !excludedFromMain.Contains(n.Id)).ToList();
+        var connectedInputs = new HashSet<(string NodeId, string SocketName)>(
+            connections.Where(c => !c.IsExecution)
+                .Select(c => (c.InputNodeId, c.InputSocketName)));
 
-        if (mainNodes.Count == 0 && loopHeaders.Count == 0)
-            return Array.Empty<IExecutionStep>();
-
-        // Build layers from main nodes
-        var incomingCount = mainNodes.ToDictionary(n => n.Id, _ => 0, StringComparer.Ordinal);
-        var mainEdges = mainNodes.ToDictionary(
-            n => n.Id,
-            _ => new HashSet<string>(StringComparer.Ordinal),
-            StringComparer.Ordinal);
-
-        // Only count edges between main (non-excluded) nodes
-        var mainNodeSet = new HashSet<string>(mainNodes.Select(n => n.Id), StringComparer.Ordinal);
-
-        foreach (var node in mainNodes)
+        foreach (var node in nodes)
         {
-            if (!forwardEdges.TryGetValue(node.Id, out var targets)) continue;
-            foreach (var target in targets)
+            foreach (var input in node.Inputs.Where(i => !i.IsExecution))
             {
-                if (mainNodeSet.Contains(target) && mainEdges[node.Id].Add(target))
+                if (input.Value is not null)
+                    continue;
+
+                if (!connectedInputs.Contains((node.Id, input.Name)))
                 {
-                    incomingCount[target]++;
+                    result.Messages.Add(new GraphValidationMessage(
+                        ValidationSeverity.Warning,
+                        $"Required input '{input.Name}' on node '{node.Name}' has no connection or default value.",
+                        node.Id));
                 }
             }
         }
-
-        // Also account for loop headers: they should appear in the topological order
-        // as predecessors to their exit targets. We need to insert LoopSteps at the
-        // right position. To do this, we track which layer each loop header would be in.
-
-        // For loop headers with predecessors, figure out their topological position
-        // by tracking which main nodes feed into them
-        var headerPredecessors = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        foreach (var (headerId, _) in loopHeaders)
-        {
-            var preds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var conn in allConnections)
-            {
-                if (conn.InputNodeId == headerId && mainNodeSet.Contains(conn.OutputNodeId))
-                    preds.Add(conn.OutputNodeId);
-            }
-            headerPredecessors[headerId] = preds;
-        }
-
-        // Kahn's algorithm for main nodes
-        var steps = new List<IExecutionStep>();
-        var remaining = new HashSet<string>(mainNodeSet, StringComparer.Ordinal);
-        var processed = new HashSet<string>(StringComparer.Ordinal);
-        var pendingLoops = new HashSet<string>(loopHeaders.Keys, StringComparer.Ordinal);
-
-        // A node is ready when: incomingCount == 0 AND all loop headers it depends on (via exit paths) are processed
-        bool IsReady(string nodeId) =>
-            incomingCount[nodeId] == 0 &&
-            (!loopExitDependencies.TryGetValue(nodeId, out var deps) || deps.All(h => processed.Contains(h)));
-
-        var ready = new SortedSet<string>(
-            incomingCount.Where(kvp => kvp.Value == 0 && IsReady(kvp.Key)).Select(kvp => kvp.Key),
-            StringComparer.Ordinal);
-
-        while (ready.Count > 0 || pendingLoops.Count > 0)
-        {
-            // Process a layer of ready main nodes
-            if (ready.Count > 0)
-            {
-                var layerNodes = new List<NodeData>();
-                var current = ready.ToList();
-                ready.Clear();
-
-                foreach (var nodeId in current)
-                {
-                    if (!remaining.Remove(nodeId)) continue;
-                    layerNodes.Add(nodeMap[nodeId]);
-                    processed.Add(nodeId);
-
-                    if (mainEdges.TryGetValue(nodeId, out var targets))
-                    {
-                        foreach (var target in targets)
-                        {
-                            incomingCount[target]--;
-                            if (incomingCount[target] == 0 && IsReady(target))
-                                ready.Add(target);
-                        }
-                    }
-                }
-
-                if (layerNodes.Count > 0)
-                    steps.Add(new LayerStep(layerNodes));
-            }
-
-            // Check if any loop headers are now ready (all their main predecessors processed)
-            var readyLoops = pendingLoops
-                .Where(h => headerPredecessors[h].All(p => processed.Contains(p)))
-                .ToList();
-
-            var concurrentLoopSteps = new List<IExecutionStep>();
-
-            foreach (var headerId in readyLoops)
-            {
-                pendingLoops.Remove(headerId);
-                var info = loopHeaders[headerId];
-                var bodyNodeIds = loopBodies[headerId];
-
-                // Build loop body sub-plan
-                var bodyNodes = bodyNodeIds.Select(id => nodeMap[id]).ToList();
-                IReadOnlyList<IExecutionStep> bodySteps;
-
-                if (bodyNodes.Count > 0)
-                {
-                    // Build a simple layer plan for body nodes
-                    bodySteps = BuildBodyLayers(bodyNodes, allConnections, nodeMap, headerId);
-                }
-                else
-                {
-                    bodySteps = Array.Empty<IExecutionStep>();
-                }
-
-                var loopStep = new LoopStep(
-                    nodeMap[headerId],
-                    info.LoopPathSocket,
-                    info.ExitPathSocket,
-                    bodySteps,
-                    bodyNodes);
-
-                concurrentLoopSteps.Add(loopStep);
-                processed.Add(headerId);
-
-                // After the loop, its exit targets may now be ready
-                foreach (var exitTarget in info.ExitPathTargets)
-                {
-                    if (mainNodeSet.Contains(exitTarget) && remaining.Contains(exitTarget))
-                    {
-                        if (incomingCount.ContainsKey(exitTarget) && IsReady(exitTarget))
-                        {
-                            ready.Add(exitTarget);
-                        }
-                    }
-                }
-            }
-
-            // If multiple independent loops are ready at the same time, run them concurrently
-            if (concurrentLoopSteps.Count == 1)
-                steps.Add(concurrentLoopSteps[0]);
-            else if (concurrentLoopSteps.Count > 1)
-                steps.Add(new ParallelSteps(concurrentLoopSteps));
-
-            // Safety: if we have no ready nodes and no ready loops, break to avoid infinite loop
-            if (ready.Count == 0 && readyLoops.Count == 0)
-            {
-                // Add any remaining nodes as a fallback layer
-                if (remaining.Count > 0)
-                {
-                    var fallback = remaining.Select(id => nodeMap[id]).ToList();
-                    steps.Add(new LayerStep(fallback));
-                    remaining.Clear();
-                }
-                break;
-            }
-        }
-
-        return steps;
     }
 
     /// <summary>
-    /// Build topological layers for loop body nodes.
+    /// Detects cycles in execution-flow connections using topological sort.
+    /// Execution-flow cycles (e.g., LoopBody.Exit wired back to ForLoop.Enter) cause
+    /// unbounded recursion and stack overflow at runtime.
     /// </summary>
-    private static IReadOnlyList<IExecutionStep> BuildBodyLayers(
-        IReadOnlyList<NodeData> bodyNodes,
-        IReadOnlyList<ConnectionData> allConnections,
-        Dictionary<string, NodeData> nodeMap,
-        string headerId)
+    private static void ValidateExecutionFlowCycles(
+        IReadOnlyList<NodeData> nodes,
+        IReadOnlyList<ConnectionData> connections,
+        GraphValidationResult result)
     {
-        var bodySet = new HashSet<string>(bodyNodes.Select(n => n.Id), StringComparer.Ordinal);
-        var incomingCount = bodyNodes.ToDictionary(n => n.Id, _ => 0, StringComparer.Ordinal);
-        var edges = bodyNodes.ToDictionary(
-            n => n.Id,
-            _ => new HashSet<string>(StringComparer.Ordinal),
+        if (nodes.Count == 0)
+            return;
+
+        var nodeMap = nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
+        var edges = nodes.ToDictionary(n => n.Id, _ => new HashSet<string>(StringComparer.Ordinal), StringComparer.Ordinal);
+        var indegree = nodes.ToDictionary(n => n.Id, _ => 0, StringComparer.Ordinal);
+
+        foreach (var connection in connections.Where(c => c.IsExecution))
+        {
+            if (!nodeMap.ContainsKey(connection.OutputNodeId) || !nodeMap.ContainsKey(connection.InputNodeId))
+                continue;
+
+            if (edges[connection.OutputNodeId].Add(connection.InputNodeId))
+            {
+                indegree[connection.InputNodeId]++;
+            }
+        }
+
+        var nodesWithExecEdges = new HashSet<string>(
+            edges.Where(kvp => kvp.Value.Count > 0).Select(kvp => kvp.Key)
+                .Concat(indegree.Where(kvp => kvp.Value > 0).Select(kvp => kvp.Key)),
             StringComparer.Ordinal);
 
-        foreach (var conn in allConnections)
+        if (nodesWithExecEdges.Count == 0)
+            return;
+
+        var queue = new Queue<string>(nodesWithExecEdges.Where(id => indegree[id] == 0));
+        var processed = 0;
+
+        while (queue.Count > 0)
         {
-            // Only count edges within the body
-            if (bodySet.Contains(conn.OutputNodeId) && bodySet.Contains(conn.InputNodeId))
+            var id = queue.Dequeue();
+            processed++;
+
+            foreach (var target in edges[id])
             {
-                if (edges[conn.OutputNodeId].Add(conn.InputNodeId))
-                    incomingCount[conn.InputNodeId]++;
+                indegree[target]--;
+                if (indegree[target] == 0)
+                    queue.Enqueue(target);
             }
         }
 
-        var layers = new List<IExecutionStep>();
-        var ready = new SortedSet<string>(
-            incomingCount.Where(kvp => kvp.Value == 0).Select(kvp => kvp.Key),
-            StringComparer.Ordinal);
-        var remaining = new HashSet<string>(bodySet, StringComparer.Ordinal);
-
-        while (ready.Count > 0)
+        if (processed != nodesWithExecEdges.Count)
         {
-            var layerNodes = new List<NodeData>();
-            var current = ready.ToList();
-            ready.Clear();
+            var cycleNodes = nodesWithExecEdges.Where(id => indegree[id] > 0).ToList();
+            var cycleNames = string.Join(", ", cycleNodes.Select(id =>
+                nodeMap.TryGetValue(id, out var node) ? $"{node.Name} ({id})" : id));
 
-            foreach (var nodeId in current)
-            {
-                if (!remaining.Remove(nodeId)) continue;
-                layerNodes.Add(nodeMap[nodeId]);
-
-                foreach (var target in edges[nodeId])
-                {
-                    incomingCount[target]--;
-                    if (incomingCount[target] == 0)
-                        ready.Add(target);
-                }
-            }
-
-            if (layerNodes.Count > 0)
-                layers.Add(new LayerStep(layerNodes));
+            result.Messages.Add(new GraphValidationMessage(
+                ValidationSeverity.Warning,
+                $"Execution-flow cycle detected involving nodes: {cycleNames}. " +
+                $"This may cause stack overflow at runtime."));
         }
-
-        if (remaining.Count > 0)
-        {
-            var fallback = remaining.Select(id => nodeMap[id]).ToList();
-            layers.Add(new LayerStep(fallback));
-        }
-
-        return layers;
     }
 
-    /// <summary>
-    /// Flatten a hierarchical plan to the legacy ExecutionPlan format for backward compat.
-    /// </summary>
-    private static ExecutionPlan FlattenToLegacy(HierarchicalPlan plan, IReadOnlyList<NodeData> allNodes)
+    private static void ValidateReachability(
+        IReadOnlyList<NodeData> nodes,
+        IReadOnlyList<ConnectionData> connections,
+        GraphValidationResult result)
     {
-        var layers = new List<ExecutionLayer>();
-        FlattenSteps(plan.Steps, layers);
+        var nodeMap = nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
+        var edges = nodes.ToDictionary(n => n.Id, _ => new HashSet<string>(StringComparer.Ordinal), StringComparer.Ordinal);
 
-        if (layers.Count == 0 && allNodes.Count > 0)
+        foreach (var connection in connections.Where(c => c.IsExecution))
         {
-            // Fallback: single layer with all nodes
-            layers.Add(new ExecutionLayer(allNodes.ToList()));
+            if (!nodeMap.ContainsKey(connection.OutputNodeId) || !nodeMap.ContainsKey(connection.InputNodeId))
+                continue;
+
+            edges[connection.OutputNodeId].Add(connection.InputNodeId);
         }
 
-        return new ExecutionPlan(layers);
-    }
+        var reachable = new HashSet<string>(StringComparer.Ordinal);
+        var queue = new Queue<string>(nodes.Where(n => n.ExecInit).Select(n => n.Id));
 
-    private static void FlattenSteps(IReadOnlyList<IExecutionStep> steps, List<ExecutionLayer> layers)
-    {
-        foreach (var step in steps)
+        while (queue.Count > 0)
         {
-            switch (step)
+            var id = queue.Dequeue();
+            if (!reachable.Add(id))
+                continue;
+
+            foreach (var target in edges[id])
             {
-                case LayerStep layer:
-                    layers.Add(new ExecutionLayer(layer.Nodes));
-                    break;
-                case LoopStep loop:
-                    // In legacy mode, just put header + body in one layer
-                    var allLoopNodes = new List<NodeData> { loop.Header };
-                    allLoopNodes.AddRange(loop.BodyNodes);
-                    layers.Add(new ExecutionLayer(allLoopNodes));
-                    break;
-                case BranchStep branch:
-                    layers.Add(new ExecutionLayer(new[] { branch.ConditionNode }));
-                    foreach (var (_, branchSteps) in branch.Branches)
-                        FlattenSteps(branchSteps, layers);
-                    break;
-                case ParallelSteps parallel:
-                    FlattenSteps(parallel.Steps, layers);
-                    break;
+                if (!reachable.Contains(target))
+                    queue.Enqueue(target);
             }
         }
+
+        foreach (var node in nodes.Where(n => n.Callable && !reachable.Contains(n.Id)))
+        {
+            result.Messages.Add(new GraphValidationMessage(
+                ValidationSeverity.Info,
+                $"Callable node '{node.Name}' is unreachable from any initiator.",
+                node.Id));
+        }
     }
+}
+
+public sealed class GraphValidationResult
+{
+    public List<GraphValidationMessage> Messages { get; } = new();
+    public bool HasErrors => Messages.Any(m => m.Severity == ValidationSeverity.Error);
+}
+
+public sealed record GraphValidationMessage(
+    ValidationSeverity Severity,
+    string Message,
+    string? NodeId = null);
+
+public enum ValidationSeverity
+{
+    Info,
+    Warning,
+    Error
 }

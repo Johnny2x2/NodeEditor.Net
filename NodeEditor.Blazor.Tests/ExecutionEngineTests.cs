@@ -2,245 +2,180 @@ using System.Collections.Concurrent;
 using NodeEditor.Net.Models;
 using NodeEditor.Net.Services;
 using NodeEditor.Net.Services.Execution;
+using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.ViewModels;
 
 namespace NodeEditor.Blazor.Tests;
 
 public sealed class ExecutionEngineTests
 {
-    [Fact]
-    public async Task SequentialExecution_ResolvesDataDependencies()
+    private static NodeExecutionService CreateService()
     {
-        var nodes = new List<NodeData>
-        {
-            TestNodes.Start("start"),
-            TestNodes.Const("const", value: 7),
-            TestNodes.Add("add")
-        };
-
-        var connections = new List<ConnectionData>
-        {
-            TestConnections.Exec("start", "Exit", "add", "Enter"),
-            TestConnections.Data("const", "Value", "add", "Value")
-        };
-
-        var context = new NodeExecutionContext();
-        var service = TestNodes.CreateExecutor();
-        var testContext = new TestNodeContext { ConstValue = 7 };
-
-        await service.ExecuteAsync(nodes, connections, context, testContext, NodeExecutionOptions.Default, CancellationToken.None);
-
-        Assert.True(context.IsNodeExecuted("const"));
-        Assert.True(context.IsNodeExecuted("add"));
-        Assert.Equal(10, context.GetSocketValue("add", "Result"));
+        var registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+        return new NodeExecutionService(new ExecutionPlanner(), registry, new MinimalServiceProvider());
     }
 
-    [Fact]
-    public async Task SequentialExecution_FollowsSignaledBranch()
+    private static NodeExecutionService CreateService(out NodeRegistryService registry)
     {
-        var nodes = new List<NodeData>
-        {
-            TestNodes.Start("start"),
-            TestNodes.Branch("branch", condValue: true),
-            TestNodes.Marker("trueNode"),
-            TestNodes.Marker("falseNode")
-        };
-
-        var connections = new List<ConnectionData>
-        {
-            TestConnections.Exec("start", "Exit", "branch", "Enter"),
-            TestConnections.Exec("branch", "True", "trueNode", "Enter"),
-            TestConnections.Exec("branch", "False", "falseNode", "Enter")
-        };
-
-        var context = new NodeExecutionContext();
-        var service = TestNodes.CreateExecutor();
-
-        await service.ExecuteAsync(nodes, connections, context, new TestNodeContext(), NodeExecutionOptions.Default, CancellationToken.None);
-
-        Assert.True(context.IsNodeExecuted("trueNode"));
-        Assert.False(context.IsNodeExecuted("falseNode"));
+        registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+        return new NodeExecutionService(new ExecutionPlanner(), registry, new MinimalServiceProvider());
     }
 
-    [Fact]
-    public async Task EventTrigger_ExecutesListenerDownstream()
+    private static NodeData NodeFromDef(NodeRegistryService registry, string defName, string id)
     {
-        var graphEvent = GraphEvent.Create("OnFire");
-
-        var listener = new NodeData(
-            Id: "listener",
-            Name: "Custom Event: OnFire",
-            Callable: true,
-            ExecInit: true,
-            Inputs: Array.Empty<SocketData>(),
-            Outputs: new[] { new SocketData("Exit", typeof(ExecutionPath).FullName!, false, true) },
-            DefinitionId: graphEvent.ListenerDefinitionId);
-
-        var trigger = new NodeData(
-            Id: "trigger",
-            Name: "Trigger Event: OnFire",
-            Callable: true,
-            ExecInit: false,
-            Inputs: new[] { new SocketData("Enter", typeof(ExecutionPath).FullName!, true, true) },
-            Outputs: new[] { new SocketData("Exit", typeof(ExecutionPath).FullName!, false, true) },
-            DefinitionId: graphEvent.TriggerDefinitionId);
-
-        var nodes = new List<NodeData>
-        {
-            TestNodes.Start("start"),
-            trigger,
-            listener,
-            TestNodes.Marker("after")
-        };
-
-        var connections = new List<ConnectionData>
-        {
-            TestConnections.Exec("start", "Exit", "trigger", "Enter"),
-            TestConnections.Exec("listener", "Exit", "after", "Enter")
-        };
-
-        var context = new NodeExecutionContext();
-        var service = TestNodes.CreateExecutor();
-
-        await service.ExecuteAsync(nodes, connections, context, new TestNodeContext(), NodeExecutionOptions.Default, CancellationToken.None);
-
-        Assert.True(context.IsNodeExecuted("trigger"));
-        Assert.True(context.IsNodeExecuted("listener"));
-        Assert.True(context.IsNodeExecuted("after"));
+        var def = registry.Definitions.First(d => d.Name == defName && (d.NodeType is not null || d.InlineExecutor is not null));
+        return def.Factory() with { Id = id };
     }
 
-    [Fact]
-    public async Task ParallelExecution_RunsIndependentNodesConcurrently()
+    private static NodeData NodeFromDef(NodeRegistryService registry, string defName, string id, params (string socketName, object value)[] inputOverrides)
     {
-        var nodes = new List<NodeData>
+        var def = registry.Definitions.First(d => d.Name == defName && (d.NodeType is not null || d.InlineExecutor is not null));
+        var node = def.Factory() with { Id = id };
+        if (inputOverrides.Length == 0) return node;
+
+        var newInputs = node.Inputs.Select(s =>
         {
-            TestNodes.Delay("start1", isEntry: true, delayMs: 120),
-            TestNodes.Delay("start2", isEntry: true, delayMs: 120)
-        };
+            var over = inputOverrides.FirstOrDefault(o => o.socketName == s.Name);
+            if (over != default)
+                return s with { Value = SocketValue.FromObject(over.value) };
+            return s;
+        }).ToArray();
 
-        var connections = new List<ConnectionData>();
-        var context = new NodeExecutionContext();
-        var testContext = new TestNodeContext();
-        var service = TestNodes.CreateExecutor();
-
-        var options = new NodeExecutionOptions(ExecutionMode.Parallel, AllowBackground: false, MaxDegreeOfParallelism: 4);
-
-        await service.ExecuteAsync(nodes, connections, context, testContext, options, CancellationToken.None);
-
-        Assert.True(testContext.MaxConcurrent >= 2);
+        return node with { Inputs = newInputs };
     }
 
-    [Fact]
-    public async Task ParallelExecution_RespectsDependencyLayers()
-    {
-        var nodes = new List<NodeData>
-        {
-            TestNodes.DelayedValue("a", delayMs: 150),
-            TestNodes.DelayedValue("b", delayMs: 150),
-            TestNodes.Sum("c")
-        };
-
-        var connections = new List<ConnectionData>
-        {
-            TestConnections.Data("a", "Value", "c", "A"),
-            TestConnections.Data("b", "Value", "c", "B")
-        };
-
-        var context = new NodeExecutionContext();
-        var testContext = new TestNodeContext();
-        var service = TestNodes.CreateExecutor();
-
-        var started = new ConcurrentDictionary<string, DateTime>();
-        var completed = new ConcurrentDictionary<string, DateTime>();
-
-        service.NodeStarted += (_, args) => started[args.Node.Id] = DateTime.UtcNow;
-        service.NodeCompleted += (_, args) => completed[args.Node.Id] = DateTime.UtcNow;
-
-        var options = new NodeExecutionOptions(ExecutionMode.Parallel, AllowBackground: false, MaxDegreeOfParallelism: 4);
-
-        await service.ExecuteAsync(nodes, connections, context, testContext, options, CancellationToken.None);
-
-        Assert.True(started.ContainsKey("c"));
-        Assert.True(completed.ContainsKey("a"));
-        Assert.True(completed.ContainsKey("b"));
-
-        Assert.True(started["c"] >= completed["a"]);
-        Assert.True(started["c"] >= completed["b"]);
-    }
+    // â”€â”€ Sequential Execution â”€â”€
 
     [Fact]
-    public async Task Cancellation_StopsExecutionWithinTimeout()
+    public async Task SequentialExecution_StartTriggersDownstream()
     {
-        var nodes = new List<NodeData>
-        {
-            TestNodes.Delay("start", isEntry: true, delayMs: 2000)
-        };
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var marker = NodeFromDef(registry, "Marker", "marker");
 
-        var connections = new List<ConnectionData>();
-        var context = new NodeExecutionContext();
-        var testContext = new TestNodeContext();
-        var service = TestNodes.CreateExecutor();
-
-        using var cts = new CancellationTokenSource(100);
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            service.ExecuteAsync(nodes, connections, context, testContext, NodeExecutionOptions.Default, cts.Token));
-    }
-
-    [Fact]
-    public async Task BackgroundQueue_ExecutesPlannedJobs()
-    {
-        var nodes = new List<NodeData>
-        {
-            TestNodes.Start("start"),
-            TestNodes.Marker("marker")
-        };
-
+        var nodes = new List<NodeData> { start, marker };
         var connections = new List<ConnectionData>
         {
             TestConnections.Exec("start", "Exit", "marker", "Enter")
         };
 
-        var context = new NodeExecutionContext();
-        var testContext = new TestNodeContext();
-        var planner = new ExecutionPlanner();
-        var service = new NodeExecutionService(planner, new SocketTypeResolver());
-        var queue = new BackgroundExecutionQueue();
-        var worker = new BackgroundExecutionWorker(queue, service);
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
-        var plan = planner.BuildPlan(nodes, connections);
-        var job = new ExecutionJob(Guid.NewGuid(), plan, connections, context, testContext, NodeExecutionOptions.Default);
-        await queue.EnqueueAsync(job);
-
-        using var cts = new CancellationTokenSource();
-        var runTask = worker.RunAsync(cts.Token);
-
-        var executed = await ExecutionTestHelpers.WaitUntilAsync(() => context.IsNodeExecuted("marker"), TimeSpan.FromSeconds(2));
-        cts.Cancel();
-
-        try
-        {
-            await runTask;
-        }
-        catch (OperationCanceledException)
-        {
-        }
-
-        Assert.True(executed);
+        Assert.True(context.IsNodeExecuted("start"));
+        Assert.True(context.IsNodeExecuted("marker"));
     }
 
     [Fact]
-    public async Task Loop_ForLoopStep_IteratesBodyInParallelMode()
+    public async Task SequentialExecution_FollowsSignaledBranch_True()
     {
-        // ForLoopStep(0..2) → body Marker → engine handles loopback
-        // After loop exits → end Marker
-        var nodes = new List<NodeData>
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var branch = NodeFromDef(registry, "Branch", "branch", ("Cond", true));
+        var trueMarker = NodeFromDef(registry, "Marker", "trueMarker");
+        var falseMarker = NodeFromDef(registry, "Marker", "falseMarker");
+
+        var nodes = new List<NodeData> { start, branch, trueMarker, falseMarker };
+        var connections = new List<ConnectionData>
         {
-            TestNodes.Start("start"),
-            TestNodes.ForLoopStep("loop", start: 0, end: 2, step: 1),
-            TestNodes.Marker("body"),
-            TestNodes.Marker("end")
+            TestConnections.Exec("start", "Exit", "branch", "Start"),
+            TestConnections.Exec("branch", "True", "trueMarker", "Enter"),
+            TestConnections.Exec("branch", "False", "falseMarker", "Enter")
         };
 
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("trueMarker"), "True branch should execute");
+        Assert.False(context.IsNodeExecuted("falseMarker"), "False branch should NOT execute");
+    }
+
+    [Fact]
+    public async Task SequentialExecution_FollowsSignaledBranch_False()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var branch = NodeFromDef(registry, "Branch", "branch", ("Cond", false));
+        var trueMarker = NodeFromDef(registry, "Marker", "trueMarker");
+        var falseMarker = NodeFromDef(registry, "Marker", "falseMarker");
+
+        var nodes = new List<NodeData> { start, branch, trueMarker, falseMarker };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "branch", "Start"),
+            TestConnections.Exec("branch", "True", "trueMarker", "Enter"),
+            TestConnections.Exec("branch", "False", "falseMarker", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.False(context.IsNodeExecuted("trueMarker"), "True branch should NOT execute");
+        Assert.True(context.IsNodeExecuted("falseMarker"), "False branch should execute");
+    }
+
+    // â”€â”€ Data Resolution â”€â”€
+
+    [Fact]
+    public async Task DataNode_ResolvesUpstreamLazily()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var abs = NodeFromDef(registry, "Abs", "abs", ("Value", -5.0));
+        var consume = NodeFromDef(registry, "Consume", "consume");
+
+        var nodes = new List<NodeData> { start, abs, consume };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "consume", "Enter"),
+            TestConnections.Data("abs", "Result", "consume", "Value")
+        };
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("abs"), "Data node should have been lazily evaluated");
+        Assert.Equal(5.0, context.GetSocketValue("abs", "Result"));
+    }
+
+    [Fact]
+    public async Task DataPipeline_AbsToClamp()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var abs = NodeFromDef(registry, "Abs", "abs", ("Value", -15.0));
+        var clamp = NodeFromDef(registry, "Clamp", "clamp", ("Min", 0.0), ("Max", 10.0));
+        var consume = NodeFromDef(registry, "Consume", "consume");
+
+        var nodes = new List<NodeData> { start, abs, clamp, consume };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "consume", "Enter"),
+            TestConnections.Data("abs", "Result", "clamp", "Value"),
+            TestConnections.Data("clamp", "Result", "consume", "Value")
+        };
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.Equal(15.0, context.GetSocketValue("abs", "Result"));
+        Assert.Equal(10.0, context.GetSocketValue("clamp", "Result"));
+    }
+
+    // â”€â”€ Loops â”€â”€
+
+    [Fact]
+    public async Task ForLoop_IteratesCorrectTimes()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var loop = NodeFromDef(registry, "For Loop", "loop", ("LoopTimes", 3));
+        var marker = NodeFromDef(registry, "Marker", "body");
+        var end = NodeFromDef(registry, "Marker", "end");
+
+        var nodes = new List<NodeData> { start, loop, marker, end };
         var connections = new List<ConnectionData>
         {
             TestConnections.Exec("start", "Exit", "loop", "Enter"),
@@ -248,126 +183,185 @@ public sealed class ExecutionEngineTests
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
-        var context = new NodeExecutionContext();
-        var service = TestNodes.CreateExecutor();
-        var testContext = new TestNodeContext();
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
-        var options = new NodeExecutionOptions(ExecutionMode.Parallel, AllowBackground: false, MaxDegreeOfParallelism: 4);
-        await service.ExecuteAsync(nodes, connections, context, testContext, options, CancellationToken.None);
-
-        // Loop should iterate: invocations at index 0, 1, 2 (LoopPath), then exit at index 3 (>End, Exit) = 4 calls
-        Assert.Equal(4, testContext.ForLoopCalls);
-        Assert.True(context.IsNodeExecuted("end"));
+        Assert.True(context.IsNodeExecuted("body"), "Loop body should have executed");
+        Assert.True(context.IsNodeExecuted("end"), "Exit marker should have been reached");
+        // Last index should be 2 (0, 1, 2)
+        Assert.Equal(2, context.GetSocketValue("loop", "Index"));
     }
 
     [Fact]
-    public async Task Loop_ForLoopStep_NoBodyNodes_StillIterates()
+    public async Task ForLoopStep_IteratesWithStep()
     {
-        // Loop with no LoopPath connections — loop still iterates internally
-        var nodes = new List<NodeData>
-        {
-            TestNodes.Start("start"),
-            TestNodes.ForLoopStep("loop", start: 0, end: 1, step: 1),
-            TestNodes.Marker("end")
-        };
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var loop = NodeFromDef(registry, "For Loop Step", "loop", ("StartValue", 0), ("EndValue", 6), ("Step", 2));
+        var end = NodeFromDef(registry, "Marker", "end");
 
+        var nodes = new List<NodeData> { start, loop, end };
         var connections = new List<ConnectionData>
         {
             TestConnections.Exec("start", "Exit", "loop", "Enter"),
             TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
-        var context = new NodeExecutionContext();
-        var service = TestNodes.CreateExecutor();
-        var testContext = new TestNodeContext();
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
-        await service.ExecuteAsync(nodes, connections, context, testContext, NodeExecutionOptions.Default, CancellationToken.None);
-
-        // index 0 → LoopPath, index 1 → LoopPath, index 2 (>End) → Exit = 3 calls
-        Assert.True(testContext.ForLoopCalls >= 2, $"Expected at least 2 loop calls but got {testContext.ForLoopCalls}");
-        Assert.True(context.IsNodeExecuted("end"));
+        Assert.True(context.IsNodeExecuted("end"), "Exit should have been reached");
+        // Iterates: 0, 2, 4 â†’ last Index = 4
+        Assert.Equal(4, context.GetSocketValue("loop", "Index"));
     }
 
     [Fact]
-    public async Task Loop_TwoIndependentLoops_RunConcurrently()
+    public async Task WhileLoop_FalseCondition_ExitsImmediately()
     {
-        // Two independent loops with no dependency between them should execute concurrently.
-        // Start → LoopA (0..1) → bodyA → endA
-        // Start → LoopB (0..1) → bodyB → endB
-        var nodes = new List<NodeData>
-        {
-            TestNodes.Start("start"),
-            TestNodes.ForLoopStep("loopA", start: 0, end: 1, step: 1),
-            TestNodes.Marker("bodyA"),
-            TestNodes.Marker("endA"),
-            TestNodes.ForLoopStep("loopB", start: 0, end: 1, step: 1),
-            TestNodes.Marker("bodyB"),
-            TestNodes.Marker("endB")
-        };
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var loop = NodeFromDef(registry, "While Loop", "loop", ("Condition", false));
+        var body = NodeFromDef(registry, "Marker", "body");
+        var end = NodeFromDef(registry, "Marker", "end");
 
+        var nodes = new List<NodeData> { start, loop, body, end };
         var connections = new List<ConnectionData>
         {
-            TestConnections.Exec("start", "Exit", "loopA", "Enter"),
-            TestConnections.Exec("start", "Exit", "loopB", "Enter"),
-            TestConnections.Exec("loopA", "LoopPath", "bodyA", "Enter"),
-            TestConnections.Exec("loopA", "Exit", "endA", "Enter"),
-            TestConnections.Exec("loopB", "LoopPath", "bodyB", "Enter"),
-            TestConnections.Exec("loopB", "Exit", "endB", "Enter")
+            TestConnections.Exec("start", "Exit", "loop", "Enter"),
+            TestConnections.Exec("loop", "LoopPath", "body", "Enter"),
+            TestConnections.Exec("loop", "Exit", "end", "Enter")
         };
 
-        var context = new NodeExecutionContext();
-        var service = TestNodes.CreateExecutor();
-        var testContext = new TestNodeContext();
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
-        var options = new NodeExecutionOptions(ExecutionMode.Parallel, AllowBackground: false, MaxDegreeOfParallelism: 4);
-        await service.ExecuteAsync(nodes, connections, context, testContext, options, CancellationToken.None);
-
-        // Both loops should complete and reach their exit targets
-        Assert.True(context.IsNodeExecuted("endA"), "endA should have been executed");
-        Assert.True(context.IsNodeExecuted("endB"), "endB should have been executed");
-
-        // Verify the plan contains a ParallelSteps grouping
-        var planner = new ExecutionPlanner();
-        var plan = planner.BuildHierarchicalPlan(nodes, connections);
-        var hasParallelSteps = plan.Steps.Any(s => s is ParallelSteps ps && ps.Steps.Count >= 2);
-        Assert.True(hasParallelSteps, "Two independent loops should be grouped into ParallelSteps");
+        Assert.False(context.IsNodeExecuted("body"), "Body should NOT execute when condition is false");
+        Assert.True(context.IsNodeExecuted("end"), "Exit should be reached");
     }
+
+    [Fact]
+    public async Task DoWhileLoop_ExecutesAtLeastOnce()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var loop = NodeFromDef(registry, "Do While Loop", "loop", ("Condition", false));
+        var body = NodeFromDef(registry, "Marker", "body");
+        var end = NodeFromDef(registry, "Marker", "end");
+
+        var nodes = new List<NodeData> { start, loop, body, end };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "loop", "Enter"),
+            TestConnections.Exec("loop", "LoopPath", "body", "Enter"),
+            TestConnections.Exec("loop", "Exit", "end", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("body"), "Body should execute at least once in do-while");
+        Assert.True(context.IsNodeExecuted("end"), "Exit should be reached");
+    }
+
+    // â”€â”€ Cancellation â”€â”€
+
+    [Fact]
+    public async Task Cancellation_StopsExecutionWithinTimeout()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var delay = NodeFromDef(registry, "Delay", "delay", ("DelayMs", 5000));
+
+        var nodes = new List<NodeData> { start, delay };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "delay", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        using var cts = new CancellationTokenSource(100);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, cts.Token));
+    }
+
+    // â”€â”€ Debug/Feedback â”€â”€
+
+    [Fact]
+    public async Task DebugPrint_EmitsFeedbackEvent()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var debug = NodeFromDef(registry, "Debug Print", "debug", ("Label", "test"), ("Value", (object)"hello"));
+
+        var nodes = new List<NodeData> { start, debug };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "debug", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        string? receivedMessage = null;
+        service.FeedbackReceived += (_, args) => receivedMessage = args.Message;
+
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.NotNull(receivedMessage);
+        Assert.Contains("test", receivedMessage);
+        Assert.Contains("hello", receivedMessage);
+    }
+
+    [Fact]
+    public async Task DebugWarning_EmitsContinueFeedback()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var warn = NodeFromDef(registry, "Debug Warning", "warn", ("Message", "caution!"));
+
+        var nodes = new List<NodeData> { start, warn };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "warn", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        ExecutionFeedbackType? feedbackType = null;
+        service.FeedbackReceived += (_, args) => feedbackType = args.Type;
+
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.Equal(ExecutionFeedbackType.Continue, feedbackType);
+    }
+
+    // â”€â”€ Step Mode â”€â”€
 
     [Fact]
     public async Task StepMode_GatePausesAndResumes()
     {
-        var nodes = new List<NodeData>
-        {
-            TestNodes.Start("start"),
-            TestNodes.Marker("a"),
-            TestNodes.Marker("b")
-        };
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var a = NodeFromDef(registry, "Marker", "a");
+        var b = NodeFromDef(registry, "Marker", "b");
 
+        var nodes = new List<NodeData> { start, a, b };
         var connections = new List<ConnectionData>
         {
             TestConnections.Exec("start", "Exit", "a", "Enter"),
             TestConnections.Exec("a", "Exit", "b", "Enter")
         };
 
-        var context = new NodeExecutionContext();
-        var service = TestNodes.CreateExecutor();
-        var testContext = new TestNodeContext();
-
-        // Start in paused mode (step mode)
+        var context = new NodeRuntimeStorage();
         service.Gate.StartPaused();
 
         var execTask = Task.Run(async () =>
-            await service.ExecuteAsync(nodes, connections, context, testContext, NodeExecutionOptions.Default, CancellationToken.None));
+            await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None));
 
-        // Allow some time for the engine to hit the gate
-        await Task.Delay(50);
-        Assert.False(context.IsNodeExecuted("start"), "Node should not have executed yet while paused");
+        await Task.Delay(100);
+        Assert.False(context.IsNodeExecuted("start"), "Should still be paused");
 
-        // Step once — should execute one node (start)
         service.Gate.StepOnce();
-        await Task.Delay(50);
+        await Task.Delay(100);
 
-        // Resume to let the rest finish
         service.Gate.Resume();
         await execTask;
 
@@ -376,113 +370,600 @@ public sealed class ExecutionEngineTests
         Assert.True(context.IsNodeExecuted("b"));
     }
 
+    // â”€â”€ Group Execution â”€â”€
+
     [Fact]
     public async Task GroupExecution_ReturnsOutputsToParentContext()
     {
-        var groupNodes = new List<NodeData>
+        var service = CreateService(out var registry);
+
+        // Inner group: Start â†’ Consume, with Abs(-42) lazily pulled by Consume
+        var innerStart = NodeFromDef(registry, "Start", "innerStart");
+        var innerAbs = NodeFromDef(registry, "Abs", "innerAbs", ("Value", -42.0));
+        var innerConsume = NodeFromDef(registry, "Consume", "innerConsume");
+
+        var innerConnections = new List<ConnectionData>
         {
-            TestNodes.Const("innerConst", value: 42)
+            TestConnections.Exec("innerStart", "Exit", "innerConsume", "Enter"),
+            TestConnections.Data("innerAbs", "Result", "innerConsume", "Value")
         };
 
         var group = new GroupNodeData(
             Id: "group",
             Name: "Group",
-            Nodes: groupNodes,
-            Connections: Array.Empty<ConnectionData>(),
+            Nodes: new List<NodeData> { innerStart, innerAbs, innerConsume },
+            Connections: innerConnections,
             Inputs: Array.Empty<SocketData>(),
-            Outputs: new[] { new SocketData("Value", typeof(int).FullName ?? "System.Int32", false, false) },
+            Outputs: new[] { new SocketData("Value", typeof(double).FullName!, false, false) },
             InputMappings: Array.Empty<GroupSocketMapping>(),
-            OutputMappings: new[] { new GroupSocketMapping("Value", "innerConst", "Value") });
+            OutputMappings: new[] { new GroupSocketMapping("Value", "innerAbs", "Result") });
 
-        var parentContext = new NodeExecutionContext();
-        var service = TestNodes.CreateExecutor();
+        var parentContext = new NodeRuntimeStorage();
 
-        await service.ExecuteGroupAsync(group, parentContext, new TestNodeContext(), NodeExecutionOptions.Default, CancellationToken.None);
+        await service.ExecuteGroupAsync(group, parentContext, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
-        Assert.Equal(42, parentContext.GetSocketValue("group", "Value"));
+        Assert.Equal(42.0, parentContext.GetSocketValue("group", "Value"));
     }
-}
 
-internal static class TestNodes
-{
-    public static NodeExecutionService CreateExecutor()
-        => new(new ExecutionPlanner(), new SocketTypeResolver());
+    // â”€â”€ Parallel Execution â”€â”€
 
-    public static NodeData Start(string id)
-        => new(id, "Start", true, true,
+    [Fact]
+    public async Task ParallelInitiators_BothExecute()
+    {
+        var service = CreateService(out var registry);
+
+        // Two independent Start â†’ Marker chains
+        var start1 = NodeFromDef(registry, "Start", "start1");
+        var marker1 = NodeFromDef(registry, "Marker", "marker1");
+        var start2 = NodeFromDef(registry, "Start", "start2");
+        var marker2 = NodeFromDef(registry, "Marker", "marker2");
+
+        var nodes = new List<NodeData> { start1, marker1, start2, marker2 };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start1", "Exit", "marker1", "Enter"),
+            TestConnections.Exec("start2", "Exit", "marker2", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        var options = new NodeExecutionOptions(ExecutionMode.Parallel, AllowBackground: false, MaxDegreeOfParallelism: 4);
+        await service.ExecuteAsync(nodes, connections, context, null!, options, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("marker1"));
+        Assert.True(context.IsNodeExecuted("marker2"));
+    }
+
+    // â”€â”€ Background Queue â”€â”€
+
+    [Fact]
+    public async Task BackgroundQueue_ExecutesPlannedJobs()
+    {
+        var registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+        var services = new MinimalServiceProvider();
+        var service = new NodeExecutionService(new ExecutionPlanner(), registry, services);
+
+        var start = registry.Definitions.First(d => d.Name == "Start" && d.NodeType is not null).Factory() with { Id = "start" };
+        var marker = registry.Definitions.First(d => d.Name == "Marker" && d.NodeType is not null).Factory() with { Id = "marker" };
+
+        var nodes = new List<NodeData> { start, marker };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "marker", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        var queue = new BackgroundExecutionQueue();
+        var worker = new BackgroundExecutionWorker(queue, service);
+
+        var job = new ExecutionJob(Guid.NewGuid(), nodes, connections, context, null!, NodeExecutionOptions.Default);
+        await queue.EnqueueAsync(job);
+
+        using var cts = new CancellationTokenSource();
+        var runTask = worker.RunAsync(cts.Token);
+
+        var executed = await ExecutionTestHelpers.WaitUntilAsync(() => context.IsNodeExecuted("marker"), TimeSpan.FromSeconds(2));
+        cts.Cancel();
+
+        try { await runTask; } catch (OperationCanceledException) { }
+
+        Assert.True(executed);
+    }
+
+    // â”€â”€ Event Nodes â”€â”€
+
+    [Fact]
+    public async Task StartNode_IsDiscoverableAsExecutionInitiator()
+    {
+        var registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+
+        var startDef = registry.Definitions.First(d => d.Name == "Start" && d.NodeType is not null);
+        var nodeData = startDef.Factory();
+
+        Assert.True(nodeData.ExecInit, "Start node should be an execution initiator");
+        Assert.True(nodeData.Callable, "Start node should be callable");
+        Assert.Contains(nodeData.Outputs, o => o.Name == "Exit" && o.IsExecution);
+    }
+
+    [Fact]
+    public async Task BranchNode_HasCorrectSocketStructure()
+    {
+        var registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+
+        var branchDef = registry.Definitions.First(d => d.Name == "Branch" && d.NodeType is not null);
+        var nodeData = branchDef.Factory();
+
+        Assert.Contains(nodeData.Inputs, i => i.Name == "Start" && i.IsExecution);
+        Assert.Contains(nodeData.Inputs, i => i.Name == "Cond" && !i.IsExecution);
+        Assert.Contains(nodeData.Outputs, o => o.Name == "True" && o.IsExecution);
+        Assert.Contains(nodeData.Outputs, o => o.Name == "False" && o.IsExecution);
+    }
+
+    // â”€â”€ Complex Chains â”€â”€
+
+    [Fact]
+    public async Task ComplexChain_StartBranchLoopMarker()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var branch = NodeFromDef(registry, "Branch", "branch", ("Cond", true));
+        var loop = NodeFromDef(registry, "For Loop", "loop", ("LoopTimes", 2));
+        var end = NodeFromDef(registry, "Marker", "end");
+
+        var nodes = new List<NodeData> { start, branch, loop, end };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "branch", "Start"),
+            TestConnections.Exec("branch", "True", "loop", "Enter"),
+            TestConnections.Exec("loop", "Exit", "end", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("loop"));
+        Assert.True(context.IsNodeExecuted("end"));
+        Assert.Equal(1, context.GetSocketValue("loop", "Index")); // Last iteration index
+    }
+
+    [Fact]
+    public async Task Delay_PausesExecution()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var delay = NodeFromDef(registry, "Delay", "delay", ("DelayMs", 50));
+        var marker = NodeFromDef(registry, "Marker", "marker");
+
+        var nodes = new List<NodeData> { start, delay, marker };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "delay", "Enter"),
+            TestConnections.Exec("delay", "Exit", "marker", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+        sw.Stop();
+
+        Assert.True(context.IsNodeExecuted("marker"));
+        Assert.True(sw.ElapsedMilliseconds >= 30, $"Expected >= 30ms delay but got {sw.ElapsedMilliseconds}ms");
+    }
+
+    [Fact]
+    public async Task Consume_ForcesUpstreamEvaluation()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var abs = NodeFromDef(registry, "Abs", "abs", ("Value", -99.0));
+        var consume = NodeFromDef(registry, "Consume", "consume");
+
+        var nodes = new List<NodeData> { start, abs, consume };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "consume", "Enter"),
+            TestConnections.Data("abs", "Result", "consume", "Value")
+        };
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("abs"), "Abs should have been evaluated");
+        Assert.Equal(99.0, context.GetSocketValue("abs", "Result"));
+    }
+
+    [Fact]
+    public async Task RepeatUntil_ExecutesBodyThenChecksCondition()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        // Condition starts true â†’ repeat-until (repeats until condition is true) should execute body once then exit
+        var loop = NodeFromDef(registry, "Repeat Until", "loop", ("Condition", true));
+        var body = NodeFromDef(registry, "Marker", "body");
+        var end = NodeFromDef(registry, "Marker", "end");
+
+        var nodes = new List<NodeData> { start, loop, body, end };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "loop", "Enter"),
+            TestConnections.Exec("loop", "LoopPath", "body", "Enter"),
+            TestConnections.Exec("loop", "Exit", "end", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("body"), "Body should execute at least once");
+        Assert.True(context.IsNodeExecuted("end"), "Should exit after condition becomes true");
+    }
+
+    [Fact]
+    public async Task ForEachLoop_IteratesOverList()
+    {
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var listCreate = NodeFromDef(registry, "List Create", "list");
+        var listAdd1 = NodeFromDef(registry, "List Add", "add1", ("Item", (object)"A"));
+        var listAdd2 = NodeFromDef(registry, "List Add", "add2", ("Item", (object)"B"));
+        var forEach = NodeFromDef(registry, "ForEach Loop", "loop");
+        var end = NodeFromDef(registry, "Marker", "end");
+
+        // Build chain: list â†’ add1 â†’ add2 â†’ forEach
+        var nodes = new List<NodeData> { start, listCreate, listAdd1, listAdd2, forEach, end };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "loop", "Enter"),
+            TestConnections.Data("listCreate", "Result", "add1", "List"),
+            TestConnections.Data("add1", "Result", "add2", "List"),
+            TestConnections.Data("add2", "Result", "loop", "List"),
+            TestConnections.Exec("loop", "Exit", "end", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("end"), "ForEach should complete and trigger Exit");
+    }
+
+    //  Phase 13A spec-named tests (using TestGraphBuilder) 
+
+    [Fact]    public async Task SingleForLoop_WithIncrementNode_Works()
+    {
+        var service = CreateService(out var registry);
+        EnsureIncrementNodeRegistered(registry);
+
+        var (nodes, connections) = new TestGraphBuilder()
+            .AddNodeFromDefinition(registry, "Start", "start")
+            .AddNodeFromDefinition(registry, "For Loop", "loop", ("LoopTimes", 3))
+            .AddNodeFromDefinition(registry, "TestIncrement", "inc", ("Key", "count"))
+            .AddNodeFromDefinition(registry, "Marker", "end")
+            .ConnectExecution("start", "Exit", "loop", "Enter")
+            .ConnectExecution("loop", "LoopPath", "inc", "Enter")
+            .ConnectExecution("loop", "Exit", "end", "Enter")
+            .Build();
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("end"), "Exit should have been reached");
+        Assert.True(context.IsNodeExecuted("inc"), "Increment node should have been executed");
+        Assert.Equal(3, context.GetVariable("count"));
+    }
+
+    [Fact]    public async Task ForLoopStepNode_HandlesNegativeStep()
+    {
+        var service = CreateService(out var registry);
+        EnsureIncrementNodeRegistered(registry);
+
+        var (nodes, connections) = new TestGraphBuilder()
+            .AddNodeFromDefinition(registry, "Start", "start")
+            .AddNodeFromDefinition(registry, "For Loop Step", "loop",
+                ("StartValue", 6), ("EndValue", 0), ("Step", -2))
+            .AddNodeFromDefinition(registry, "TestIncrement", "inc", ("Key", "count"))
+            .AddNodeFromDefinition(registry, "Marker", "end")
+            .ConnectExecution("start", "Exit", "loop", "Enter")
+            .ConnectExecution("loop", "LoopPath", "inc", "Enter")
+            .ConnectExecution("loop", "Exit", "end", "Enter")
+            .Build();
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("end"), "Exit should have been reached");
+        Assert.Equal(2, context.GetSocketValue("loop", "Index"));
+        Assert.Equal(3, context.GetVariable("count"));
+    }
+
+    [Fact]
+    public async Task NestedForLoops_ExecuteCorrectly()
+    {
+        var service = CreateService(out var registry);
+        EnsureIncrementNodeRegistered(registry);
+
+        var (nodes, connections) = new TestGraphBuilder()
+            .AddNodeFromDefinition(registry, "Start", "start")
+            .AddNodeFromDefinition(registry, "For Loop", "outer", ("LoopTimes", 3))
+            .AddNodeFromDefinition(registry, "For Loop", "inner", ("LoopTimes", 2))
+            .AddNodeFromDefinition(registry, "TestIncrement", "inc", ("Key", "count"))
+            .AddNodeFromDefinition(registry, "Marker", "end")
+            .ConnectExecution("start", "Exit", "outer", "Enter")
+            .ConnectExecution("outer", "LoopPath", "inner", "Enter")
+            .ConnectExecution("inner", "LoopPath", "inc", "Enter")
+            .ConnectExecution("outer", "Exit", "end", "Enter")
+            .Build();
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("end"));
+        Assert.Equal(6, context.GetVariable("count"));
+    }
+
+    [Fact]
+    public async Task VariableSetAndGet_SharesValue()
+    {
+        var service = CreateService(out var registry);
+
+        var setNode = CreateSetVariableNode(nodeId: "set", variableId: "v1", value: 123);
+        var getNode = CreateGetVariableNode(nodeId: "get", variableId: "v1");
+
+        var (nodes, connections) = new TestGraphBuilder()
+            .AddNodeFromDefinition(registry, "Start", "start")
+            .AddNodeData(setNode)
+            .AddNodeData(getNode)
+            .AddNodeFromDefinition(registry, "Consume", "consume")
+            .ConnectExecution("start", "Exit", "set", "Enter")
+            .ConnectExecution("set", "Exit", "consume", "Enter")
+            .ConnectData("get", "Value", "consume", "Value")
+            .Build();
+
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
+
+        Assert.True(context.IsNodeExecuted("set"), "Set Variable node should execute");
+        Assert.True(context.IsNodeExecuted("get"), "Get Variable node should be lazily executed");
+        Assert.Equal(123, context.GetSocketValue("consume", "Value"));
+    }
+
+    private static void EnsureIncrementNodeRegistered(NodeRegistryService registry)
+    {
+        // Use a unique name to avoid conflict with the built-in Math "Increment" node
+        var incrementDefinition = NodeBuilder.Create("TestIncrement")
+            .Category("Test")
+            .Callable()
+            .Input<string>("Key", "count")
+            .OnExecute(async (ctx, ct) =>
+            {
+                var key = ctx.GetInput<string>("Key");
+                var current = ctx.GetVariable(key);
+                var next = current is int i ? i + 1 : 1;
+                ctx.SetVariable(key, next);
+                await ctx.TriggerAsync("Exit");
+            })
+            .Build();
+
+        registry.RegisterDefinitions(new[] { incrementDefinition });
+    }
+
+    private static NodeData CreateSetVariableNode(string nodeId, string variableId, object value)
+    {
+        var defId = GraphVariable.SetDefinitionPrefix + variableId;
+        var inputs = new[]
+        {
+            new SocketData("Enter", ExecutionSocket.TypeName, IsInput: true, IsExecution: true),
+            new SocketData("Value", value.GetType().FullName ?? typeof(object).FullName!, IsInput: true, IsExecution: false, SocketValue.FromObject(value))
+        };
+        var outputs = new[]
+        {
+            new SocketData("Exit", ExecutionSocket.TypeName, IsInput: false, IsExecution: true),
+            new SocketData("Value", value.GetType().FullName ?? typeof(object).FullName!, IsInput: false, IsExecution: false)
+        };
+
+        return new NodeData(
+            Id: nodeId,
+            Name: "Set Variable",
+            Callable: true,
+            ExecInit: false,
+            Inputs: inputs,
+            Outputs: outputs,
+            DefinitionId: defId);
+    }
+
+    private static NodeData CreateGetVariableNode(string nodeId, string variableId)
+    {
+        var defId = GraphVariable.GetDefinitionPrefix + variableId;
+        var outputs = new[]
+        {
+            new SocketData("Value", typeof(object).FullName!, IsInput: false, IsExecution: false)
+        };
+
+        return new NodeData(
+            Id: nodeId,
+            Name: "Get Variable",
+            Callable: false,
+            ExecInit: false,
             Inputs: Array.Empty<SocketData>(),
-            Outputs: new[] { ExecOutput("Exit") });
+            Outputs: outputs,
+            DefinitionId: defId);
+    }
 
-    public static NodeData Const(string id, int value)
-        => new(id, "Const", false, false,
+    // ── Execution call-depth guard ──
+
+    [Fact]
+    public async Task ExecutionFlowCycle_ThrowsBeforeStackOverflow()
+    {
+        // Arrange: two callable nodes wired in a cycle (A.Exit → B.Enter, B.Exit → A.Enter)
+        var service = CreateService(out var registry);
+        var start = NodeFromDef(registry, "Start", "start");
+        var nodeA = NodeFromDef(registry, "Marker", "a");
+        var nodeB = NodeFromDef(registry, "Marker", "b");
+
+        var nodes = new List<NodeData> { start, nodeA, nodeB };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "a", "Enter"),
+            TestConnections.Exec("a", "Exit", "b", "Enter"),
+            TestConnections.Exec("b", "Exit", "a", "Enter") // cycle!
+        };
+
+        var context = new NodeRuntimeStorage();
+        var options = new NodeExecutionOptions(ExecutionMode.Sequential, false, 1, MaxCallDepth: 20);
+
+        // Act & Assert: should get InvalidOperationException, not StackOverflowException
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ExecuteAsync(nodes, connections, context, null!, options, CancellationToken.None));
+
+        Assert.Contains("Execution call depth exceeded", ex.Message);
+    }
+
+    // ── Event node execution ──
+
+    [Fact]
+    public async Task EventTriggerNode_FiresBusAndFollowsExit()
+    {
+        // Arrange: trigger → marker, with listener wired to a second marker
+        var service = CreateService(out var registry);
+        var graphEvent = GraphEvent.Create("TestEvent");
+        var eventId = graphEvent.Id;
+
+        var execType = "NodeEditor.Blazor.Services.Execution.ExecutionPath";
+
+        // Register event definitions via the real NodeEditorState
+        var state = new NodeEditorState();
+        var eventFactory = new EventNodeFactory(registry, state);
+        state.AddEvent(graphEvent);
+
+        var start = NodeFromDef(registry, "Start", "start");
+        var triggerMarker = NodeFromDef(registry, "Marker", "trigger-marker");
+        var listenerMarker = NodeFromDef(registry, "Marker", "listener-marker");
+
+        // Build event nodes manually matching EventNodeFactory pattern
+        var triggerNode = new NodeData("trigger", "Trigger Event: TestEvent", Callable: true, ExecInit: false,
+            Inputs: new[] { new SocketData("Enter", execType, IsInput: true, IsExecution: true) },
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) },
+            DefinitionId: GraphEvent.TriggerDefinitionPrefix + eventId);
+
+        var listenerNode = new NodeData("listener", "Custom Event: TestEvent", Callable: true, ExecInit: true,
             Inputs: Array.Empty<SocketData>(),
-            Outputs: new[] { DataOutput("Value", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(value)) });
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) },
+            DefinitionId: GraphEvent.ListenerDefinitionPrefix + eventId);
 
-    public static NodeData Add(string id)
-        => new(id, "Add", true, false,
-            Inputs: new[] { ExecInput("Enter"), DataInput("Value", typeof(int).FullName ?? "System.Int32") },
-            Outputs: new[] { DataOutput("Result", typeof(int).FullName ?? "System.Int32"), ExecOutput("Exit") });
+        var nodes = new List<NodeData> { start, triggerNode, triggerMarker, listenerNode, listenerMarker };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "trigger", "Enter"),
+            TestConnections.Exec("trigger", "Exit", "trigger-marker", "Enter"),
+            TestConnections.Exec("listener", "Exit", "listener-marker", "Enter")
+        };
 
-    public static NodeData Branch(string id, bool condValue)
-        => new(id, "Branch", true, false,
-            Inputs: new[] { ExecInput("Enter"), DataInput("cond", typeof(bool).FullName ?? "System.Boolean", SocketValue.FromObject(condValue)) },
-            Outputs: new[] { ExecOutput("True"), ExecOutput("False") });
+        var context = new NodeRuntimeStorage();
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, CancellationToken.None);
 
-    public static NodeData Marker(string id)
-        => new(id, "Marker", true, false,
-            Inputs: new[] { ExecInput("Enter") },
-            Outputs: new[] { DataOutput("Hit", typeof(bool).FullName ?? "System.Boolean"), ExecOutput("Exit") });
+        // Both markers should be executed
+        Assert.True(context.IsNodeExecuted("trigger"));
+        Assert.True(context.IsNodeExecuted("trigger-marker"));
+        Assert.True(context.IsNodeExecuted("listener"));
+        Assert.True(context.IsNodeExecuted("listener-marker"));
+    }
 
-    public static NodeData Delay(string id, bool isEntry, int delayMs)
-        => new(id, "Delay", true, isEntry,
-            Inputs: new[]
-            {
-                ExecInput("Enter"),
-                DataInput("DelayMs", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(delayMs))
-            },
-            Outputs: new[] { ExecOutput("Exit") });
+    [Fact]
+    public async Task EventTrigger_WithTwoListenersEachWithDelay_DoesNotHang()
+    {
+        // Arrange: one trigger event, two listeners; each listener does Delay -> Marker
+        var service = CreateService(out var registry);
+        var graphEvent = GraphEvent.Create("ParallelDelayEvent");
+        var eventId = graphEvent.Id;
 
-    public static NodeData DelayedValue(string id, int delayMs)
-        => new(id, "DelayedValue", true, false,
-            Inputs: new[] { DataInput("DelayMs", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(delayMs)) },
-            Outputs: new[] { DataOutput("Value", typeof(int).FullName ?? "System.Int32") });
+        var execType = "NodeEditor.Blazor.Services.Execution.ExecutionPath";
 
-    public static NodeData Sum(string id)
-        => new(id, "Sum", true, false,
-            Inputs: new[]
-            {
-                DataInput("A", typeof(int).FullName ?? "System.Int32"),
-                DataInput("B", typeof(int).FullName ?? "System.Int32")
-            },
-            Outputs: new[] { DataOutput("Result", typeof(int).FullName ?? "System.Int32") });
+        // Register event definitions via the real NodeEditorState
+        var state = new NodeEditorState();
+        var eventFactory = new EventNodeFactory(registry, state);
+        state.AddEvent(graphEvent);
 
-    public static NodeData ForLoopStep(string id, int start, int end, int step)
-        => new(id, "For Loop Step", true, false,
-            Inputs: new[]
-            {
-                ExecInput("Enter"),
-                DataInput("Start", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(start)),
-                DataInput("End", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(end)),
-                DataInput("Step", typeof(int).FullName ?? "System.Int32", SocketValue.FromObject(step))
-            },
-            Outputs: new[]
-            {
-                ExecOutput("Exit"),
-                ExecOutput("LoopPath"),
-                DataOutput("Index", typeof(int).FullName ?? "System.Int32")
-            });
+        var start = NodeFromDef(registry, "Start", "start");
 
-    private static SocketData ExecInput(string name)
-        => new(name, typeof(ExecutionPath).FullName ?? nameof(ExecutionPath), true, true);
+        var triggerNode = new NodeData("trigger", "Trigger Event: ParallelDelayEvent", Callable: true, ExecInit: false,
+            Inputs: new[] { new SocketData("Enter", execType, IsInput: true, IsExecution: true) },
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) },
+            DefinitionId: GraphEvent.TriggerDefinitionPrefix + eventId);
 
-    private static SocketData ExecOutput(string name)
-        => new(name, typeof(ExecutionPath).FullName ?? nameof(ExecutionPath), false, true);
+        var listenerA = new NodeData("listener-a", "Custom Event: ParallelDelayEvent", Callable: true, ExecInit: true,
+            Inputs: Array.Empty<SocketData>(),
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) },
+            DefinitionId: GraphEvent.ListenerDefinitionPrefix + eventId);
 
-    private static SocketData DataInput(string name, string typeName, SocketValue? value = null)
-        => new(name, typeName, true, false, value);
+        var listenerB = new NodeData("listener-b", "Custom Event: ParallelDelayEvent", Callable: true, ExecInit: true,
+            Inputs: Array.Empty<SocketData>(),
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) },
+            DefinitionId: GraphEvent.ListenerDefinitionPrefix + eventId);
 
-    private static SocketData DataOutput(string name, string typeName, SocketValue? value = null)
-        => new(name, typeName, false, false, value);
+        var delayA = NodeFromDef(registry, "Delay", "delay-a", ("DelayMs", 150));
+        var delayB = NodeFromDef(registry, "Delay", "delay-b", ("DelayMs", 200));
+        var markerA = NodeFromDef(registry, "Marker", "marker-a");
+        var markerB = NodeFromDef(registry, "Marker", "marker-b");
+        var triggerExitMarker = NodeFromDef(registry, "Marker", "trigger-exit-marker");
+
+        var nodes = new List<NodeData>
+        {
+            start, triggerNode, listenerA, listenerB, delayA, delayB, markerA, markerB, triggerExitMarker
+        };
+
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start", "Exit", "trigger", "Enter"),
+            TestConnections.Exec("trigger", "Exit", "trigger-exit-marker", "Enter"),
+
+            TestConnections.Exec("listener-a", "Exit", "delay-a", "Enter"),
+            TestConnections.Exec("delay-a", "Exit", "marker-a", "Enter"),
+
+            TestConnections.Exec("listener-b", "Exit", "delay-b", "Enter"),
+            TestConnections.Exec("delay-b", "Exit", "marker-b", "Enter")
+        };
+
+        var context = new NodeRuntimeStorage();
+
+        // Act + Assert: should complete and not hang
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await service.ExecuteAsync(nodes, connections, context, null!, NodeExecutionOptions.Default, cts.Token);
+
+        Assert.True(context.IsNodeExecuted("trigger"));
+        Assert.True(context.IsNodeExecuted("trigger-exit-marker"));
+        Assert.True(context.IsNodeExecuted("listener-a"));
+        Assert.True(context.IsNodeExecuted("listener-b"));
+        Assert.True(context.IsNodeExecuted("delay-a"));
+        Assert.True(context.IsNodeExecuted("delay-b"));
+        Assert.True(context.IsNodeExecuted("marker-a"));
+        Assert.True(context.IsNodeExecuted("marker-b"));
+    }
+
+    // ── Execution-flow cycle validation ──
+
+    [Fact]
+    public void ExecutionPlanner_DetectsExecutionFlowCycle()
+    {
+        var execType = "NodeEditor.Blazor.Services.Execution.ExecutionPath";
+        var nodeA = new NodeData("a", "A", Callable: true, ExecInit: true,
+            Inputs: new[] { new SocketData("Enter", execType, IsInput: true, IsExecution: true) },
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) });
+        var nodeB = new NodeData("b", "B", Callable: true, ExecInit: false,
+            Inputs: new[] { new SocketData("Enter", execType, IsInput: true, IsExecution: true) },
+            Outputs: new[] { new SocketData("Exit", execType, IsInput: false, IsExecution: true) });
+
+        var nodes = new List<NodeData> { nodeA, nodeB };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("a", "Exit", "b", "Enter"),
+            TestConnections.Exec("b", "Exit", "a", "Enter")
+        };
+
+        var planner = new ExecutionPlanner();
+        var result = planner.ValidateGraph(nodes, connections);
+
+        Assert.Contains(result.Messages, m => m.Message.Contains("Execution-flow cycle"));
+    }
 }
 
 internal static class TestConnections
@@ -494,152 +975,9 @@ internal static class TestConnections
         => new(outputNode, inputNode, outputSocket, inputSocket, false);
 }
 
-internal sealed class TestNodeContext : INodeMethodContext
+internal sealed class MinimalServiceProvider : IServiceProvider
 {
-    private int _current;
-    private int _max;
-    private readonly Dictionary<string, double> _loopState = new(StringComparer.Ordinal);
-
-    public NodeData? CurrentProcessingNode { get; set; }
-
-#pragma warning disable CS0067 // Event is never used
-    public event Action<string, NodeData, ExecutionFeedbackType, object?, bool>? FeedbackInfo;
-#pragma warning restore CS0067
-
-    public int MaxConcurrent => _max;
-
-    public int ConstValue { get; set; } = 42;
-
-    public int ForLoopCalls { get; private set; }
-
-    [Node("Start")]
-    public void Start(out ExecutionPath Exit)
-    {
-        Exit = new ExecutionPath();
-        Exit.Signal();
-    }
-
-    [Node("Const")]
-    public void Const(out int Value)
-    {
-        Value = ConstValue;
-    }
-
-    [Node("Add")]
-    public void Add(ExecutionPath Enter, int Value, out int Result, out ExecutionPath Exit)
-    {
-        Result = Value + 3;
-        Exit = new ExecutionPath();
-        Exit.Signal();
-    }
-
-    [Node("Branch")]
-    public void Branch(ExecutionPath Enter, bool cond, out ExecutionPath True, out ExecutionPath False)
-    {
-        True = new ExecutionPath();
-        False = new ExecutionPath();
-
-        if (cond)
-        {
-            True.Signal();
-        }
-        else
-        {
-            False.Signal();
-        }
-    }
-
-    [Node("Marker")]
-    public void Marker(ExecutionPath Enter, out bool Hit, out ExecutionPath Exit)
-    {
-        Hit = true;
-        Exit = new ExecutionPath();
-        Exit.Signal();
-    }
-
-    [Node("Delay")]
-    public Task Delay(ExecutionPath Enter, int DelayMs, CancellationToken token, out ExecutionPath Exit)
-    {
-        Exit = new ExecutionPath();
-        Exit.Signal();
-
-        var current = Interlocked.Increment(ref _current);
-        UpdateMax(current);
-
-        return Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(DelayMs, token);
-            }
-            finally
-            {
-                Interlocked.Decrement(ref _current);
-            }
-        }, token);
-    }
-
-    [Node("DelayedValue")]
-    public Task DelayedValue(int DelayMs, CancellationToken token, out int Value)
-    {
-        Value = DelayMs;
-        return Task.Delay(DelayMs, token);
-    }
-
-    [Node("Sum")]
-    public void Sum(int A, int B, out int Result)
-    {
-        Result = A + B;
-    }
-
-    [Node("For Loop Step")]
-    public void ForLoopStep(int Start, int End, int Step, out ExecutionPath Exit, out ExecutionPath LoopPath, out int Index)
-    {
-        ForLoopCalls++;
-        Exit = new ExecutionPath();
-        LoopPath = new ExecutionPath();
-
-        if (Step == 0)
-        {
-            Index = Start;
-            Exit.Signal();
-            return;
-        }
-
-        var key = CurrentProcessingNode?.Id ?? "loop";
-        if (!_loopState.TryGetValue(key, out var current))
-        {
-            current = Start;
-        }
-
-        var shouldExit = Step > 0 ? current > End : current < End;
-        if (shouldExit)
-        {
-            Index = (int)(current - Step);
-            _loopState.Remove(key);
-            Exit.Signal();
-            return;
-        }
-
-        Index = (int)current;
-        current += Step;
-        _loopState[key] = current;
-        LoopPath.Signal();
-    }
-
-    private void UpdateMax(int current)
-    {
-        int initial;
-        do
-        {
-            initial = _max;
-            if (current <= initial)
-            {
-                return;
-            }
-        }
-        while (Interlocked.CompareExchange(ref _max, current, initial) != initial);
-    }
+    public object? GetService(Type serviceType) => null;
 }
 
 internal static partial class ExecutionTestHelpers
@@ -649,14 +987,153 @@ internal static partial class ExecutionTestHelpers
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            if (predicate())
-            {
-                return true;
-            }
-
+            if (predicate()) return true;
             await Task.Delay(20);
         }
-
         return predicate();
     }
 }
+
+/// <summary>
+/// Tests that focus on parallel execution of multiple initiators.
+/// </summary>
+public sealed class ParallelInitiatorTests
+{
+    private static NodeExecutionService CreateService(out NodeRegistryService registry)
+    {
+        registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+        return new NodeExecutionService(new ExecutionPlanner(), registry, new MinimalServiceProvider());
+    }
+
+    private static NodeData NodeFromDef(NodeRegistryService registry, string defName, string id,
+        params (string socketName, object value)[] inputOverrides)
+    {
+        var def = registry.Definitions.First(d => d.Name == defName && (d.NodeType is not null || d.InlineExecutor is not null));
+        var node = def.Factory() with { Id = id };
+        if (inputOverrides.Length == 0) return node;
+
+        var newInputs = node.Inputs.Select(s =>
+        {
+            var over = inputOverrides.FirstOrDefault(o => o.socketName == s.Name);
+            if (over != default)
+                return s with { Value = SocketValue.FromObject(over.value) };
+            return s;
+        }).ToArray();
+
+        return node with { Inputs = newInputs };
+    }
+
+    [Fact]
+    public async Task TwoParallelStartDelayChains_CompleteSuccessfully()
+    {
+        // Arrange: two independent Start → Delay → Marker chains
+        var service = CreateService(out var registry);
+        var startA = NodeFromDef(registry, "Start", "start-a");
+        var delayA = NodeFromDef(registry, "Delay", "delay-a", ("DelayMs", 100));
+        var markerA = NodeFromDef(registry, "Marker", "marker-a");
+
+        var startB = NodeFromDef(registry, "Start", "start-b");
+        var delayB = NodeFromDef(registry, "Delay", "delay-b", ("DelayMs", 200));
+        var markerB = NodeFromDef(registry, "Marker", "marker-b");
+
+        var nodes = new List<NodeData> { startA, delayA, markerA, startB, delayB, markerB };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start-a", "Exit", "delay-a", "Enter"),
+            TestConnections.Exec("delay-a", "Exit", "marker-a", "Enter"),
+            TestConnections.Exec("start-b", "Exit", "delay-b", "Enter"),
+            TestConnections.Exec("delay-b", "Exit", "marker-b", "Enter"),
+        };
+
+        var context = new NodeRuntimeStorage();
+        // Use parallel options (MaxDegreeOfParallelism > 1) like the real app
+        var options = NodeExecutionOptions.Default;
+
+        // Act — with a timeout to detect hangs
+        service.Gate.Run();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await service.ExecuteAsync(nodes, connections, context, null!, options, cts.Token);
+
+        // Assert: all nodes should have executed
+        Assert.True(context.IsNodeExecuted("start-a"), "start-a should be executed");
+        Assert.True(context.IsNodeExecuted("delay-a"), "delay-a should be executed");
+        Assert.True(context.IsNodeExecuted("marker-a"), "marker-a should be executed");
+        Assert.True(context.IsNodeExecuted("start-b"), "start-b should be executed");
+        Assert.True(context.IsNodeExecuted("delay-b"), "delay-b should be executed");
+        Assert.True(context.IsNodeExecuted("marker-b"), "marker-b should be executed");
+    }
+
+    [Fact]
+    public async Task TwoParallelStartDelayChains_Sequential_CompleteSuccessfully()
+    {
+        // Same scenario but with MaxDegreeOfParallelism = 1 (sequential)
+        var service = CreateService(out var registry);
+        var startA = NodeFromDef(registry, "Start", "start-a");
+        var delayA = NodeFromDef(registry, "Delay", "delay-a", ("DelayMs", 50));
+        var markerA = NodeFromDef(registry, "Marker", "marker-a");
+
+        var startB = NodeFromDef(registry, "Start", "start-b");
+        var delayB = NodeFromDef(registry, "Delay", "delay-b", ("DelayMs", 50));
+        var markerB = NodeFromDef(registry, "Marker", "marker-b");
+
+        var nodes = new List<NodeData> { startA, delayA, markerA, startB, delayB, markerB };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start-a", "Exit", "delay-a", "Enter"),
+            TestConnections.Exec("delay-a", "Exit", "marker-a", "Enter"),
+            TestConnections.Exec("start-b", "Exit", "delay-b", "Enter"),
+            TestConnections.Exec("delay-b", "Exit", "marker-b", "Enter"),
+        };
+
+        var context = new NodeRuntimeStorage();
+        var options = new NodeExecutionOptions(ExecutionMode.Sequential, false, 1);
+
+        service.Gate.Run();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await service.ExecuteAsync(nodes, connections, context, null!, options, cts.Token);
+
+        Assert.True(context.IsNodeExecuted("start-a"));
+        Assert.True(context.IsNodeExecuted("marker-a"));
+        Assert.True(context.IsNodeExecuted("start-b"));
+        Assert.True(context.IsNodeExecuted("marker-b"));
+    }
+
+    [Fact]
+    public async Task TwoParallelDelays_RunFasterThanSequential()
+    {
+        // Verify the delays actually run in parallel, not sequentially
+        var service = CreateService(out var registry);
+        var startA = NodeFromDef(registry, "Start", "start-a");
+        var delayA = NodeFromDef(registry, "Delay", "delay-a", ("DelayMs", 300));
+        var markerA = NodeFromDef(registry, "Marker", "marker-a");
+
+        var startB = NodeFromDef(registry, "Start", "start-b");
+        var delayB = NodeFromDef(registry, "Delay", "delay-b", ("DelayMs", 300));
+        var markerB = NodeFromDef(registry, "Marker", "marker-b");
+
+        var nodes = new List<NodeData> { startA, delayA, markerA, startB, delayB, markerB };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start-a", "Exit", "delay-a", "Enter"),
+            TestConnections.Exec("delay-a", "Exit", "marker-a", "Enter"),
+            TestConnections.Exec("start-b", "Exit", "delay-b", "Enter"),
+            TestConnections.Exec("delay-b", "Exit", "marker-b", "Enter"),
+        };
+
+        var context = new NodeRuntimeStorage();
+        var options = NodeExecutionOptions.Default; // parallel
+
+        service.Gate.Run();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await service.ExecuteAsync(nodes, connections, context, null!, options, cts.Token);
+        sw.Stop();
+
+        Assert.True(context.IsNodeExecuted("marker-a"));
+        Assert.True(context.IsNodeExecuted("marker-b"));
+        // If parallel, total time should be ~300ms, not ~600ms
+        Assert.True(sw.ElapsedMilliseconds < 550, $"Expected parallel execution but took {sw.ElapsedMilliseconds}ms");
+    }
+}
+

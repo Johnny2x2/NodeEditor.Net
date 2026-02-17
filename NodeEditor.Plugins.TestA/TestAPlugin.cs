@@ -2,6 +2,7 @@ using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
 using NodeEditor.Net.Services.Plugins;
 using NodeEditor.Net.Services.Registry;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace NodeEditor.Plugins.TestA;
 
@@ -16,71 +17,137 @@ public sealed class TestAPlugin : INodePlugin
     {
         registry.RegisterFromAssembly(typeof(TestAPlugin).Assembly);
     }
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddSingleton<ITestAProbeService, TestAProbeService>();
+    }
 }
 
-public sealed class TestAPluginContext : INodeContext
+public interface ITestAProbeService
 {
-    [Node("Echo String", category: "Test", description: "Echo a string", isCallable: false)]
-    public void Echo(string Input, out string Output)
+    string GetValue();
+}
+
+public sealed class TestAProbeService : ITestAProbeService
+{
+    public string GetValue() => "plugin-service-ok";
+}
+
+public sealed class EchoStringNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
     {
-        Output = Input;
+        builder.Name("Echo String").Category("Test")
+            .Description("Echo a string")
+            .Input<string>("Input", "")
+            .Output<string>("Output");
     }
 
-    [Node("Ping", category: "Test", description: "Emit an execution pulse", isCallable: true, isExecutionInitiator: true)]
-    public void Ping(out ExecutionPath Exit)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        context.SetOutput("Output", context.GetInput<string>("Input"));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class PingNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Ping").Category("Test")
+            .Description("Emit an execution pulse")
+            .ExecutionInitiator();
     }
 
-    [Node("Load Image", category: "Test/Image", description: "Load an image from file path", isCallable: true)]
-    public void LoadImage(string ImagePath, out NodeImage? Image, out ExecutionPath Exit)
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Exit = new ExecutionPath();
-        
-        if (string.IsNullOrEmpty(ImagePath))
-        {
-            Image = null;
-            Exit.Signal();
-            return;
-        }
+        await context.TriggerAsync("Exit");
+    }
+}
 
-        if (ImagePath.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
-        {
-            Image = new NodeImage(ImagePath);
-            Exit.Signal();
-            return;
-        }
+public sealed class LoadImageNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Load Image").Category("Test/Image")
+            .Description("Load an image from file path")
+            .Callable()
+            .Input<string>("ImagePath", "")
+            .Output<NodeImage?>("Image");
+    }
 
-        if (!File.Exists(ImagePath))
-        {
-            Image = null;
-            Exit.Signal();
-            return;
-        }
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var imagePath = context.GetInput<string>("ImagePath");
+        NodeImage? image;
 
-        try
+        if (string.IsNullOrEmpty(imagePath))
         {
-            var bytes = File.ReadAllBytes(ImagePath);
-            var base64 = Convert.ToBase64String(bytes);
-            var ext = Path.GetExtension(ImagePath).ToLowerInvariant();
-            var mimeType = ext switch
+            image = null;
+        }
+        else if (imagePath.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+        {
+            image = new NodeImage(imagePath);
+        }
+        else if (!File.Exists(imagePath))
+        {
+            image = null;
+        }
+        else
+        {
+            try
             {
-                ".jpg" or ".jpeg" => "image/jpeg",
-                ".png" => "image/png",
-                ".gif" => "image/gif",
-                ".bmp" => "image/bmp",
-                ".webp" => "image/webp",
-                _ => "image/png"
-            };
-            
-            Image = new NodeImage($"data:{mimeType};base64,{base64}");
+                var bytes = File.ReadAllBytes(imagePath);
+                var base64 = Convert.ToBase64String(bytes);
+                var ext = Path.GetExtension(imagePath).ToLowerInvariant();
+                var mimeType = ext switch
+                {
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".png" => "image/png",
+                    ".gif" => "image/gif",
+                    ".bmp" => "image/bmp",
+                    ".webp" => "image/webp",
+                    _ => "image/png"
+                };
+
+                image = new NodeImage($"data:{mimeType};base64,{base64}");
+            }
+            catch
+            {
+                image = null;
+            }
         }
-        catch
-        {
-            Image = null;
-        }
-        
-        Exit.Signal();
+
+        context.SetOutput("Image", image);
+        await context.TriggerAsync("Exit");
+    }
+}
+
+public sealed class PluginServiceProbeNode : NodeBase
+{
+    private ITestAProbeService? _probeService;
+
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Plugin Service Probe").Category("Test")
+            .Description("Validates plugin-scoped service resolution during execution")
+            .ExecutionInitiator()
+            .Output<string>("Value")
+            .Output<bool>("Ok");
+    }
+
+    public override Task OnCreatedAsync(IServiceProvider services)
+    {
+        _probeService = services.GetRequiredService<ITestAProbeService>();
+        return Task.CompletedTask;
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var value = _probeService?.GetValue() ?? string.Empty;
+        context.SetOutput("Value", value);
+        context.SetOutput("Ok", !string.IsNullOrWhiteSpace(value));
+        await context.TriggerAsync("Exit");
     }
 }

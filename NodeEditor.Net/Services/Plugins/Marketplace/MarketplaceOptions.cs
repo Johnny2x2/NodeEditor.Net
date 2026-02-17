@@ -5,6 +5,8 @@ namespace NodeEditor.Net.Services.Plugins.Marketplace;
 /// </summary>
 public sealed class MarketplaceOptions
 {
+    public const long DefaultMaxUploadSizeBytes = 500L * 1024L * 1024L;
+
     /// <summary>
     /// Path to the local plugin repository folder.
     /// Can be absolute or relative to application base directory.
@@ -55,4 +57,9 @@ public sealed class MarketplaceOptions
     /// Whether to allow installing plugins from untrusted sources.
     /// </summary>
     public bool AllowUntrustedPlugins { get; set; } = false;
+
+    /// <summary>
+    /// Maximum accepted package upload size in bytes.
+    /// </summary>
+    public long MaxUploadSizeBytes { get; set; } = DefaultMaxUploadSizeBytes;
 }

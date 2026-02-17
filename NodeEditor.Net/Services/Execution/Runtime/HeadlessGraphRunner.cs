@@ -1,4 +1,5 @@
-using NodeEditor.Net.Models;
+﻿using NodeEditor.Net.Models;
+using NodeEditor.Net.Services;
 using NodeEditor.Net.Services.Serialization;
 
 namespace NodeEditor.Net.Services.Execution;
@@ -25,9 +26,9 @@ public sealed class HeadlessGraphRunner
     /// <summary>
     /// Execute a graph from its pure model representation.
     /// </summary>
-    public async Task<INodeExecutionContext> ExecuteAsync(
+    public async Task<INodeRuntimeStorage> ExecuteAsync(
         GraphData graphData,
-        INodeExecutionContext? context = null,
+        INodeRuntimeStorage? context = null,
         object? nodeContext = null,
         NodeExecutionOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -39,8 +40,8 @@ public sealed class HeadlessGraphRunner
 
         var nodes = graphData.Nodes.Select(n => n.Data).ToList();
         var connections = graphData.Connections.ToList();
-        var executionContext = context ?? new NodeExecutionContext();
-        var effectiveNodeContext = nodeContext ?? new NodeContextFactory().CreateCompositeFromLoadedAssemblies();
+        var executionContext = context ?? new NodeRuntimeStorage();
+        var effectiveNodeContext = nodeContext ?? new object();
 
         VariableNodeExecutor.SeedVariables(executionContext, graphData.Variables, _typeResolver);
 
@@ -58,9 +59,9 @@ public sealed class HeadlessGraphRunner
     /// <summary>
     /// Convenience: load from JSON and execute.
     /// </summary>
-    public Task<INodeExecutionContext> ExecuteFromJsonAsync(
+    public Task<INodeRuntimeStorage> ExecuteFromJsonAsync(
         string json,
-        INodeExecutionContext? context = null,
+        INodeRuntimeStorage? context = null,
         object? nodeContext = null,
         NodeExecutionOptions? options = null,
         CancellationToken cancellationToken = default)
