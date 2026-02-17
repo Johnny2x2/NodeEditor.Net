@@ -172,6 +172,28 @@
     background: linear-gradient(180deg, #121220 0%, #141428 100%);
 }
 
+.compare-card {
+    height: 100%;
+}
+
+.compare-card--accent {
+    border-color: rgba(102, 153, 255, 0.35);
+    box-shadow: 0 0 0 1px rgba(102, 153, 255, 0.12);
+}
+
+.why-note {
+    margin-top: 20px;
+    text-align: center;
+    color: rgba(224, 224, 240, 0.72);
+    max-width: 860px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.social-proof-section .hero-actions {
+    margin-bottom: 0;
+}
+
 @media (max-width: 768px) {
     .hero-title { font-size: 2.2rem; }
     .hero-subtitle { font-size: 1rem; }

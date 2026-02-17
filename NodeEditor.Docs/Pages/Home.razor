@@ -1,171 +1,84 @@
 ﻿@page "/"
 
-<PageTitle>NodeEditor.Net — Visual Node Editor for .NET</PageTitle>
+<PageTitle>NodeEditor.Net — Visualize Coding with AI</PageTitle>
 
-<!-- Hero -->
 <section class="hero">
     <div class="hero-bg"></div>
     <div class="hero-glow"></div>
     <div class="hero-content">
-        <span class="badge badge--green">Open Source &middot; MIT License &middot; .NET 10</span>
-        <h1 class="hero-title">
-            Visual Node Editor<br />
-            <span class="hero-highlight">for .NET</span>
-        </h1>
+        <span class="badge badge--green">Open Source &middot; MIT License &middot; C# First</span>
+        <h1 class="hero-title">Visualize Coding with AI.</h1>
         <p class="hero-subtitle">
-            Build interactive, graph-based visual programming with a full execution engine,
-            plugin marketplace, AI integration, and headless execution support.
+            The ultimate extensible node editor for .NET. Build complex workflows with Blazor, MAUI, and deep MCP AI integration.
         </p>
         <div class="hero-actions">
-            <a href="getting-started" class="btn btn-primary btn-lg">Get Started</a>
-            <a href="https://github.com/Johnny2x2/NodeEditor.Net" target="_blank" class="btn btn-outline btn-lg">
-                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-                View on GitHub
-            </a>
+            <a href="https://github.com/Johnny2x2/NodeEditor.Net" target="_blank" class="btn btn-primary btn-lg">View on GitHub</a>
+            <a href="download" class="btn btn-outline btn-lg">Download Demo</a>
         </div>
         <div class="screenshot-frame hero-screenshot">
-            <img src="images/editor-graph.png" alt="NodeEditor.Net — Graph editor with connected nodes" />
+            <img src="images/editor-graph.png" alt="Complex NodeEditor.Net workflow graph with multiple connected nodes" />
         </div>
     </div>
 </section>
 
-<!-- Feature Highlights -->
 <section class="section section--alt">
     <div class="section-container">
         <div class="section-header">
-            <h2>Powerful Features</h2>
-            <p>Everything you need for visual programming in .NET</p>
+            <h2>Built for serious .NET workflow engineering</h2>
         </div>
-        <div class="grid-3">
-            <div class="card">
-                <div class="feature-icon">🖱️</div>
-                <h3>Interactive Canvas</h3>
-                <p>Pan, zoom, drag nodes, box-select, and create connections with mouse or touch. Full multi-touch support.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">⚡</div>
-                <h3>Execution Engine</h3>
-                <p>Run node graphs with parallel, sequential, or event-driven execution. Step-through debugging built in.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">🔌</div>
-                <h3>Plugin System</h3>
-                <p>Dynamically load custom node types from external assemblies with full lifecycle management.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">🏪</div>
-                <h3>Plugin Marketplace</h3>
-                <p>Browse, install, update, and manage plugins from local or remote repositories.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">🤖</div>
-                <h3>AI Integration (MCP)</h3>
-                <p>Model Context Protocol server enables Claude, Cursor, and other AI assistants to build graphs.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">🖥️</div>
-                <h3>Headless Execution</h3>
-                <p>Run node graphs programmatically without any UI — console apps, APIs, CI/CD pipelines.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">💾</div>
-                <h3>Serialization</h3>
-                <p>Save and load node graphs as JSON with version migration support.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">🎨</div>
-                <h3>Custom Editors</h3>
-                <p>9 built-in socket editors (text, number, bool, dropdown, slider, image) plus extensibility.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">📊</div>
-                <h3>Variables &amp; Events</h3>
-                <p>Graph-scoped variables with auto Get/Set nodes. Custom events with Trigger/Listener nodes.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">🔒</div>
-                <h3>Type System</h3>
-                <p>Type-safe socket connections with automatic type resolution and validation.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">🔍</div>
-                <h3>Viewport Culling</h3>
-                <p>Automatic performance optimization for large graphs — supports 500+ nodes smoothly.</p>
-            </div>
-            <div class="card">
-                <div class="feature-icon">🧪</div>
-                <h3>Well Tested</h3>
-                <p>Comprehensive unit tests with bUnit + xUnit. 30+ test files covering every subsystem.</p>
-            </div>
+        <div class="grid-2">
+            <article class="card">
+                <h3>Cross-Platform</h3>
+                <p>Native performance on Web (Blazor) and Desktop (MAUI).</p>
+            </article>
+            <article class="card">
+                <h3>AI-Native</h3>
+                <p>First-class support for MCP (Model Context Protocol).</p>
+            </article>
+            <article class="card">
+                <h3>Plugin Ecosystem</h3>
+                <p>Architecture designed for infinite extensibility.</p>
+            </article>
+            <article class="card">
+                <h3>C# Power</h3>
+                <p>Type-safe, high-performance execution.</p>
+            </article>
         </div>
     </div>
 </section>
 
-<!-- Screenshots -->
 <section class="section">
     <div class="section-container">
         <div class="section-header">
-            <h2>See It in Action</h2>
-            <p>The WebHost UI provides a full-featured visual programming environment</p>
+            <h2>Why NodeEditor.Net?</h2>
+            <p>The C# alternative to Python-heavy and JavaScript-heavy visual automation stacks.</p>
         </div>
         <div class="grid-2">
-            <div class="screenshot-card">
-                <div class="screenshot-frame">
-                    <img src="images/editor-events.png" alt="Event-driven nodes" />
-                </div>
-                <h4>Event System</h4>
-                <p>Create event-driven flows with custom Trigger and Listener nodes</p>
-            </div>
-            <div class="screenshot-card">
-                <div class="screenshot-frame">
-                    <img src="images/editor-canvas.png" alt="Clean workspace" />
-                </div>
-                <h4>Clean Workspace</h4>
-                <p>Variables, Events, and Properties panels alongside an intuitive canvas</p>
-            </div>
+            <article class="card compare-card">
+                <h3>Typical n8n / ComfyUI stack</h3>
+                <p>Great tools, but optimized around JavaScript or Python ecosystems and dynamic runtime conventions.</p>
+            </article>
+            <article class="card compare-card compare-card--accent">
+                <h3>NodeEditor.Net stack</h3>
+                <p>Built for C# developers who want engineered architecture, strong typing, and maintainable execution pipelines.</p>
+            </article>
         </div>
+        <p class="why-note">
+            Not code slop. NodeEditor.Net is structured for long-term reliability with clear layering, testability, and production-focused design.
+        </p>
     </div>
 </section>
 
-<!-- Architecture -->
-<section class="section section--alt">
+<section class="section section--alt social-proof-section">
     <div class="section-container">
         <div class="section-header">
-            <h2>3-Tier Architecture</h2>
-            <p>Clean separation of concerns for maximum flexibility</p>
+            <h2>Open source and ready to extend</h2>
+            <p>Use the docs, inspect the source, and ship your own workflow nodes with confidence.</p>
         </div>
-        <div class="arch-stack">
-            <div class="arch-layer arch--core">
-                <span class="arch-tag">Core</span>
-                <h3>NodeEditor.Net</h3>
-                <p>Pure .NET 10 class library — execution engine, models, ViewModels, registry, plugins, serialization, logging, and headless execution. No Blazor dependency.</p>
-            </div>
-            <div class="arch-arrow">▲</div>
-            <div class="arch-layer arch--ui">
-                <span class="arch-tag">UI</span>
-                <h3>NodeEditor.Blazor</h3>
-                <p>Razor component library — canvas, nodes, editors, marketplace UI, and DI setup via <code>AddNodeEditor()</code>.</p>
-            </div>
-            <div class="arch-arrow">▲</div>
-            <div class="arch-layer arch--host">
-                <span class="arch-tag">Host</span>
-                <h3>NodeEditor.Blazor.WebHost</h3>
-                <p>Blazor Server host — the runnable demo with MCP integration, graph presets, and plugin marketplace.</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- CTA -->
-<section class="section cta-section">
-    <div class="section-container" style="text-align: center;">
-        <h2>Ready to Build?</h2>
-        <p style="color: var(--text-secondary); max-width: 500px; margin: 12px auto 32px;">
-            Get started with NodeEditor.Net in minutes. Clone the repo, add three lines of code, and you have a working visual editor.
-        </p>
         <div class="hero-actions">
-            <a href="getting-started" class="btn btn-primary btn-lg">Get Started Tutorial</a>
-            <a href="documentation" class="btn btn-outline btn-lg">Browse Docs</a>
+            <a href="https://github.com/Johnny2x2/NodeEditor.Net" target="_blank" class="btn btn-outline">GitHub</a>
+            <a href="documentation" class="btn btn-outline">Documentation</a>
+            <a href="https://www.nuget.org/packages/NodeEditor.Blazor" target="_blank" class="btn btn-outline">NuGet</a>
         </div>
     </div>
 </section>
