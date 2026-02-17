@@ -1,0 +1,70 @@
+@page "/docs/plugin-sdk"
+
+<PageTitle>Plugin SDK — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Plugin SDK (Template Project)</h1>
+        <p>
+            The repository includes a <strong>Plugin SDK template project</strong> to make new plugins
+            copy-paste simple while staying consistent with the runtime architecture.
+        </p>
+
+        <h2>What It Is</h2>
+        <ul>
+            <li>A minimal plugin project: <code>NodeEditor.Plugins.Template/</code></li>
+            <li>A single sample node in <code>TemplatePlugin.cs</code></li>
+            <li>Required manifest: <code>plugin.json</code></li>
+            <li>Optional marketplace metadata: <code>plugin-marketplace.json</code></li>
+        </ul>
+
+        <h2>Key Contracts</h2>
+        <table class="docs-table">
+            <thead><tr><th>Contract</th><th>Purpose</th></tr></thead>
+            <tbody>
+                <tr><td><code>plugin.json</code></td><td><strong>Loader contract</strong> — defines <code>id</code>, <code>entryAssembly</code>, versioning, and minimum supported API</td></tr>
+                <tr><td><code>INodePlugin</code></td><td><strong>Registration contract</strong> — the host calls <code>Register()</code> and lifecycle hooks</td></tr>
+                <tr><td><code>INodeContext</code> + <code>[Node]</code></td><td><strong>Node discovery contract</strong> — <code>NodeRegistryService.RegisterFromAssembly()</code> scans for these</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Quick Start (Copy/Paste Flow)</h2>
+        <ol>
+            <li>Copy <code>NodeEditor.Plugins.Template/</code> to a new folder</li>
+            <li>Rename the project file and update the namespace in <code>TemplatePlugin.cs</code></li>
+            <li>Update <code>plugin.json</code>:
+                <ul>
+                    <li><code>id</code> → unique reverse-DNS id</li>
+                    <li><code>name</code> → display name</li>
+                    <li><code>entryAssembly</code> → your new DLL name</li>
+                    <li><code>category</code> → marketplace category</li>
+                </ul>
+            </li>
+            <li>Update the sample node or add new <code>[Node]</code> methods in your <code>INodeContext</code> class</li>
+            <li>Optional: update <code>plugin-marketplace.json</code> with descriptions, tags, URLs, and release notes</li>
+        </ol>
+
+        <h2>Build &amp; Package</h2>
+        <p>Use the publish script to build, publish, and package your plugin:</p>
+        <pre><code>./publish-plugin.ps1 -PluginProject path/to/YourPlugin.csproj</code></pre>
+        <p>What it does:</p>
+        <ul>
+            <li>Builds the project</li>
+            <li>Copies the DLLs and manifests into the local repository: <code>plugin-repository/</code></li>
+            <li>Generates a default <code>plugin-marketplace.json</code> if missing</li>
+            <li>Creates a ZIP in <code>plugin-packages/&lt;ProjectName&gt;/&lt;ProjectName&gt;-&lt;version&gt;.zip</code></li>
+        </ul>
+
+        <h2>Plugin Notes</h2>
+        <ul>
+            <li>The SDK template is intentionally minimal: one <code>INodePlugin</code>, one <code>INodeContext</code>, one sample node</li>
+            <li>The host relies on <code>plugin.json</code> + <code>entryAssembly</code> to load the plugin assembly</li>
+            <li>The node registry uses reflection on <code>[Node]</code> attributes</li>
+            <li>Marketplace metadata is optional but recommended</li>
+        </ul>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>
