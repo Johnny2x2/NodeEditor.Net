@@ -379,6 +379,98 @@ pre code {
 }
 
 /* ============================================
+   Documentation article pages
+   ============================================ */
+.doc-content {
+    max-width: 860px;
+}
+
+.doc-content h2 {
+    font-size: 1.5rem;
+    margin-top: 48px;
+    margin-bottom: 16px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(61, 61, 92, 0.25);
+}
+
+.doc-content h2:first-of-type {
+    border-top: none;
+    margin-top: 32px;
+    padding-top: 0;
+}
+
+.doc-content h3 {
+    font-size: 1.15rem;
+    margin-top: 32px;
+    margin-bottom: 12px;
+}
+
+.doc-content h4 {
+    font-size: 1rem;
+    margin-top: 24px;
+    margin-bottom: 8px;
+}
+
+.doc-content p {
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    line-height: 1.7;
+}
+
+.doc-content ul,
+.doc-content ol {
+    margin: 12px 0 20px;
+    padding-left: 24px;
+    color: var(--text-secondary);
+}
+
+.doc-content li {
+    margin-bottom: 6px;
+    line-height: 1.6;
+}
+
+.doc-content pre {
+    margin-bottom: 20px;
+    max-width: 100%;
+}
+
+.doc-content blockquote {
+    border-left: 3px solid var(--accent);
+    padding: 12px 20px;
+    margin: 20px 0;
+    background: rgba(102, 153, 255, 0.05);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    color: var(--text-secondary);
+}
+
+.doc-content .info-box {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    margin: 20px 0;
+}
+
+.doc-content .info-box h4 {
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+.doc-nav {
+    display: flex;
+    gap: 16px;
+    margin-top: 48px;
+    padding-top: 32px;
+    border-top: 1px solid rgba(61, 61, 92, 0.3);
+    flex-wrap: wrap;
+}
+
+.doc-nav a {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* ============================================
    Responsive
    ============================================ */
 @media (max-width: 768px) {

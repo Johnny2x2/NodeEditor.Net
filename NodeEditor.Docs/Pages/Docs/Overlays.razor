@@ -1,0 +1,138 @@
+@page "/docs/overlays"
+
+<PageTitle>Overlays — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Overlays</h1>
+        <p>
+            Overlays are non-functional visual shapes that sit behind nodes on the canvas. They help you
+            organize and annotate your graph by grouping related nodes into labeled regions.
+        </p>
+
+        <h2>What They Are</h2>
+        <p>
+            An overlay is a colored rectangle with optional title and body text that renders behind nodes.
+            Overlays don't affect execution or connections—they're purely organizational. Think of them
+            as visual "folders" or "sections" that make large graphs easier to navigate.
+        </p>
+
+        <h2>Why They Matter</h2>
+        <ul>
+            <li><strong>Group related nodes</strong> into logical sections (e.g., "Input Processing", "AI Logic", "Output")</li>
+            <li><strong>Add documentation</strong> directly on the canvas via body text</li>
+            <li><strong>Color-code</strong> different subsystems for quick identification</li>
+            <li><strong>Communicate intent</strong> to other users viewing your graph</li>
+        </ul>
+
+        <h2>Properties</h2>
+        <table class="docs-table">
+            <thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>Id</code></td><td><code>string</code></td><td>Unique identifier</td></tr>
+                <tr><td><code>Title</code></td><td><code>string</code></td><td>Header text displayed at the top of the overlay</td></tr>
+                <tr><td><code>Body</code></td><td><code>string?</code></td><td>Optional description text</td></tr>
+                <tr><td><code>Position</code></td><td><code>Point2D</code></td><td>Location on the canvas (top-left corner)</td></tr>
+                <tr><td><code>Size</code></td><td><code>Size2D</code></td><td>Width and height of the region</td></tr>
+                <tr><td><code>Color</code></td><td><code>ColorValue</code></td><td>Background color (RGB)</td></tr>
+                <tr><td><code>Opacity</code></td><td><code>double</code></td><td>Transparency level (0.0 = invisible, 1.0 = opaque)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Creating Overlays</h2>
+
+        <h3>Through the UI</h3>
+        <p>Use the <strong>Organizer Overlay</strong> tool in the canvas toolbar:</p>
+        <ol>
+            <li>Click the organizer tool</li>
+            <li>Click and drag on the canvas to define the region</li>
+            <li>Enter a title and optional body text</li>
+            <li>Choose a color and opacity</li>
+        </ol>
+
+        <h3>Programmatically</h3>
+        <pre><code>using NodeEditor.Net.ViewModels;
+using NodeEditor.Net.Models;
+
+editorState.AddOverlay(new OverlayViewModel
+{
+    Id = Guid.NewGuid().ToString(),
+    Title = "Input Processing",
+    Body = "These nodes handle raw user input and normalization",
+    Position = new Point2D(100, 100),
+    Size = new Size2D(400, 300),
+    Color = new ColorValue(50, 100, 200),
+    Opacity = 0.15
+});</code></pre>
+
+        <h2>Selection</h2>
+        <p>Overlays support selection, similar to nodes:</p>
+        <ul>
+            <li>Click on an overlay to select it</li>
+            <li>Selected overlays can be moved, resized, or deleted</li>
+            <li>The <code>OverlaySelectionChanged</code> event fires when overlay selection changes</li>
+        </ul>
+        <pre><code>editorState.OverlaySelectionChanged += (sender, args) =&gt;
+{
+    var selected = args.CurrentSelection;
+    Console.WriteLine($"Selected {selected.Count} overlays");
+};</code></pre>
+
+        <h2>Serialization</h2>
+        <p>Overlays are automatically serialized as part of the <code>GraphData</code> model:</p>
+        <pre><code>{
+  "version": 1,
+  "nodes": [...],
+  "connections": [...],
+  "overlays": [
+    {
+      "id": "overlay-1",
+      "title": "Input Processing",
+      "body": "These nodes handle raw user input",
+      "x": 100,
+      "y": 100,
+      "width": 400,
+      "height": 300,
+      "color": { "r": 50, "g": 100, "b": 200 },
+      "opacity": 0.15
+    }
+  ]
+}</code></pre>
+
+        <h2>MCP Integration</h2>
+        <table class="docs-table">
+            <thead><tr><th>Ability</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>overlay.add</code></td><td>Create a new overlay on the canvas</td></tr>
+                <tr><td><code>overlay.remove</code></td><td>Remove an overlay by ID</td></tr>
+                <tr><td><code>overlay.list</code></td><td>List all overlays in the graph</td></tr>
+                <tr><td><code>overlay.get</code></td><td>Get details of a specific overlay</td></tr>
+                <tr><td><code>overlay.select</code></td><td>Select an overlay</td></tr>
+                <tr><td><code>overlay.remove_selected</code></td><td>Remove all selected overlays</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Component</h2>
+        <p>The <code>OrganizerOverlay.razor</code> component renders overlays on the canvas:</p>
+        <ul>
+            <li>Renders below nodes but above the canvas background</li>
+            <li>Supports drag-to-move and drag-to-resize handles</li>
+            <li>Displays title and body text</li>
+            <li>Applies color and opacity styling</li>
+        </ul>
+
+        <h2>Namespaces</h2>
+        <table class="docs-table">
+            <thead><tr><th>Type</th><th>Namespace</th></tr></thead>
+            <tbody>
+                <tr><td><code>OverlayViewModel</code></td><td><code>NodeEditor.Net.ViewModels</code></td></tr>
+                <tr><td><code>OverlayData</code></td><td><code>NodeEditor.Net.Models</code></td></tr>
+                <tr><td><code>ColorValue</code></td><td><code>NodeEditor.Net.Models</code></td></tr>
+            </tbody>
+        </table>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>
