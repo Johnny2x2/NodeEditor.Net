@@ -62,6 +62,23 @@
                 }
             </button>
 
+            @if (IsRepositoryPlugin)
+            {
+                <button class="ne-plugin-details-btn ne-plugin-details-btn--danger-soft"
+                        disabled="@IsDeletingRepository"
+                        @onclick="ToggleDeleteOptions">
+                    @if (IsDeletingRepository)
+                    {
+                        <span class="ne-plugin-details-spinner"></span>
+                        <span>Deleting...</span>
+                    }
+                    else
+                    {
+                        <span>Delete from Repository...</span>
+                    }
+                </button>
+            }
+
             @if (InstalledInfo is not null)
             {
                 <div class="ne-plugin-details-installed-info">
@@ -88,8 +105,42 @@
                     <span>Install</span>
                 }
             </button>
+
+            @if (IsRepositoryPlugin)
+            {
+                <button class="ne-plugin-details-btn ne-plugin-details-btn--danger-soft"
+                        disabled="@IsDeletingRepository"
+                        @onclick="ToggleDeleteOptions">
+                    @if (IsDeletingRepository)
+                    {
+                        <span class="ne-plugin-details-spinner"></span>
+                        <span>Deleting...</span>
+                    }
+                    else
+                    {
+                        <span>Delete from Repository...</span>
+                    }
+                </button>
+            }
         }
     </div>
+
+    @if (_showDeleteOptions && IsRepositoryPlugin)
+    {
+        <div class="ne-plugin-details-delete-options">
+            <span class="ne-plugin-details-delete-label">Choose delete action:</span>
+            <button class="ne-plugin-details-btn ne-plugin-details-btn--danger-soft"
+                    disabled="@IsDeletingRepository"
+                    @onclick="DeleteRepositoryOnly">
+                Delete repository copy only
+            </button>
+            <button class="ne-plugin-details-btn ne-plugin-details-btn--danger"
+                    disabled="@IsDeletingRepository"
+                    @onclick="DeleteAndUninstall">
+                Delete + Uninstall
+            </button>
+        </div>
+    }
 
     @if (!string.IsNullOrEmpty(Plugin.Description))
     {
@@ -235,10 +286,26 @@
     [Parameter] public InstalledPluginInfo? InstalledInfo { get; set; }
     [Parameter] public bool IsInstalling { get; set; }
     [Parameter] public bool IsUninstalling { get; set; }
+    [Parameter] public bool IsRepositoryPlugin { get; set; }
+    [Parameter] public bool IsDeletingRepository { get; set; }
 
     [Parameter] public EventCallback OnInstall { get; set; }
     [Parameter] public EventCallback OnUninstall { get; set; }
     [Parameter] public EventCallback OnUpdate { get; set; }
+    [Parameter] public EventCallback OnDeleteRepository { get; set; }
+    [Parameter] public EventCallback OnDeleteRepositoryAndUninstall { get; set; }
+
+    private bool _showDeleteOptions;
+    private string? _deleteMenuPluginId;
+
+    protected override void OnParametersSet()
+    {
+        if (!string.Equals(_deleteMenuPluginId, Plugin.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            _showDeleteOptions = false;
+            _deleteMenuPluginId = Plugin.Id;
+        }
+    }
 
     private bool HasUpdate => IsInstalled && InstalledInfo is not null
         && Version.TryParse(InstalledInfo.Version, out var installed)
@@ -254,5 +321,22 @@
             >= 1_024 => $"{bytes / 1_024.0:0.##} KB",
             _ => $"{bytes} B"
         };
+    }
+
+    private void ToggleDeleteOptions()
+    {
+        _showDeleteOptions = !_showDeleteOptions;
+    }
+
+    private async Task DeleteRepositoryOnly()
+    {
+        _showDeleteOptions = false;
+        await OnDeleteRepository.InvokeAsync();
+    }
+
+    private async Task DeleteAndUninstall()
+    {
+        _showDeleteOptions = false;
+        await OnDeleteRepositoryAndUninstall.InvokeAsync();
     }
 }

@@ -1,8 +1,10 @@
 @namespace NodeEditor.Blazor.Components.Marketplace
+@using Microsoft.AspNetCore.Components.Forms
 @using NodeEditor.Net.Services.Plugins.Marketplace
 @using NodeEditor.Net.Services.Plugins.Marketplace.Models
 @inject AggregatedPluginMarketplaceSource MarketplaceSource
 @inject IPluginInstallationService InstallationService
+@inject ILocalPluginRepositoryService LocalRepositoryService
 
 <div class="ne-plugin-manager-overlay @(IsOpen ? "ne-plugin-manager-overlay--visible" : "")"
      @onclick="OnOverlayClick">
@@ -60,6 +62,33 @@
             else
             {
                 <div class="ne-plugin-manager-list-panel">
+                    <div class="ne-plugin-upload-panel">
+                        <div class="ne-plugin-upload-dropzone @(_isUploadDragOver ? "ne-plugin-upload-dropzone--active" : "") @(_isUploadingPackage ? "ne-plugin-upload-dropzone--busy" : "")"
+                             @ondragenter="OnUploadDragEnter"
+                             @ondragleave="OnUploadDragLeave"
+                             @ondrop="OnUploadDrop"
+                             @ondrop:preventDefault
+                             @ondragover:preventDefault>
+                            <InputFile id="@_uploadInputId"
+                                       class="ne-plugin-upload-input"
+                                       OnChange="OnPluginPackageSelected"
+                                       accept=".zip"
+                                       disabled="@_isUploadingPackage" />
+
+                            <div class="ne-plugin-upload-content">
+                                <strong>Install Plugin ZIP</strong>
+                                @if (_isUploadingPackage)
+                                {
+                                    <span>Uploading and installing...</span>
+                                }
+                                else
+                                {
+                                    <span>Drag & drop ZIP here or click to upload</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
                     <PluginSearchBar @bind-SearchText="_searchText"
                                      @bind-SelectedCategory="_selectedCategory"
                                      Categories="_categories"
@@ -119,9 +148,13 @@
                                             InstalledInfo="GetInstalledInfo(_selectedPlugin.Id)"
                                             IsInstalling="_installingPluginIds.Contains(_selectedPlugin.Id)"
                                             IsUninstalling="_uninstallingPluginIds.Contains(_selectedPlugin.Id)"
+                                            IsRepositoryPlugin="IsRepositoryPlugin(_selectedPlugin)"
+                                            IsDeletingRepository="_deletingRepositoryPluginIds.Contains(_selectedPlugin.Id)"
                                             OnInstall="() => InstallPlugin(_selectedPlugin)"
                                             OnUninstall="() => UninstallPlugin(_selectedPlugin.Id)"
-                                            OnUpdate="() => UpdatePlugin(_selectedPlugin)" />
+                                            OnUpdate="() => UpdatePlugin(_selectedPlugin)"
+                                            OnDeleteRepository="() => DeleteFromRepository(_selectedPlugin, uninstallIfInstalled: false)"
+                                            OnDeleteRepositoryAndUninstall="() => DeleteFromRepository(_selectedPlugin, uninstallIfInstalled: true)" />
                     }
                     else
                     {
@@ -172,6 +205,12 @@
 
     private HashSet<string> _installingPluginIds = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _uninstallingPluginIds = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _deletingRepositoryPluginIds = new(StringComparer.OrdinalIgnoreCase);
+
+    private const long MaxUploadSizeBytes = MarketplaceOptions.DefaultMaxUploadSizeBytes;
+    private readonly string _uploadInputId = $"plugin-zip-upload-{Guid.NewGuid():N}";
+    private bool _isUploadingPackage;
+    private bool _isUploadDragOver;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -260,6 +299,11 @@
         _selectedPlugin = plugin;
     }
 
+    private static bool IsRepositoryPlugin(MarketplacePluginInfo plugin)
+    {
+        return string.Equals(plugin.SourceId, "local", StringComparison.OrdinalIgnoreCase);
+    }
+
     private bool IsPluginInstalled(string pluginId)
     {
         return _installedPlugins.Any(p =>
@@ -309,6 +353,63 @@
         }
     }
 
+    private async Task OnPluginPackageSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        if (!file.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowStatus("Only .zip plugin packages are supported.", isError: true);
+            return;
+        }
+
+        _isUploadingPackage = true;
+        ShowStatus($"Uploading {file.Name}...");
+        StateHasChanged();
+
+        try
+        {
+            await using var stream = file.OpenReadStream(MaxUploadSizeBytes);
+            var addResult = await LocalRepositoryService.AddPackageAsync(stream, file.Name);
+            if (!addResult.Success || string.IsNullOrWhiteSpace(addResult.StoredPath))
+            {
+                ShowStatus($"Failed to save plugin package: {addResult.ErrorMessage}", isError: true);
+                return;
+            }
+
+            var displayName = addResult.PluginName ?? addResult.PluginId ?? file.Name;
+            ShowStatus($"Saved {displayName} to local repository. Installing...");
+            StateHasChanged();
+
+            var installResult = await InstallationService.InstallFromPackageAsync(addResult.StoredPath);
+            if (!installResult.Success)
+            {
+                ShowStatus($"Saved package but install failed: {installResult.ErrorMessage}", isError: true);
+                return;
+            }
+
+            ShowStatus($"Installed {displayName} and saved it to local repository.");
+            await LoadDataAsync();
+        }
+        catch (IOException ioEx)
+        {
+            ShowStatus($"Upload failed: {ioEx.Message}", isError: true);
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Upload failed: {ex.Message}", isError: true);
+        }
+        finally
+        {
+            _isUploadingPackage = false;
+            _isUploadDragOver = false;
+        }
+    }
+
     private async Task UninstallPlugin(string pluginId)
     {
         var plugin = _availablePlugins.FirstOrDefault(p => p.Id == pluginId);
@@ -339,6 +440,49 @@
         finally
         {
             _uninstallingPluginIds.Remove(pluginId);
+        }
+    }
+
+    private async Task DeleteFromRepository(MarketplacePluginInfo plugin, bool uninstallIfInstalled)
+    {
+        _deletingRepositoryPluginIds.Add(plugin.Id);
+        ShowStatus(uninstallIfInstalled
+            ? $"Deleting {plugin.Name} from repository and uninstalling..."
+            : $"Deleting {plugin.Name} from repository...");
+        StateHasChanged();
+
+        try
+        {
+            if (uninstallIfInstalled && IsPluginInstalled(plugin.Id))
+            {
+                var uninstallResult = await InstallationService.UninstallAsync(plugin.Id);
+                if (!uninstallResult.Success)
+                {
+                    ShowStatus($"Failed to uninstall {plugin.Name}: {uninstallResult.ErrorMessage}", isError: true);
+                    return;
+                }
+            }
+
+            var deleteResult = await LocalRepositoryService.DeletePluginAsync(plugin.Id);
+            if (!deleteResult.Success)
+            {
+                ShowStatus($"Failed to delete {plugin.Name} from repository: {deleteResult.ErrorMessage}", isError: true);
+                return;
+            }
+
+            ShowStatus(uninstallIfInstalled
+                ? $"Deleted {plugin.Name} from repository and uninstalled it."
+                : $"Deleted {plugin.Name} from repository.");
+
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Delete failed for {plugin.Name}: {ex.Message}", isError: true);
+        }
+        finally
+        {
+            _deletingRepositoryPluginIds.Remove(plugin.Id);
         }
     }
 
@@ -381,6 +525,21 @@
     private void OnOverlayClick()
     {
         _ = Close();
+    }
+
+    private void OnUploadDragEnter(DragEventArgs _)
+    {
+        _isUploadDragOver = true;
+    }
+
+    private void OnUploadDragLeave(DragEventArgs _)
+    {
+        _isUploadDragOver = false;
+    }
+
+    private void OnUploadDrop(DragEventArgs _)
+    {
+        _isUploadDragOver = false;
     }
 
     private async Task Close()

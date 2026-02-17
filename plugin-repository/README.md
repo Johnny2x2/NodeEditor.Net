@@ -7,6 +7,15 @@ This folder serves as the **local plugin marketplace repository**.
 Plugins published here will appear in the **Plugin Manager** UI within the app.
 Open the app, click "Plugins", and install any plugins you want.
 
+The Plugin Manager also supports direct ZIP upload:
+- Drag and drop a plugin `.zip` into the upload area, or click to pick a file.
+- Uploaded packages are saved into this repository and installed immediately.
+- If a plugin with the same `id` already exists here, the uploaded package replaces it.
+
+Repository cleanup actions in plugin details:
+- **Delete repository copy only** (keep current install as-is)
+- **Delete + Uninstall** (remove both installed copy and repository package)
+
 ## For Plugin Developers
 
 See the SDK guide: [docs/reference/PLUGIN_SDK.md](../docs/reference/PLUGIN_SDK.md)
@@ -34,6 +43,8 @@ plugin-packages/<ProjectName>/<ProjectName>-<version>.zip
 Each plugin folder should contain:
 
 ```
+
+ZIP packages are also supported as top-level repository entries, as long as they contain a valid `plugin.json` anywhere in the archive.
 PluginName/
 ├── plugin.json                 # Required: Plugin manifest
 ├── plugin-marketplace.json     # Optional: Extended marketplace metadata
