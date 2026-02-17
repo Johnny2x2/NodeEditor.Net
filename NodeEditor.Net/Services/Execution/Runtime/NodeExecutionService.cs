@@ -118,7 +118,10 @@ public sealed class NodeExecutionService : INodeExecutionService
         {
             var instance = runtime.GetOrCreateInstance(node.Id);
             if (instance is not null)
+            {
                 await instance.OnCreatedAsync(runtime.GetServicesForNode(node.Id)).ConfigureAwait(false);
+                runtime.MarkNodeCreated(node.Id);
+            }
         }
 
         // 4. Find initiator nodes and execute them

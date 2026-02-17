@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -17,7 +18,7 @@ internal sealed class ExecutionRuntime
     private readonly Dictionary<(string nodeId, string socketName), (string sourceNodeId, string sourceSocket)> _dataInputConnections;
     private readonly Dictionary<string, NodeBase?> _nodeInstances;
     private readonly Dictionary<string, NodeDefinition> _nodeDefinitions;
-    private readonly HashSet<string> _createdNodes = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, bool> _createdNodes = new(StringComparer.Ordinal);
     private readonly NodeExecutionOptions _options;
     private readonly Dictionary<(string nodeId, string completedExecSocket), List<Task>> _pendingStreamItemTasks = new();
     private readonly Func<string, IServiceProvider?>? _resolveServicesForDefinition;
@@ -91,6 +92,15 @@ internal sealed class ExecutionRuntime
         return instance;
     }
 
+    /// <summary>
+    /// Marks a node as already created (OnCreatedAsync was called).
+    /// Used by the service layer after pre-creating instances in step 3.
+    /// </summary>
+    internal void MarkNodeCreated(string nodeId)
+    {
+        _createdNodes.TryAdd(nodeId, true);
+    }
+
     internal async Task ExecuteNodeByIdAsync(string nodeId)
     {
         if (!_nodeMap.TryGetValue(nodeId, out var node))
@@ -104,9 +114,11 @@ internal sealed class ExecutionRuntime
         }
 
         // Guard against execution-flow cycles that would cause a stack overflow.
-        if (++_callDepth > _options.MaxCallDepth)
+        // Use Interlocked for thread safety — parallel initiators share this runtime.
+        var depth = Interlocked.Increment(ref _callDepth);
+        if (depth > _options.MaxCallDepth)
         {
-            _callDepth--;
+            Interlocked.Decrement(ref _callDepth);
             throw new InvalidOperationException(
                 $"Execution call depth exceeded {_options.MaxCallDepth}. " +
                 $"This usually indicates an execution-flow cycle involving node '{node.Name}' ({nodeId}). " +
@@ -119,7 +131,7 @@ internal sealed class ExecutionRuntime
         }
         finally
         {
-            _callDepth--;
+            Interlocked.Decrement(ref _callDepth);
         }
     }
 
@@ -198,7 +210,7 @@ internal sealed class ExecutionRuntime
                     throw new InvalidOperationException($"No node implementation available for '{node.Name}'.");
                 }
 
-                if (_createdNodes.Add(nodeId))
+                if (_createdNodes.TryAdd(nodeId, true))
                 {
                     await instance.OnCreatedAsync(GetServicesForNode(nodeId)).ConfigureAwait(false);
                 }

@@ -13,7 +13,7 @@ public sealed class DelayNode : NodeBase
     public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
         var delayMs = context.GetInput<int>("DelayMs");
-        await Task.Delay(delayMs, ct);
+        await Task.Delay(delayMs, ct).ConfigureAwait(false);
         await context.TriggerAsync("Exit");
     }
 }

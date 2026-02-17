@@ -33,14 +33,14 @@ internal sealed class ScopedNodeExecutionContext : INodeExecutionContext
 
     public T GetInput<T>(string socketName)
     {
+        // ResolveAllDataInputsScopedAsync runs before ExecuteAsync, so values should be cached
+        // in the scoped storage or read-through from the parent.
         if (_scope.TryGetSocketValue(Node.Id, socketName, out var cached))
             return Cast<T>(cached);
 
-        // Fall back to resolving from the runtime (will execute upstream if needed)
-        var resolved = _runtime.ResolveInputScopedAsync(Node, socketName, _scope).GetAwaiter().GetResult();
-        if (resolved is not null)
-            return Cast<T>(resolved);
-
+        // Fallback: read the socket default value directly. We intentionally avoid
+        // the previous sync-over-async ResolveInputScopedAsync(...).GetAwaiter().GetResult()
+        // call which could deadlock on SynchronizationContexts (e.g., Blazor Server).
         var socket = Node.Inputs.FirstOrDefault(s => s.Name == socketName);
         if (socket?.Value is not null)
             return _runtime.DeserializeSocketValue<T>(socket.Value);

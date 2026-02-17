@@ -923,3 +923,146 @@ internal static partial class ExecutionTestHelpers
     }
 }
 
+/// <summary>
+/// Tests that focus on parallel execution of multiple initiators.
+/// </summary>
+public sealed class ParallelInitiatorTests
+{
+    private static NodeExecutionService CreateService(out NodeRegistryService registry)
+    {
+        registry = new NodeRegistryService(new NodeDiscoveryService());
+        registry.EnsureInitialized();
+        return new NodeExecutionService(new ExecutionPlanner(), registry, new MinimalServiceProvider());
+    }
+
+    private static NodeData NodeFromDef(NodeRegistryService registry, string defName, string id,
+        params (string socketName, object value)[] inputOverrides)
+    {
+        var def = registry.Definitions.First(d => d.Name == defName && (d.NodeType is not null || d.InlineExecutor is not null));
+        var node = def.Factory() with { Id = id };
+        if (inputOverrides.Length == 0) return node;
+
+        var newInputs = node.Inputs.Select(s =>
+        {
+            var over = inputOverrides.FirstOrDefault(o => o.socketName == s.Name);
+            if (over != default)
+                return s with { Value = SocketValue.FromObject(over.value) };
+            return s;
+        }).ToArray();
+
+        return node with { Inputs = newInputs };
+    }
+
+    [Fact]
+    public async Task TwoParallelStartDelayChains_CompleteSuccessfully()
+    {
+        // Arrange: two independent Start → Delay → Marker chains
+        var service = CreateService(out var registry);
+        var startA = NodeFromDef(registry, "Start", "start-a");
+        var delayA = NodeFromDef(registry, "Delay", "delay-a", ("DelayMs", 100));
+        var markerA = NodeFromDef(registry, "Marker", "marker-a");
+
+        var startB = NodeFromDef(registry, "Start", "start-b");
+        var delayB = NodeFromDef(registry, "Delay", "delay-b", ("DelayMs", 200));
+        var markerB = NodeFromDef(registry, "Marker", "marker-b");
+
+        var nodes = new List<NodeData> { startA, delayA, markerA, startB, delayB, markerB };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start-a", "Exit", "delay-a", "Enter"),
+            TestConnections.Exec("delay-a", "Exit", "marker-a", "Enter"),
+            TestConnections.Exec("start-b", "Exit", "delay-b", "Enter"),
+            TestConnections.Exec("delay-b", "Exit", "marker-b", "Enter"),
+        };
+
+        var context = new NodeRuntimeStorage();
+        // Use parallel options (MaxDegreeOfParallelism > 1) like the real app
+        var options = NodeExecutionOptions.Default;
+
+        // Act — with a timeout to detect hangs
+        service.Gate.Run();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await service.ExecuteAsync(nodes, connections, context, null!, options, cts.Token);
+
+        // Assert: all nodes should have executed
+        Assert.True(context.IsNodeExecuted("start-a"), "start-a should be executed");
+        Assert.True(context.IsNodeExecuted("delay-a"), "delay-a should be executed");
+        Assert.True(context.IsNodeExecuted("marker-a"), "marker-a should be executed");
+        Assert.True(context.IsNodeExecuted("start-b"), "start-b should be executed");
+        Assert.True(context.IsNodeExecuted("delay-b"), "delay-b should be executed");
+        Assert.True(context.IsNodeExecuted("marker-b"), "marker-b should be executed");
+    }
+
+    [Fact]
+    public async Task TwoParallelStartDelayChains_Sequential_CompleteSuccessfully()
+    {
+        // Same scenario but with MaxDegreeOfParallelism = 1 (sequential)
+        var service = CreateService(out var registry);
+        var startA = NodeFromDef(registry, "Start", "start-a");
+        var delayA = NodeFromDef(registry, "Delay", "delay-a", ("DelayMs", 50));
+        var markerA = NodeFromDef(registry, "Marker", "marker-a");
+
+        var startB = NodeFromDef(registry, "Start", "start-b");
+        var delayB = NodeFromDef(registry, "Delay", "delay-b", ("DelayMs", 50));
+        var markerB = NodeFromDef(registry, "Marker", "marker-b");
+
+        var nodes = new List<NodeData> { startA, delayA, markerA, startB, delayB, markerB };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start-a", "Exit", "delay-a", "Enter"),
+            TestConnections.Exec("delay-a", "Exit", "marker-a", "Enter"),
+            TestConnections.Exec("start-b", "Exit", "delay-b", "Enter"),
+            TestConnections.Exec("delay-b", "Exit", "marker-b", "Enter"),
+        };
+
+        var context = new NodeRuntimeStorage();
+        var options = new NodeExecutionOptions(ExecutionMode.Sequential, false, 1);
+
+        service.Gate.Run();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await service.ExecuteAsync(nodes, connections, context, null!, options, cts.Token);
+
+        Assert.True(context.IsNodeExecuted("start-a"));
+        Assert.True(context.IsNodeExecuted("marker-a"));
+        Assert.True(context.IsNodeExecuted("start-b"));
+        Assert.True(context.IsNodeExecuted("marker-b"));
+    }
+
+    [Fact]
+    public async Task TwoParallelDelays_RunFasterThanSequential()
+    {
+        // Verify the delays actually run in parallel, not sequentially
+        var service = CreateService(out var registry);
+        var startA = NodeFromDef(registry, "Start", "start-a");
+        var delayA = NodeFromDef(registry, "Delay", "delay-a", ("DelayMs", 300));
+        var markerA = NodeFromDef(registry, "Marker", "marker-a");
+
+        var startB = NodeFromDef(registry, "Start", "start-b");
+        var delayB = NodeFromDef(registry, "Delay", "delay-b", ("DelayMs", 300));
+        var markerB = NodeFromDef(registry, "Marker", "marker-b");
+
+        var nodes = new List<NodeData> { startA, delayA, markerA, startB, delayB, markerB };
+        var connections = new List<ConnectionData>
+        {
+            TestConnections.Exec("start-a", "Exit", "delay-a", "Enter"),
+            TestConnections.Exec("delay-a", "Exit", "marker-a", "Enter"),
+            TestConnections.Exec("start-b", "Exit", "delay-b", "Enter"),
+            TestConnections.Exec("delay-b", "Exit", "marker-b", "Enter"),
+        };
+
+        var context = new NodeRuntimeStorage();
+        var options = NodeExecutionOptions.Default; // parallel
+
+        service.Gate.Run();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await service.ExecuteAsync(nodes, connections, context, null!, options, cts.Token);
+        sw.Stop();
+
+        Assert.True(context.IsNodeExecuted("marker-a"));
+        Assert.True(context.IsNodeExecuted("marker-b"));
+        // If parallel, total time should be ~300ms, not ~600ms
+        Assert.True(sw.ElapsedMilliseconds < 550, $"Expected parallel execution but took {sw.ElapsedMilliseconds}ms");
+    }
+}
+

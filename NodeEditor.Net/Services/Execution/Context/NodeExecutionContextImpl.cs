@@ -25,13 +25,13 @@ internal sealed class NodeExecutionContextImpl : INodeExecutionContext
     // ── Data I/O ──
     public T GetInput<T>(string socketName)
     {
+        // ResolveAllDataInputsAsync runs before ExecuteAsync, so values should be cached.
         if (_runtime.RuntimeStorage.TryGetSocketValue(Node.Id, socketName, out var cached))
             return Cast<T>(cached);
 
-        var resolved = _runtime.ResolveInputAsync(Node, socketName).GetAwaiter().GetResult();
-        if (resolved is not null)
-            return Cast<T>(resolved);
-
+        // Fallback: read the socket default value directly. We intentionally avoid
+        // the previous sync-over-async ResolveInputAsync(...).GetAwaiter().GetResult()
+        // call which could deadlock on SynchronizationContexts (e.g., Blazor Server).
         var socket = Node.Inputs.FirstOrDefault(s => s.Name == socketName);
         if (socket?.Value is not null)
             return _runtime.DeserializeSocketValue<T>(socket.Value);
