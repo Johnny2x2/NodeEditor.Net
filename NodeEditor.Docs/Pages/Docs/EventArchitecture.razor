@@ -1,0 +1,209 @@
+@page "/docs/event-architecture"
+
+<PageTitle>Event-Based Architecture — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>Event-Based Architecture Guide</h1>
+        <p>
+            NodeEditor.Net uses an event-based architecture for state management. This approach provides
+            optimal performance for Blazor rendering and enables reactive UI updates.
+        </p>
+
+        <h2>Why Events Over Immutable Snapshots</h2>
+        <ol>
+            <li><strong>Performance:</strong> Events allow Blazor components to subscribe only to relevant changes, avoiding unnecessary re-renders</li>
+            <li><strong>Memory efficiency:</strong> No need to create full state copies on every change</li>
+            <li><strong>Blazor best practices:</strong> Aligns with .NET's event pattern and INotifyPropertyChanged</li>
+            <li><strong>Real-time updates:</strong> Provides immediate notifications to all subscribers</li>
+            <li><strong>History tracking:</strong> Events can be logged for undo/redo functionality</li>
+        </ol>
+
+        <h2>NodeEditorState</h2>
+        <p>The <code>NodeEditorState</code> class is the central state management service. It:</p>
+        <ul>
+            <li>Maintains collections of nodes and connections</li>
+            <li>Tracks selection state and viewport</li>
+            <li>Raises events when state changes occur</li>
+            <li>Follows the Observer pattern</li>
+        </ul>
+
+        <h2>Event Types</h2>
+        <table class="docs-table">
+            <thead><tr><th>Event</th><th>When Raised</th><th>Event Args</th></tr></thead>
+            <tbody>
+                <tr><td><code>NodeAdded</code></td><td>When a node is added to the graph</td><td><code>NodeEventArgs</code></td></tr>
+                <tr><td><code>NodeRemoved</code></td><td>When a node is removed from the graph</td><td><code>NodeEventArgs</code></td></tr>
+                <tr><td><code>ConnectionAdded</code></td><td>When a connection is created</td><td><code>ConnectionEventArgs</code></td></tr>
+                <tr><td><code>ConnectionRemoved</code></td><td>When a connection is deleted</td><td><code>ConnectionEventArgs</code></td></tr>
+                <tr><td><code>SelectionChanged</code></td><td>When node selection changes</td><td><code>SelectionChangedEventArgs</code></td></tr>
+                <tr><td><code>ViewportChanged</code></td><td>When the visible area changes</td><td><code>ViewportChangedEventArgs</code></td></tr>
+                <tr><td><code>ZoomChanged</code></td><td>When the zoom level changes</td><td><code>ZoomChangedEventArgs</code></td></tr>
+            </tbody>
+        </table>
+
+        <h2>Basic Subscription</h2>
+        <pre><code>@@implements IDisposable
+@@inject NodeEditorState EditorState
+
+@@code {
+    protected override void OnInitialized()
+    {
+        EditorState.NodeAdded += OnNodeAdded;
+        EditorState.SelectionChanged += OnSelectionChanged;
+    }
+
+    private void OnNodeAdded(object? sender, NodeEventArgs e)
+    {
+        Console.WriteLine($"Node added: {e.Node.Data.Name}");
+        StateHasChanged();
+    }
+
+    private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var added = e.CurrentSelection.Except(e.PreviousSelection);
+        var removed = e.PreviousSelection.Except(e.CurrentSelection);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        // Always unsubscribe to prevent memory leaks
+        EditorState.NodeAdded -= OnNodeAdded;
+        EditorState.SelectionChanged -= OnSelectionChanged;
+    }
+}</code></pre>
+
+        <h2>Selective Re-rendering</h2>
+        <p>Only subscribe to events that affect your component:</p>
+        <pre><code>public class ConnectionListComponent : ComponentBase, IDisposable
+{
+    [Inject] NodeEditorState EditorState { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // Only subscribe to connection-related events
+        EditorState.ConnectionAdded += OnConnectionChanged;
+        EditorState.ConnectionRemoved += OnConnectionChanged;
+        // No need to subscribe to NodeAdded, SelectionChanged, etc.
+    }
+
+    private void OnConnectionChanged(object? sender, EventArgs e)
+    {
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        EditorState.ConnectionAdded -= OnConnectionChanged;
+        EditorState.ConnectionRemoved -= OnConnectionChanged;
+    }
+}</code></pre>
+
+        <h2>Modifying State</h2>
+        <p>Always use the provided methods instead of directly modifying collections:</p>
+        <pre><code>// ✅ Correct - raises events
+EditorState.AddNode(newNode);
+EditorState.RemoveNode("nodeId");
+EditorState.SelectNode("nodeId");
+
+// ❌ Incorrect - does not raise events
+EditorState.Nodes.Add(newNode);    // Don't do this!
+EditorState.Nodes.Remove(node);    // Don't do this!</code></pre>
+
+        <h2>Best Practices</h2>
+
+        <h3>1. Always Dispose Subscriptions</h3>
+        <pre><code>@@implements IDisposable
+
+public void Dispose()
+{
+    EditorState.NodeAdded -= OnNodeAdded;
+    // Unsubscribe from all events
+}</code></pre>
+
+        <h3>2. Use Specific Event Handlers</h3>
+        <p>Create separate handlers for different concerns:</p>
+        <pre><code>protected override void OnInitialized()
+{
+    EditorState.SelectionChanged += OnSelectionChanged;
+    EditorState.ZoomChanged += OnZoomChanged;
+}
+
+private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+{
+    // Handle selection logic
+}
+
+private void OnZoomChanged(object? sender, ZoomChangedEventArgs e)
+{
+    // Handle zoom logic
+}</code></pre>
+
+        <h3>3. Minimize Re-renders</h3>
+        <p>Only call <code>StateHasChanged()</code> when necessary:</p>
+        <pre><code>private void OnNodeAdded(object? sender, NodeEventArgs e)
+{
+    if (ShouldDisplayNode(e.Node))
+    {
+        StateHasChanged();
+    }
+}</code></pre>
+
+        <h3>4. Thread Safety and Async Operations</h3>
+        <p>
+            Event handlers are invoked synchronously on the same thread as the state modification.
+            For async operations, use async Task pattern:
+        </p>
+        <pre><code>private async Task OnNodeAddedAsync(NodeViewModel node)
+{
+    await SomeAsyncOperation();
+    StateHasChanged();
+}
+
+private void OnNodeAdded(object? sender, NodeEventArgs e)
+{
+    _ = InvokeAsync(async () =&gt;
+    {
+        await OnNodeAddedAsync(e.Node);
+    });
+}</code></pre>
+        <p>
+            <strong>Important:</strong> Never use <code>async void</code> event handlers as they can lead to unhandled exceptions.
+        </p>
+
+        <h2>Performance Considerations</h2>
+        <ul>
+            <li><code>ObservableCollection</code> provides <code>CollectionChanged</code> events for fine-grained collection modifications</li>
+            <li>Custom events on <code>NodeEditorState</code> provide semantic meaning (e.g., "selection changed")</li>
+            <li>Use both together: <code>ObservableCollection</code> for data binding, custom events for component logic</li>
+        </ul>
+
+        <h2>Testing</h2>
+        <p>The event system is fully tested. See <code>StateEventTests.cs</code> for examples:</p>
+        <pre><code>[Fact]
+public void AddNode_RaisesNodeAddedEvent()
+{
+    var state = new NodeEditorState();
+    NodeEventArgs? raisedArgs = null;
+    state.NodeAdded += (sender, args) =&gt; raisedArgs = args;
+
+    state.AddNode(node);
+
+    Assert.NotNull(raisedArgs);
+    Assert.Equal(node, raisedArgs.Node);
+}</code></pre>
+
+        <h2>Future Enhancements</h2>
+        <ul>
+            <li><strong>Undo/Redo:</strong> Record events for history tracking</li>
+            <li><strong>Remote collaboration:</strong> Broadcast events to other clients</li>
+            <li><strong>Change detection:</strong> Track dirty state for save prompts</li>
+            <li><strong>Performance monitoring:</strong> Log event frequency for optimization</li>
+        </ul>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>
