@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/png" href="images/logo.png" />
     <link href="NodeEditor.Docs.styles.css" rel="stylesheet" />
+    <link rel="stylesheet" href="lib/hljs/styles/vs2015.min.css" />
     <script type="importmap"></script>
 </head>
 
@@ -33,6 +34,23 @@
         <span class="dismiss">🗙</span>
     </div>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script src="lib/hljs/highlight.min.js"></script>
+    <script src="lib/hljs/languages/csharp.min.js"></script>
+    <script src="lib/hljs/languages/xml.min.js"></script>
+    <script src="lib/hljs/languages/json.min.js"></script>
+    <script src="lib/hljs/languages/bash.min.js"></script>
+    <script>
+        hljs.configure({ ignoreUnescapedHTML: true, cssSelector: 'pre code' });
+        hljs.highlightAll();
+
+        // Re-highlight after Blazor SPA navigation
+        var observer = new MutationObserver(function () {
+            document.querySelectorAll('pre code:not(.hljs)').forEach(function (el) {
+                hljs.highlightElement(el);
+            });
+        });
+        observer.observe(document.getElementById('app'), { childList: true, subtree: true });
+    </script>
 </body>
 
 </html>

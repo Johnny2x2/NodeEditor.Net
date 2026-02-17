@@ -93,6 +93,12 @@ pre code {
     color: var(--text-primary);
 }
 
+/* Highlight.js theme overrides — match site dark scheme */
+pre code.hljs {
+    background: #141422;
+    padding: 16px 20px;
+}
+
 /* ============================================
    Buttons
    ============================================ */
