@@ -1,0 +1,156 @@
+@page "/docs/mcp-state-bridge"
+
+<PageTitle>MCP State Bridge — NodeEditor.Net</PageTitle>
+
+<section class="section page-top">
+    <div class="section-container doc-content">
+        <h1>MCP State Bridge</h1>
+        <p>
+            The MCP state bridge is a pattern that connects the singleton MCP server to the scoped
+            Blazor circuit's <code>NodeEditorState</code>, enabling AI assistants to control the live
+            canvas in real-time.
+        </p>
+
+        <h2>The Problem</h2>
+        <p>
+            In Blazor Server, <code>NodeEditorState</code> is a <strong>scoped</strong> service—one instance
+            per user circuit. The MCP HTTP/SSE endpoint, however, is a <strong>singleton</strong> that lives
+            outside of any Blazor circuit. The MCP server needs to read and modify the user's state, but it
+            can't directly inject a scoped service.
+        </p>
+
+        <h2>The Solution: State Bridge Pattern</h2>
+        <pre><code>Browser (Blazor circuit)
+  └─ NodeEditorState (scoped)
+       ▲
+       │ Attach / Detach
+       ▼
+  INodeEditorStateBridge (singleton)
+       ▲
+       │ Delegates via Current
+       ▼
+  BridgedNodeEditorState
+       ▲
+       │ Used by
+       ▼
+  MCP Ability Providers
+       ▲
+       │ Called by
+       ▼
+  MCP HTTP endpoint (/mcp)
+       ▲
+       │ X-API-Key auth
+       ▼
+  MCP Client (Claude, Cursor, etc.)</code></pre>
+
+        <h3>Key Components</h3>
+        <table class="docs-table">
+            <thead><tr><th>Component</th><th>Lifetime</th><th>Role</th></tr></thead>
+            <tbody>
+                <tr><td><code>INodeEditorStateBridge</code></td><td>Singleton</td><td>Holds a reference to the active circuit's state</td></tr>
+                <tr><td><code>NodeEditorStateBridge</code></td><td>Singleton</td><td>Thread-safe implementation with Attach/Detach</td></tr>
+                <tr><td><code>BridgedNodeEditorState</code></td><td>Singleton</td><td>Implements <code>INodeEditorState</code> by proxying through the bridge</td></tr>
+            </tbody>
+        </table>
+
+        <h2>How It Works</h2>
+        <ol>
+            <li><strong>Browser opens:</strong> The Blazor circuit initializes. <code>Home.razor</code> <strong>attaches</strong> its scoped <code>NodeEditorState</code> to the singleton bridge</li>
+            <li><strong>MCP receives request:</strong> The ability provider uses <code>BridgedNodeEditorState</code>, which delegates to whatever state is currently attached</li>
+            <li><strong>State is mutated:</strong> The ability provider calls methods on <code>BridgedNodeEditorState</code>, which forwards to the real <code>NodeEditorState</code></li>
+            <li><strong>UI updates:</strong> Because <code>NodeEditorState</code> raises events, the Blazor components re-render — the user sees changes on their canvas in real-time</li>
+            <li><strong>Browser closes:</strong> The circuit disposes and <strong>detaches</strong> from the bridge. Subsequent MCP calls return an error</li>
+        </ol>
+
+        <h2>Code Flow</h2>
+
+        <h3>Attaching (Browser Opens)</h3>
+        <pre><code>// In the main editor component
+@@inject NodeEditorState State
+@@inject INodeEditorStateBridge Bridge
+
+protected override void OnInitialized()
+{
+    Bridge.Attach(State);
+}
+
+public void Dispose()
+{
+    Bridge.Detach();
+}</code></pre>
+
+        <h3>MCP Ability Using the Bridge</h3>
+        <pre><code>public class NodeAbilityProvider : IAbilityProvider
+{
+    private readonly BridgedNodeEditorState _state;
+
+    public NodeAbilityProvider(BridgedNodeEditorState state)
+    {
+        _state = state;
+    }
+
+    public async Task&lt;string&gt; AddNode(string definitionId, double x, double y)
+    {
+        var node = CreateNodeFromDefinition(definitionId);
+        node.Position = new Point2D(x, y);
+        _state.AddNode(node);  // → Bridge → Real NodeEditorState → UI updates
+        return node.Data.Id;
+    }
+}</code></pre>
+
+        <h3>Error When No Session</h3>
+        <pre><code>public void AddNode(NodeViewModel node)
+{
+    var state = _bridge.Current
+        ?? throw new InvalidOperationException(
+            "No active editor session. Open the Node Editor in the browser first.");
+    state.AddNode(node);
+}</code></pre>
+
+        <h2>Thread Safety</h2>
+        <ul>
+            <li>Attach and Detach are atomic operations</li>
+            <li><code>BridgedNodeEditorState</code> checks for a valid reference before every call</li>
+            <li>The <code>InvokeAsync</code> dispatcher marshals external calls safely onto Blazor's synchronization context</li>
+        </ul>
+
+        <h2>API Key Security</h2>
+        <ol>
+            <li><strong>Key generation:</strong> 32-byte cryptographic random key, stored at <code>%LocalAppData%/NodeEditor/mcp-api-key.dat</code></li>
+            <li><strong>Middleware:</strong> <code>McpApiKeyMiddleware</code> validates the <code>X-API-Key</code> header</li>
+            <li><strong>Timing-safe:</strong> Uses <code>CryptographicOperations.FixedTimeEquals</code> to prevent timing attacks</li>
+            <li><strong>Revocation:</strong> Keys can be revoked and regenerated from the Settings panel</li>
+        </ol>
+
+        <h2>Configuration</h2>
+        <pre><code>{
+  "Mcp": {
+    "Enabled": true,
+    "RoutePattern": "/mcp"
+  }
+}</code></pre>
+
+        <h2>Important Notes</h2>
+        <ul>
+            <li><strong>One active session:</strong> The bridge supports one active Blazor circuit at a time. If multiple tabs are open, the last one to initialize "wins"</li>
+            <li><strong>Open browser first:</strong> The browser must be open with the Node Editor loaded before MCP commands will work</li>
+            <li><strong>Real-time feedback:</strong> Changes appear on the canvas instantly — nodes appear, connections draw, execution runs</li>
+        </ul>
+
+        <h2>Namespaces</h2>
+        <table class="docs-table">
+            <thead><tr><th>Type</th><th>Namespace</th></tr></thead>
+            <tbody>
+                <tr><td><code>INodeEditorStateBridge</code></td><td><code>NodeEditor.Net.Services</code></td></tr>
+                <tr><td><code>NodeEditorStateBridge</code></td><td><code>NodeEditor.Net.Services</code></td></tr>
+                <tr><td><code>BridgedNodeEditorState</code></td><td><code>NodeEditor.Net.Services</code></td></tr>
+                <tr><td><code>McpApiKeyMiddleware</code></td><td><code>NodeEditor.Mcp</code></td></tr>
+                <tr><td><code>McpApiKeyService</code></td><td><code>NodeEditor.Net.Services</code></td></tr>
+            </tbody>
+        </table>
+
+        <div class="doc-nav">
+            <a href="documentation">← Back to Documentation</a>
+        </div>
+    </div>
+</section>
