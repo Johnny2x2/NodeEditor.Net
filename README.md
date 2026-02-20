@@ -54,25 +54,41 @@ var app = builder.Build();
 <NodeEditorCanvas State="@EditorState" />
 ```
 
-**3. Define custom nodes** with attributes:
+**3. Define custom nodes** by subclassing `NodeBase`:
 
 ```csharp
-using NodeEditor.Net.Services.Registry;
 using NodeEditor.Net.Services.Execution;
 
-public sealed class MathNodes : INodeContext
+public sealed class AddNode : NodeBase
 {
-    [Node("Add", category: "Math", description: "Adds two numbers", isCallable: false)]
-    public void Add(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add").Category("Math")
+            .Description("Adds two numbers.")
+            .Input<double>("A", 0.0)
+            .Input<double>("B", 0.0)
+            .Output<double>("Result");
     }
 
-    [Node("Start", category: "Flow", isCallable: true, isExecutionInitiator: true)]
-    public void Start(out ExecutionPath Exit)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        context.SetOutput("Result", context.GetInput<double>("A") + context.GetInput<double>("B"));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class MyStartNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Start").Category("Flow")
+            .Description("Entry point for execution.")
+            .ExecutionInitiator();
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        await context.TriggerAsync("Exit");
     }
 }
 ```
@@ -128,7 +144,7 @@ The library uses a **3-tier, event-based MVVM** architecture:
 ### Key Patterns
 
 - **Event-Driven State**: Components subscribe to `NodeEditorState` events (`NodeAdded`, `ConnectionRemoved`, `SelectionChanged`, etc.) for efficient, selective re-rendering.
-- **Node Discovery**: Nodes are discovered via `[Node]` attributes on `INodeContext` methods and registered through `NodeRegistryService`.
+- **Node Discovery**: Nodes are subclasses of `NodeBase` discovered via assembly scanning and registered through `NodeRegistryService`.
 - **Plugin Lifecycle**: Plugins implement `INodePlugin` with lifecycle hooks (`OnLoadAsync` → `Register` → `ConfigureServices` → `OnInitializeAsync` → `OnUnloadAsync`).
 - **State Bridge**: The `INodeEditorStateBridge` singleton connects the scoped Blazor circuit state to singleton services like MCP, enabling real-time AI-controlled editing.
 

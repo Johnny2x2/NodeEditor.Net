@@ -93,37 +93,53 @@ Nodes are the fundamental building blocks of a graph. Each node encapsulates a s
 
 ### How Nodes Are Defined
 
-Nodes are defined as methods on classes that implement `INodeContext`, decorated with the `[Node]` attribute:
+Nodes are defined by subclassing `NodeBase`, overriding `Configure(INodeBuilder)` for metadata/sockets and `ExecuteAsync(INodeExecutionContext, CancellationToken)` for logic:
 
 ```csharp
-using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
 
-public sealed class MathContext : INodeContext
+public sealed class AddNode : NodeBase
 {
-    [Node("Add", category: "Math", description: "Add two numbers", isCallable: false)]
-    public void Add(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add")
+               .Category("Math")
+               .Description("Add two numbers")
+               .Input<double>("A", 0.0)
+               .Input<double>("B", 0.0)
+               .Output<double>("Result");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Result",
+            context.GetInput<double>("A") + context.GetInput<double>("B"));
+        return Task.CompletedTask;
     }
 }
 ```
 
-### Node Attribute Properties
+### Builder API
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `Name` | `string` | `"Node"` | Display name in the editor |
-| `Category` | `string` | `"General"` | Grouping category (supports nesting: `"Math/Trig"`) |
-| `Description` | `string` | `"Some node."` | Tooltip text |
-| `IsCallable` | `bool` | `true` | Whether the node has execution flow sockets |
-| `IsExecutionInitiator` | `bool` | `false` | Whether the node starts an execution chain |
+| Method | Description |
+|--------|-------------|
+| `Name(string)` | Display name in the editor |
+| `Category(string)` | Grouping category (supports nesting: `"Math/Trig"`) |
+| `Description(string)` | Tooltip text |
+| `Input<T>(name, default?, editorHint?)` | Add an input socket |
+| `Output<T>(name)` | Add an output socket |
+| `Callable()` | Add Enter/Exit execution sockets |
+| `ExecutionInitiator()` | Add Exit socket only (starts execution chain) |
+| `ExecutionInput(name)` | Named execution input |
+| `ExecutionOutput(name)` | Named execution output |
 
 ### Socket Types
 
-- **Regular parameters** → Input sockets (left side of node)
-- **`out` parameters** → Output sockets (right side of node)
-- **`ExecutionPath` parameters** → Execution flow sockets (white, control when the node runs)
+- **`Input<T>()`** → Input sockets (left side of node)
+- **`Output<T>()`** → Output sockets (right side of node)
+- **`.Callable()` / `.ExecutionInitiator()`** → Execution flow sockets (control when the node runs)
 
 ### Node Discovery and Registration
 
@@ -466,18 +482,38 @@ Socket editors are inline UI controls that appear on unconnected input sockets, 
 | `ImageEditor` | `Image` | Image upload/path selector |
 | `ListEditor` | `List` | Dynamic list item editor |
 
-### Using `[SocketEditor]` Attribute
+### Using `SocketEditorHint`
+
+Pass `SocketEditorHint` via the builder's `Input` method:
 
 ```csharp
-[Node("Config Node", category: "Settings")]
-public void Configure(
-    [SocketEditor(SocketEditorKind.Text, Placeholder = "Enter name")] string Name,
-    [SocketEditor(SocketEditorKind.NumberUpDown, Min = 0, Max = 100, Step = 5)] int Count,
-    [SocketEditor(SocketEditorKind.Dropdown, Options = "Low,Medium,High")] string Priority,
-    [SocketEditor(SocketEditorKind.Bool)] bool Enabled,
-    out string Summary)
+public class ConfigNode : NodeBase
 {
-    Summary = $"{Name}: {Count} ({Priority}) - {(Enabled ? "ON" : "OFF")}";
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Config").Category("Settings")
+            .Input<string>("Name", "",
+                new SocketEditorHint(SocketEditorKind.Text, Placeholder: "Enter name"))
+            .Input<int>("Count", 50,
+                new SocketEditorHint(SocketEditorKind.NumberUpDown, Min: 0, Max: 100, Step: 5))
+            .Input<string>("Priority", "Medium",
+                new SocketEditorHint(SocketEditorKind.Dropdown, Options: "Low,Medium,High"))
+            .Input<bool>("Enabled", true,
+                new SocketEditorHint(SocketEditorKind.Bool))
+            .Output<string>("Summary");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var name = context.GetInput<string>("Name");
+        var count = context.GetInput<int>("Count");
+        var priority = context.GetInput<string>("Priority");
+        var enabled = context.GetInput<bool>("Enabled");
+        context.SetOutput("Summary",
+            $"{name}: {count} ({priority}) - {(enabled ? "ON" : "OFF")}");
+        return Task.CompletedTask;
+    }
 }
 ```
 

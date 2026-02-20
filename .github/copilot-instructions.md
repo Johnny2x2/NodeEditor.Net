@@ -1,10 +1,10 @@
-# Copilot instructions for NodeEditorMax
+# Copilot instructions for NodeEditor.Net
 
 ## Big picture
 - This repo has a 3-tier architecture: `NodeEditor.Net` (pure .NET 10 core library — models, ViewModels, services, execution, plugins, serialization) → `NodeEditor.Blazor` (Razor component library — Blazor UI components and Blazor-specific services) → `NodeEditor.Blazor.WebHost` (runnable Blazor Server demo).
 - State is centralized in `NodeEditor.Net/Services/Core/NodeEditorState.cs`; UI components subscribe to its events for rendering (`NodeEditor.Blazor/Components/*`).
 - Models vs ViewModels are separated: data classes in `NodeEditor.Net/Models` and bindable wrappers in `NodeEditor.Net/ViewModels`.
-- Nodes are discovered via `[Node]` attributes on `INodeContext` methods and registered through `NodeRegistryService`.
+- Nodes are defined by subclassing `NodeBase`, overriding `Configure(INodeBuilder)` for metadata/sockets and `ExecuteAsync(INodeExecutionContext, CancellationToken)` for logic. Discovered via `NodeDiscoveryService` and registered through `INodeRegistryService`.
 - Plugins implement `INodePlugin` and are loaded via `PluginLoader`; manifests live in `plugin.json`.
 
 ## Key files to orient
@@ -17,7 +17,7 @@
 - Reference docs: `docs/reference/` (architecture, execution engine, plugin SDK, events)
 
 ## Workflows
-- Build solution: `dotnet build NodeEditorMax.slnx`
+- Build solution: `dotnet build NodeEditor.slnx`
 - Run web host: `dotnet watch run --project NodeEditor.Blazor.WebHost/NodeEditor.Blazor.WebHost.csproj`
 - Run tests: `dotnet test NodeEditor.Blazor.Tests/NodeEditor.Blazor.Tests.csproj`
   - Tests use bUnit + Playwright and dynamically load plugins; build targets copy plugin outputs into `bin/.../plugins/*` for test discovery.

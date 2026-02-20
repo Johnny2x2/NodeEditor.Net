@@ -39,20 +39,30 @@
             Nodes are the fundamental building blocks. Each node encapsulates a small operation and
             exposes input and output <strong>sockets</strong> for data and execution flow.
         </p>
-        <pre><code>public sealed class MathNodes : INodeContext
+        <pre><code>public sealed class AddNode : NodeBase
 {
-    [Node("Add", category: "Math", isCallable: false)]
-    public void Add(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add").Category("Math")
+               .Input&lt;double&gt;("A", 0.0)
+               .Input&lt;double&gt;("B", 0.0)
+               .Output&lt;double&gt;("Result");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Result",
+            context.GetInput&lt;double&gt;("A") + context.GetInput&lt;double&gt;("B"));
+        return Task.CompletedTask;
     }
 }</code></pre>
         <table class="docs-table">
             <thead><tr><th>Node Type</th><th>Has Execution Flow</th><th>Evaluates</th></tr></thead>
             <tbody>
-                <tr><td>Data node (<code>isCallable: false</code>)</td><td>No</td><td>Lazily, on demand</td></tr>
-                <tr><td>Callable node (<code>isCallable: true</code>)</td><td>Yes (Enter/Exit)</td><td>When execution reaches it</td></tr>
-                <tr><td>Execution initiator</td><td>Yes (Exit only)</td><td>Automatically at start</td></tr>
+                <tr><td>Data node (no <code>.Callable()</code>)</td><td>No</td><td>Lazily, on demand</td></tr>
+                <tr><td>Callable node (<code>.Callable()</code>)</td><td>Yes (Enter/Exit)</td><td>When execution reaches it</td></tr>
+                <tr><td>Execution initiator (<code>.ExecutionInitiator()</code>)</td><td>Yes (Exit only)</td><td>Automatically at start</td></tr>
             </tbody>
         </table>
 

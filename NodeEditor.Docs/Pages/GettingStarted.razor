@@ -93,7 +93,7 @@ app.Run();</code></pre>
 @@using NodeEditor.Net.Services
 @@using NodeEditor.Net.Services.Registry
 @@inject NodeEditorState EditorState
-@@inject NodeRegistryService Registry
+@@inject INodeRegistryService Registry
 
 &lt;PageTitle&gt;Node Editor&lt;/PageTitle&gt;
 
@@ -104,8 +104,8 @@ app.Run();</code></pre>
 @@code {
     protected override void OnInitialized()
     {
-        Registry.EnsureInitialized(
-            new[] { typeof(MyNodes).Assembly });
+        Registry.RegisterFromAssembly(
+            typeof(AddNode).Assembly);
     }
 }</code></pre>
             </div>
@@ -116,42 +116,62 @@ app.Run();</code></pre>
             <div class="step-number">5</div>
             <div class="step-body">
                 <h2>Define Your First Nodes</h2>
-                <p>Create a node context class with <code>[Node]</code>-attributed methods:</p>
-                <pre><code>using NodeEditor.Net.Services.Registry;
-using NodeEditor.Net.Services.Execution;
+                <p>Create node classes by subclassing <code>NodeBase</code>. Each node overrides <code>Configure</code> (to declare metadata and sockets) and <code>ExecuteAsync</code> (to run logic):</p>
+                <pre><code class="language-csharp">using NodeEditor.Net.Services.Execution;
 
-public sealed class MyNodes : INodeContext
+// Data node — computes a value (no execution flow)
+public sealed class AddNode : NodeBase
 {
-    // Data node — computes a value
-    [Node("Add", category: "Math",
-          description: "Adds two numbers",
-          isCallable: false)]
-    public void Add(double A, double B,
-                    out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add").Category("Math")
+            .Description("Adds two numbers.")
+            .Input&lt;double&gt;("A", 0.0)
+            .Input&lt;double&gt;("B", 0.0)
+            .Output&lt;double&gt;("Result");
     }
 
-    // Callable node — has execution flow
-    [Node("Print", category: "Debug",
-          isCallable: true)]
-    public void Print(ExecutionPath Entry,
-                      string Message,
-                      out ExecutionPath Exit)
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Console.WriteLine(Message);
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        context.SetOutput("Result",
+            context.GetInput&lt;double&gt;("A") + context.GetInput&lt;double&gt;("B"));
+        return Task.CompletedTask;
+    }
+}
+
+// Callable node — has execution flow (Enter/Exit)
+public sealed class PrintNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Print").Category("Debug")
+            .Callable()
+            .Input&lt;string&gt;("Message", "");
     }
 
-    // Execution initiator — starts the chain
-    [Node("Start", category: "Flow",
-          isCallable: true,
-          isExecutionInitiator: true)]
-    public void Start(out ExecutionPath Exit)
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        var msg = context.GetInput&lt;string&gt;("Message");
+        context.EmitFeedback(msg, ExecutionFeedbackType.DebugPrint);
+        await context.TriggerAsync("Exit");
+    }
+}
+
+// Execution initiator — starts the chain
+public sealed class MyStartNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("My Start").Category("Flow")
+            .ExecutionInitiator();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        await context.TriggerAsync("Exit");
     }
 }</code></pre>
             </div>
@@ -181,19 +201,19 @@ public sealed class MyNodes : INodeContext
                 <div class="grid-2" style="margin-top: 16px;">
                     <div class="card">
                         <h4>Data Nodes</h4>
-                        <p><code>isCallable: false</code> — Compute outputs from inputs. No execution flow sockets. Evaluate lazily when their outputs are needed.</p>
+                        <p>No <code>Callable()</code> call — compute outputs from inputs. No execution flow sockets. Evaluate lazily when their outputs are needed.</p>
                     </div>
                     <div class="card">
                         <h4>Callable Nodes</h4>
-                        <p><code>isCallable: true</code> — Participate in execution flow via <code>ExecutionPath</code> input/output sockets.</p>
+                        <p>Call <code>Callable()</code> — adds <code>Enter</code> and <code>Exit</code> execution sockets automatically. Trigger the next node with <code>context.TriggerAsync("Exit")</code>.</p>
                     </div>
                     <div class="card">
                         <h4>Execution Initiators</h4>
-                        <p><code>isExecutionInitiator: true</code> — Start an execution chain. No execution input, only outputs.</p>
+                        <p>Call <code>ExecutionInitiator()</code> — adds an <code>Exit</code> execution output but no execution input. Starts the chain.</p>
                     </div>
                     <div class="card">
                         <h4>Branching Nodes</h4>
-                        <p>Multiple <code>out ExecutionPath</code> parameters. Signal the correct path based on conditions.</p>
+                        <p>Use <code>ExecutionInput()</code> / <code>ExecutionOutput()</code> for named execution sockets. Trigger the correct path based on conditions.</p>
                     </div>
                 </div>
             </div>

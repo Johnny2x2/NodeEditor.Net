@@ -20,7 +20,7 @@ PluginLoader
 ├── Discovers plugin assemblies from directories
 ├── Validates plugin manifests and versions
 ├── Creates isolated AssemblyLoadContext per plugin
-└── Registers discovered nodes with NodeRegistryService
+└── Registers discovered nodes with INodeRegistryService
 
 INodePlugin
 ├── Defines plugin metadata (ID, Name, Version)
@@ -29,8 +29,8 @@ INodePlugin
 INodeProvider (optional)
 └── Provides custom NodeDefinition factories
 
-INodeContext
-└── Contains methods decorated with [Node] attribute
+NodeBase
+└── Abstract base class for defining nodes via Configure(INodeBuilder) + ExecuteAsync
 ```
 
 ## Creating a Plugin
@@ -52,7 +52,7 @@ public sealed class MyPlugin : INodePlugin
     public Version Version => new(1, 0, 0);
     public Version MinApiVersion => new(1, 0, 0);
 
-    public void Register(NodeRegistryService registry)
+    public void Register(INodeRegistryService registry)
     {
         // Register all types from this assembly
         registry.RegisterFromAssembly(typeof(MyPlugin).Assembly);
@@ -60,37 +60,77 @@ public sealed class MyPlugin : INodePlugin
 }
 ```
 
-### Step 2: Create a Node Context
+### Step 2: Create Node Classes
 
-Create a class implementing `INodeContext` with node methods:
+Create classes extending `NodeBase` for each node:
 
 ```csharp
+using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
-using NodeEditor.Net.Services.Registry;
 
 namespace MyCompany.NodeEditor.Plugins;
 
-public sealed class MyPluginContext : INodeContext
+public sealed class AddNumbersNode : NodeBase
 {
-    [Node("Add Numbers", category: "Math", description: "Add two numbers together")]
-    public void AddNumbers(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add Numbers")
+               .Category("Math")
+               .Description("Add two numbers together")
+               .Input<double>("A", 0.0)
+               .Input<double>("B", 0.0)
+               .Output<double>("Result");
     }
 
-    [Node("Format Text", category: "String", description: "Format a string with value")]
-    public void FormatText(string Template, double Value, out string Result)
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Result = string.Format(Template, Value);
+        var a = context.GetInput<double>("A");
+        var b = context.GetInput<double>("B");
+        context.SetOutput("Result", a + b);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FormatTextNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Format Text")
+               .Category("String")
+               .Description("Format a string with value")
+               .Input<string>("Template", "")
+               .Input<double>("Value", 0.0)
+               .Output<string>("Result");
     }
 
-    [Node("Log Message", category: "Debug", description: "Log a message",
-          isCallable: true, isExecutionInitiator: false)]
-    public void LogMessage(ExecutionPath Entry, string Message, out ExecutionPath Exit)
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Console.WriteLine($"[LOG] {Message}");
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        var template = context.GetInput<string>("Template");
+        var value = context.GetInput<double>("Value");
+        context.SetOutput("Result", string.Format(template, value));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class LogMessageNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Log Message")
+               .Category("Debug")
+               .Description("Log a message")
+               .Input<string>("Message", "")
+               .Callable(); // Adds Enter/Exit execution sockets
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var message = context.GetInput<string>("Message");
+        Console.WriteLine($"[LOG] {message}");
+        await context.TriggerAsync("Exit");
     }
 }
 ```
@@ -129,75 +169,131 @@ plugins/
     └── AnotherPlugin.dll
 ```
 
-## Node Attribute
+## Node Definition via NodeBase
 
-The `[Node]` attribute defines node metadata:
+Nodes are defined by subclassing `NodeBase` and overriding two methods:
 
-```csharp
-[Node(
-    name: "Node Name",              // Display name (required)
-    category: "Category",           // Category for grouping (optional)
-    description: "Description",     // Tooltip description (optional)
-    isCallable: false,              // Can be executed (default: false)
-    isExecutionInitiator: false     // Entry point for execution (default: false)
-)]
-public void MyNode(/* parameters */)
-{
-    // Implementation
-}
-```
+- `Configure(INodeBuilder builder)` — sets metadata and declares sockets
+- `ExecuteAsync(INodeExecutionContext context, CancellationToken ct)` — runs the logic
 
-### Parameter Types
+### Builder API
 
-**Input Parameters** (standard parameters):
-- Appear as input sockets on the left
-- Support primitive types: `int`, `double`, `float`, `string`, `bool`
-- Support `ExecutionPath` for execution flow
+The fluent `INodeBuilder` provides:
 
-**Output Parameters** (`out` parameters):
-- Appear as output sockets on the right
-- Use `out` keyword
-- Support same types as input parameters
+| Method | Purpose |
+|--------|---------|
+| `Name(string)` | Display name (required) |
+| `Category(string)` | Category for grouping |
+| `Description(string)` | Tooltip description |
+| `Input<T>(name, default, editorHint?)` | Add an input socket |
+| `Output<T>(name)` | Add an output socket |
+| `Callable()` | Add Enter/Exit execution sockets |
+| `ExecutionInitiator()` | Add Exit socket only (entry point) |
+| `ExecutionInput(name)` | Named execution input |
+| `ExecutionOutput(name)` | Named execution output |
+| `StreamOutput<T>()` | Add a streaming output |
+| `OnExecute(Func)` | Inline execution (for simple nodes) |
 
 ### Examples
 
-**Data Processing Node:**
+**Data Node:**
 ```csharp
-[Node("Multiply", category: "Math")]
-public void Multiply(double A, double B, out double Result)
+public class MultiplyNode : NodeBase
 {
-    Result = A * B;
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Multiply")
+               .Category("Math")
+               .Input<double>("A", 0.0)
+               .Input<double>("B", 0.0)
+               .Output<double>("Result");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var a = context.GetInput<double>("A");
+        var b = context.GetInput<double>("B");
+        context.SetOutput("Result", a * b);
+        return Task.CompletedTask;
+    }
 }
 ```
 
-**Execution Flow Node:**
+**Callable Node:**
 ```csharp
-[Node("Print", category: "Debug", isCallable: true)]
-public void Print(ExecutionPath Entry, string Text, out ExecutionPath Exit)
+public class PrintNode : NodeBase
 {
-    Console.WriteLine(Text);
-    Exit = new ExecutionPath();
-    Exit.Signal();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Print")
+               .Category("Debug")
+               .Input<string>("Text", "")
+               .Callable();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var text = context.GetInput<string>("Text");
+        Console.WriteLine(text);
+        await context.TriggerAsync("Exit");
+    }
 }
 ```
 
 **Multiple Outputs:**
 ```csharp
-[Node("Compare", category: "Math")]
-public void Compare(double A, double B, out bool Greater, out bool Equal, out bool Less)
+public class CompareNode : NodeBase
 {
-    Greater = A > B;
-    Equal = Math.Abs(A - B) < double.Epsilon;
-    Less = A < B;
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Compare")
+               .Category("Math")
+               .Input<double>("A", 0.0)
+               .Input<double>("B", 0.0)
+               .Output<bool>("Greater")
+               .Output<bool>("Equal")
+               .Output<bool>("Less");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var a = context.GetInput<double>("A");
+        var b = context.GetInput<double>("B");
+        context.SetOutput("Greater", a > b);
+        context.SetOutput("Equal", Math.Abs(a - b) < double.Epsilon);
+        context.SetOutput("Less", a < b);
+        return Task.CompletedTask;
+    }
 }
 ```
 
 **Conditional Branch:**
 ```csharp
-[Node("Branch", category: "Flow", isCallable: true)]
-public void Branch(ExecutionPath Entry, bool Condition,
-                   out ExecutionPath True, out ExecutionPath False)
+public class BranchNode : NodeBase
 {
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Branch")
+               .Category("Flow")
+               .Input<bool>("Condition", false)
+               .Callable()
+               .ExecutionOutput("True")
+               .ExecutionOutput("False");
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var condition = context.GetInput<bool>("Condition");
+        if (condition)
+            await context.TriggerAsync("True");
+        else
+            await context.TriggerAsync("False");
+    }
+}
     True = new ExecutionPath();
     False = new ExecutionPath();
 
@@ -222,7 +318,7 @@ public sealed class AdvancedPlugin : INodePlugin, INodeProvider
     public Version Version => new(1, 0, 0);
     public Version MinApiVersion => new(1, 0, 0);
 
-    public void Register(NodeRegistryService registry)
+    public void Register(INodeRegistryService registry)
     {
         registry.RegisterDefinitions(GetNodeDefinitions());
     }
@@ -264,21 +360,28 @@ If your plugin depends on other assemblies:
 
 ### State Management in Plugins
 
-For plugins that need persistent state:
+For nodes that need persistent state, use fields in the `NodeBase` subclass:
 
 ```csharp
-public sealed class StatefulContext : INodeContext
+public sealed class CounterNode : NodeBase
 {
-    private readonly Dictionary<string, int> _counters = new();
+    private int _count;
 
-    [Node("Counter", category: "Utility")]
-    public void Counter(string CounterName, out int Value)
+    public override void Configure(INodeBuilder builder)
     {
-        if (!_counters.ContainsKey(CounterName))
-            _counters[CounterName] = 0;
+        builder.Name("Counter")
+               .Category("Utility")
+               .Input<string>("CounterName", "default")
+               .Output<int>("Value")
+               .Callable();
+    }
 
-        _counters[CounterName]++;
-        Value = _counters[CounterName];
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        _count++;
+        context.SetOutput("Value", _count);
+        await context.TriggerAsync("Exit");
     }
 }
 ```
@@ -325,7 +428,7 @@ app.Run();
 
 ```csharp
 @inject PluginLoader PluginLoader
-@inject NodeRegistryService Registry
+@inject INodeRegistryService Registry
 
 private async Task LoadPluginsAsync()
 {
@@ -432,43 +535,99 @@ See the included template plugin for a complete example:
 ```csharp
 public sealed class TemplatePlugin : INodePlugin
 {
-    public string Id => "com.nodeeditormax.template";
-    public string Id => "com.nodeeditormax.sample";
+    public string Id => "com.nodeeditor.template";
+    public string Name => "Template Plugin";
     public Version Version => new(1, 0, 0);
     public Version MinApiVersion => new(1, 0, 0);
 
-    public void Register(NodeRegistryService registry)
+    public void Register(INodeRegistryService registry)
     {
-        registry.RegisterFromAssembly(typeof(SamplePlugin).Assembly);
+        registry.RegisterFromAssembly(typeof(TemplatePlugin).Assembly);
     }
 }
 
-public sealed class SamplePluginContext : INodeContext
+public sealed class MultiplyNode : NodeBase
 {
-    [Node("Multiply", category: "Math", description: "Multiply two numbers")]
-    public void Multiply(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A * B;
+        builder.Name("Multiply")
+               .Category("Math")
+               .Description("Multiply two numbers")
+               .Input<double>("A", 0.0)
+               .Input<double>("B", 0.0)
+               .Output<double>("Result");
     }
 
-    [Node("Clamp", category: "Math", description: "Clamp value between min/max")]
-    public void Clamp(double Value, double Min, double Max, out double Result)
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Result = Math.Clamp(Value, Min, Max);
+        var a = context.GetInput<double>("A");
+        var b = context.GetInput<double>("B");
+        context.SetOutput("Result", a * b);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class ClampNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Clamp")
+               .Category("Math")
+               .Description("Clamp value between min/max")
+               .Input<double>("Value", 0.0)
+               .Input<double>("Min", 0.0)
+               .Input<double>("Max", 1.0)
+               .Output<double>("Result");
     }
 
-    [Node("Random Int", category: "Math", description: "Random integer in range")]
-    public void RandomInt(int Min, int Max, out int Result)
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Result = Random.Shared.Next(Min, Max + 1);
+        var value = context.GetInput<double>("Value");
+        var min = context.GetInput<double>("Min");
+        var max = context.GetInput<double>("Max");
+        context.SetOutput("Result", Math.Clamp(value, min, max));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class RandomIntNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Random Int")
+               .Category("Math")
+               .Description("Random integer in range")
+               .Input<int>("Min", 0)
+               .Input<int>("Max", 100)
+               .Output<int>("Result");
     }
 
-    [Node("Pulse", category: "Flow", description: "Emit an execution pulse",
-          isCallable: true, isExecutionInitiator: true)]
-    public void Pulse(out ExecutionPath Exit)
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        var min = context.GetInput<int>("Min");
+        var max = context.GetInput<int>("Max");
+        context.SetOutput("Result", Random.Shared.Next(min, max + 1));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class PulseNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Pulse")
+               .Category("Flow")
+               .Description("Emit an execution pulse")
+               .ExecutionInitiator();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        await context.TriggerAsync("Exit");
     }
 }
 ```
@@ -491,32 +650,49 @@ Follow semantic versioning:
 
 ### 3. Error Handling
 
-Handle errors gracefully in node methods:
+Handle errors gracefully in node execution:
 ```csharp
-[Node("Safe Divide", category: "Math")]
-public void SafeDivide(double A, double B, out double Result, out bool Success)
+public class SafeDivideNode : NodeBase
 {
-    if (Math.Abs(B) < double.Epsilon)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = 0;
-        Success = false;
-        return;
+        builder.Name("Safe Divide")
+               .Category("Math")
+               .Input<double>("A", 0.0)
+               .Input<double>("B", 1.0)
+               .Output<double>("Result")
+               .Output<bool>("Success");
     }
 
-    Result = A / B;
-    Success = true;
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var a = context.GetInput<double>("A");
+        var b = context.GetInput<double>("B");
+
+        if (Math.Abs(b) < double.Epsilon)
+        {
+            context.SetOutput("Result", 0.0);
+            context.SetOutput("Success", false);
+        }
+        else
+        {
+            context.SetOutput("Result", a / b);
+            context.SetOutput("Success", true);
+        }
+
+        return Task.CompletedTask;
+    }
 }
 ```
 
 ### 4. Documentation
 
-Always provide descriptions:
+Always provide descriptions via the builder:
 ```csharp
-[Node(
-    name: "Process Data",
-    category: "Processing",
-    description: "Processes input data using custom algorithm. Returns null if input is invalid."
-)]
+builder.Name("Process Data")
+       .Category("Processing")
+       .Description("Processes input data using custom algorithm. Returns null if input is invalid.");
 ```
 
 ### 5. Testing
@@ -568,16 +744,16 @@ Plugins run with the same permissions as the host application. Only load plugins
 
 ### Nodes Not Appearing
 
-1. Ensure `INodeContext` is public
-2. Check that methods have `[Node]` attribute
-3. Verify `Register()` method is called
+1. Ensure `NodeBase` subclass is `public`
+2. Check that `Configure(INodeBuilder)` is overridden
+3. Verify `Register()` method calls `RegisterFromAssembly`
 4. Check that assembly is properly registered
 
 ### Type Resolution Errors
 
-1. Ensure socket types are supported (primitives or `ExecutionPath`)
+1. Ensure socket types are supported (primitives, strings, or custom types registered with `SocketTypeResolver`)
 2. Check for circular dependencies
-3. Verify method signatures match node definition
+3. Verify `Configure` builder calls match `ExecuteAsync` input/output names
 
 ### Version Conflicts
 
@@ -597,7 +773,7 @@ public interface INodePlugin
     string Id { get; }
     Version Version { get; }
     Version MinApiVersion { get; }
-    void Register(NodeRegistryService registry);
+    void Register(INodeRegistryService registry);
 }
 ```
 
@@ -610,12 +786,13 @@ public interface INodeProvider
 }
 ```
 
-### INodeContext
+### NodeBase
 
 ```csharp
-public interface INodeContext
+public abstract class NodeBase
 {
-    // Marker interface for node method containers
+    public abstract void Configure(INodeBuilder builder);
+    public abstract Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct);
 }
 ```
 

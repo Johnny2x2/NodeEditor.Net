@@ -25,49 +25,51 @@ This guide covers common issues you may encounter when using NodeEditor.Blazor a
 - Context menu doesn't appear at all
 
 ### Common Causes
-1. Node context not registered in DI container
-2. NodeAttribute missing or misconfigured
-3. Node context has no public node methods
+1. Node assembly not registered with `INodeRegistryService`
+2. Node class does not extend `NodeBase`
+3. `Configure(INodeBuilder)` not implemented or has errors
 
 ### Solution
 
-**Step 1:** Verify node context registration in `Program.cs` or `MauiProgram.cs`:
+**Step 1:** Verify node assembly registration in `Program.cs`:
 
 ```csharp
-builder.Services.AddNodeEditor(config =>
-{
-    config.RegisterNodeContext<MathNodeContext>();
-    config.RegisterNodeContext<MyCustomContext>(); // Add this
-});
+// After building services
+var registry = app.Services.GetRequiredService<INodeRegistryService>();
+registry.RegisterFromAssembly(typeof(MyNode).Assembly);
 ```
 
-**Step 2:** Check that your node methods have the `[Node]` attribute:
+**Step 2:** Check that your node extends `NodeBase` and overrides `Configure`:
 
 ```csharp
-public class MyCustomContext : INodeContext
+public class ProcessDataNode : NodeBase
 {
-    [Node("Process Data", Category = "Custom")]
-    public void ProcessData(int input, out int output)
+    public override void Configure(INodeBuilder builder)
     {
-        output = input * 2;
+        builder.Name("Process Data")
+               .Category("Custom")
+               .Input<int>("Input", 0)
+               .Output<int>("Output")
+               .Callable();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var input = context.GetInput<int>("Input");
+        context.SetOutput("Output", input * 2);
+        await context.TriggerAsync("Exit");
     }
 }
 ```
 
-**Step 3:** Ensure the method is public and has at least one input or output parameter.
+**Step 3:** Ensure the class is `public` and has a parameterless constructor.
 
-**Step 4:** If using dynamic contexts, verify the context is activated:
-
-```csharp
-// In your component or service
-await State.SetActiveNodeContextAsync("MyCustomContext");
-```
-
-**Step 5:** Check browser console for registration errors:
+**Step 4:** Check browser console for registration errors:
 
 ```javascript
 // Open browser DevTools (F12) and look for errors like:
-// "Failed to register node context: MyCustomContext"
+// "Failed to register node from assembly"
 ```
 
 ### Verification
@@ -105,28 +107,23 @@ builder.Services.AddNodeEditor(config =>
 });
 ```
 
-**Step 2:** Verify socket type names match between input and output:
+**Step 2:** Verify socket type names are consistent between nodes:
 
 ```csharp
-// This will work - both use "Number"
-[Node("Add")]
-public void Add(
-    [Socket("Number")] int a,
-    [Socket("Number")] int b,
-    [Socket("Number")] out int result)
+// This will work - both use int
+public class AddNode : NodeBase
 {
-    result = a + b;
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Add")
+               .Input<int>("A", 0)
+               .Input<int>("B", 0)
+               .Output<int>("Result");
+    }
 }
 
-// This will NOT work - type names don't match
-[Node("Bad Add")]
-public void BadAdd(
-    [Socket("Integer")] int a,  // ❌ "Integer"
-    [Socket("Number")] int b,   // ❌ "Number"
-    out int result)
-{
-    result = a + b;
-}
+// Connections are validated by the C# type system via the builder.
+// SocketTypeResolver checks type assignability automatically.
 ```
 
 **Step 3:** For generic compatibility, use the resolver's compatibility rules:
@@ -1050,8 +1047,8 @@ If you encounter issues not covered in this guide:
 ## Version-Specific Issues
 
 ### v2.0
-- Breaking change: NodeAttribute constructor signature changed
-- Migration: Update `[Node("Name")]` to `[Node("Name", Category = "Default")]`
+- Breaking change: Nodes now use `NodeBase` subclass pattern instead of `INodeContext` + `[Node]` attributes
+- Migration: Rewrite node methods as `NodeBase` subclasses with `Configure(INodeBuilder)` and `ExecuteAsync`
 
 ### v1.5
 - Known issue: iOS plugin loading requires compile-time registration

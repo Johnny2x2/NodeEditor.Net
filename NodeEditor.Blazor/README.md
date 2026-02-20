@@ -207,15 +207,24 @@ Nodes are the fundamental building blocks. Each node has:
 - **Inputs** - List of input sockets
 - **Outputs** - List of output sockets
 
-Nodes are defined using the `[Node]` attribute:
+Nodes are defined by subclassing `NodeBase` and using the fluent builder API:
 
 ```csharp
-public class MathContext : INodeContext
+public sealed class AddNode : NodeBase
 {
-    [Node("Add", category: "Math", description: "Add two numbers", isCallable: false)]
-    public void Add(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add").Category("Math")
+            .Description("Add two numbers")
+            .Input<double>("A", 0.0)
+            .Input<double>("B", 0.0)
+            .Output<double>("Result");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Result", context.GetInput<double>("A") + context.GetInput<double>("B"));
+        return Task.CompletedTask;
     }
 }
 ```
@@ -228,7 +237,7 @@ Sockets are connection points on nodes:
 - **Execution Sockets** - Control flow (white)
 - **Data Sockets** - Value flow (colored by type)
 
-Socket types are automatically inferred from method parameters and return values.
+Socket types are declared via the builder API (`Input<T>`, `Output<T>`) and resolved at connection time.
 
 ### Connections
 
@@ -295,18 +304,26 @@ public sealed class MyPlugin : INodePlugin
     public Version Version => new(1, 0, 0);
     public Version MinApiVersion => new(1, 0, 0);
 
-    public void Register(NodeRegistryService registry)
+    public void Register(INodeRegistryService registry)
     {
         registry.RegisterFromAssembly(typeof(MyPlugin).Assembly);
     }
 }
 
-public class MyPluginContext : INodeContext
+public sealed class CustomNode : NodeBase
 {
-    [Node("Custom Node", category: "Custom", description: "My custom node")]
-    public void CustomNode(int Input, out int Output)
+    public override void Configure(INodeBuilder builder)
     {
-        Output = Input * 2;
+        builder.Name("Custom Node").Category("Custom")
+            .Description("My custom node")
+            .Input<int>("Input", 0)
+            .Output<int>("Output");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Output", context.GetInput<int>("Input") * 2);
+        return Task.CompletedTask;
     }
 }
 ```
@@ -581,32 +598,71 @@ The project includes comprehensive unit tests in `NodeEditor.Blazor.Tests`:
 ### Example 1: Math Calculator
 
 ```csharp
-public class MathContext : INodeContext
+public sealed class ConstantNode : NodeBase
 {
-    [Node("Constant", category: "Math", description: "Constant value")]
-    public void Constant(out double Value)
+    public override void Configure(INodeBuilder builder)
     {
-        Value = 42.0;
+        builder.Name("Constant").Category("Math")
+            .Description("Constant value")
+            .Output<double>("Value");
     }
 
-    [Node("Add", category: "Math", description: "Add two numbers")]
-    public void Add(double A, double B, out double Result)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Result = A + B;
+        context.SetOutput("Value", 42.0);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class AddNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Add").Category("Math")
+            .Description("Add two numbers")
+            .Input<double>("A", 0.0).Input<double>("B", 0.0)
+            .Output<double>("Result");
     }
 
-    [Node("Multiply", category: "Math", description: "Multiply two numbers")]
-    public void Multiply(double A, double B, out double Result)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Result = A * B;
+        context.SetOutput("Result", context.GetInput<double>("A") + context.GetInput<double>("B"));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class MultiplyNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Multiply").Category("Math")
+            .Description("Multiply two numbers")
+            .Input<double>("A", 0.0).Input<double>("B", 0.0)
+            .Output<double>("Result");
     }
 
-    [Node("Log Result", category: "Debug", description: "Log value to console", isCallable: true)]
-    public void LogResult(ExecutionPath Entry, double Value, out ExecutionPath Exit)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Console.WriteLine($"Result: {Value}");
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        context.SetOutput("Result", context.GetInput<double>("A") * context.GetInput<double>("B"));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class LogResultNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Log Result").Category("Debug")
+            .Description("Log value to console")
+            .Callable()
+            .Input<double>("Value", 0.0);
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var value = context.GetInput<double>("Value");
+        context.EmitFeedback($"Result: {value}", ExecutionFeedbackType.DebugPrint);
+        await context.TriggerAsync("Exit");
     }
 }
 ```
@@ -614,26 +670,43 @@ public class MathContext : INodeContext
 ### Example 2: Conditional Flow
 
 ```csharp
-public class FlowContext : INodeContext
+public sealed class BranchNode : NodeBase
 {
-    [Node("Branch", category: "Flow", description: "Conditional branch", isCallable: true)]
-    public void Branch(ExecutionPath Entry, bool Condition, out ExecutionPath True, out ExecutionPath False)
+    public override void Configure(INodeBuilder builder)
     {
-        True = new ExecutionPath();
-        False = new ExecutionPath();
-
-        if (Condition)
-            True.Signal();
-        else
-            False.Signal();
+        builder.Name("Branch").Category("Flow")
+            .Description("Conditional branch")
+            .ExecutionInput("Start")
+            .Input<bool>("Condition")
+            .ExecutionOutput("True")
+            .ExecutionOutput("False");
     }
 
-    [Node("Compare", category: "Math", description: "Compare two numbers")]
-    public void Compare(double A, double B, out bool Greater, out bool Equal, out bool Less)
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Greater = A > B;
-        Equal = Math.Abs(A - B) < 0.0001;
-        Less = A < B;
+        var cond = context.GetInput<bool>("Condition");
+        await context.TriggerAsync(cond ? "True" : "False");
+    }
+}
+
+public sealed class CompareNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Compare").Category("Math")
+            .Description("Compare two numbers")
+            .Input<double>("A", 0.0).Input<double>("B", 0.0)
+            .Output<bool>("Greater").Output<bool>("Equal").Output<bool>("Less");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var a = context.GetInput<double>("A");
+        var b = context.GetInput<double>("B");
+        context.SetOutput("Greater", a > b);
+        context.SetOutput("Equal", Math.Abs(a - b) < 0.0001);
+        context.SetOutput("Less", a < b);
+        return Task.CompletedTask;
     }
 }
 ```
@@ -648,7 +721,7 @@ public class StringPlugin : INodePlugin, INodeProvider
     public Version Version => new(1, 0, 0);
     public Version MinApiVersion => new(1, 0, 0);
 
-    public void Register(NodeRegistryService registry)
+    public void Register(INodeRegistryService registry)
     {
         registry.RegisterDefinitions(GetNodeDefinitions());
     }

@@ -35,7 +35,7 @@ graph TB
     subgraph "Singleton Services Created Once"
         PL[PluginLoader]
         PSR[IPluginServiceRegistry]
-        NRS[NodeRegistryService]
+        NRS[INodeRegistryService]
         NDS[NodeDiscoveryService]
         STR[SocketTypeResolver]
         EP[ExecutionPlanner]
@@ -450,7 +450,7 @@ sequenceDiagram
     participant ExecService as NodeExecutionService
     participant Planner as ExecutionPlanner
     participant Invoker as NodeMethodInvoker
-    participant Context as INodeContext
+    participant Context as NodeBase
     
     User->>Canvas: Clicks "Execute" on node
     Canvas->>ExecService: ExecuteAsync(nodeId, Sequential)
@@ -572,7 +572,7 @@ sequenceDiagram
     participant PSR as IPluginServiceRegistry
     participant LoadCtx as PluginLoadContext
     participant Assembly as Plugin Assembly
-    participant Registry as NodeRegistryService
+    participant Registry as INodeRegistryService
     participant UI as UI Components
     
     App->>Loader: LoadAndRegisterAsync(services)
@@ -631,7 +631,7 @@ graph LR
     PluginAssembly[Plugin Assembly]
     Discovery[NodeDiscoveryService]
     Definitions[New NodeDefinitions]
-    Registry[NodeRegistryService]
+    Registry[INodeRegistryService]
     Cache[Definition Cache]
     CtxMenu[ContextMenu Component]
     
@@ -667,7 +667,7 @@ sequenceDiagram
     participant Loader as PluginLoader
     participant Plugin as INodePlugin
     participant PSR as IPluginServiceRegistry
-    participant Registry as NodeRegistryService
+    participant Registry as INodeRegistryService
     participant Host as IServiceProvider
 
     Loader->>Plugin: OnLoadAsync()
@@ -772,7 +772,7 @@ sequenceDiagram
     participant Migrator as GraphSchemaMigrator
     participant Validator as ConnectionValidator
     participant State as NodeEditorState
-    participant Registry as NodeRegistryService
+    participant Registry as INodeRegistryService
     
     User->>Canvas: Clicks "Load Graph"
     Canvas->>File: Read file contents

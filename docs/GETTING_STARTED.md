@@ -75,7 +75,7 @@ Create a Razor page with the node editor canvas:
 @using NodeEditor.Net.Services
 @using NodeEditor.Net.Services.Registry
 @inject NodeEditorState EditorState
-@inject NodeRegistryService Registry
+@inject INodeRegistryService Registry
 
 <PageTitle>Node Editor</PageTitle>
 
@@ -87,46 +87,73 @@ Create a Razor page with the node editor canvas:
     protected override void OnInitialized()
     {
         // Register nodes from this assembly so they appear in the context menu
-        Registry.EnsureInitialized(new[] { typeof(MyNodes).Assembly });
+        Registry.RegisterFromAssembly(typeof(AddNode).Assembly);
     }
 }
 ```
 
 ## Step 5: Define Your First Nodes
 
-Create a node context class with `[Node]`-attributed methods:
+Create node classes by subclassing `NodeBase`. Each node overrides `Configure` (to declare metadata and sockets via the fluent builder API) and `ExecuteAsync` (to run logic):
 
 ```csharp
-using NodeEditor.Net.Services.Registry;
 using NodeEditor.Net.Services.Execution;
 
 namespace MyNodeEditor;
 
-public sealed class MyNodes : INodeContext
+// A data node — computes a value from inputs (no execution flow sockets)
+public sealed class AddNode : NodeBase
 {
-    // A data node (no execution flow) — computes a value from inputs
-    [Node("Add", category: "Math", description: "Adds two numbers", isCallable: false)]
-    public void Add(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add").Category("Math")
+            .Description("Adds two numbers.")
+            .Input<double>("A", 0.0)
+            .Input<double>("B", 0.0)
+            .Output<double>("Result");
     }
 
-    // An executable node — has execution flow sockets (Entry/Exit)
-    [Node("Print", category: "Debug", description: "Prints a value", isCallable: true)]
-    public void Print(ExecutionPath Entry, string Message, out ExecutionPath Exit)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Console.WriteLine(Message);
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        var a = context.GetInput<double>("A");
+        var b = context.GetInput<double>("B");
+        context.SetOutput("Result", a + b);
+        return Task.CompletedTask;
+    }
+}
+
+// A callable node — has execution flow sockets (Enter/Exit)
+public sealed class PrintNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Print").Category("Debug")
+            .Description("Prints a message to the debug output.")
+            .Callable()
+            .Input<string>("Message", "");
     }
 
-    // An execution initiator — starts the execution chain
-    [Node("Start", category: "Flow", description: "Entry point",
-          isCallable: true, isExecutionInitiator: true)]
-    public void Start(out ExecutionPath Exit)
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        var message = context.GetInput<string>("Message");
+        context.EmitFeedback(message, ExecutionFeedbackType.DebugPrint);
+        await context.TriggerAsync("Exit");
+    }
+}
+
+// An execution initiator — starts the execution chain
+public sealed class MyStartNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("My Start").Category("Flow")
+            .Description("Entry point for execution.")
+            .ExecutionInitiator();
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        await context.TriggerAsync("Exit");
     }
 }
 ```
@@ -145,61 +172,96 @@ Open the browser and navigate to `/editor`. You should see:
 
 ## Understanding Node Types
 
-### Data Nodes (`isCallable: false`)
+### Data Nodes (no execution sockets)
 
-Data nodes compute outputs from inputs. They have no execution flow sockets and evaluate lazily when their outputs are needed.
+Data nodes compute outputs from inputs. They have no execution flow sockets and evaluate lazily when their outputs are needed. Omit `Callable()` / `ExecutionInitiator()` in the builder.
 
 ```csharp
-[Node("Multiply", category: "Math", isCallable: false)]
-public void Multiply(double A, double B, out double Result)
+public sealed class MultiplyNode : NodeBase
 {
-    Result = A * B;
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Multiply").Category("Math")
+            .Input<double>("A", 0.0)
+            .Input<double>("B", 0.0)
+            .Output<double>("Result");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Result", context.GetInput<double>("A") * context.GetInput<double>("B"));
+        return Task.CompletedTask;
+    }
 }
 ```
 
-### Callable Nodes (`isCallable: true`)
+### Callable Nodes
 
-Callable nodes participate in execution flow. They have `ExecutionPath` input/output sockets that control when they run.
+Callable nodes participate in execution flow. Call `Callable()` on the builder to add `Enter` and `Exit` execution sockets automatically. Trigger the next node with `context.TriggerAsync("Exit")`.
 
 ```csharp
-[Node("Log", category: "Debug", isCallable: true)]
-public void Log(ExecutionPath Entry, string Text, out ExecutionPath Exit)
+public sealed class LogNode : NodeBase
 {
-    Console.WriteLine(Text);
-    Exit = new ExecutionPath();
-    Exit.Signal();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Log").Category("Debug")
+            .Description("Logs text to debug output.")
+            .Callable()
+            .Input<string>("Text", "");
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var text = context.GetInput<string>("Text");
+        context.EmitFeedback(text, ExecutionFeedbackType.DebugPrint);
+        await context.TriggerAsync("Exit");
+    }
 }
 ```
 
-### Execution Initiators (`isExecutionInitiator: true`)
+### Execution Initiators
 
-These nodes start an execution chain. They have no execution input but produce execution outputs.
+These nodes start an execution chain. Call `ExecutionInitiator()` — this adds an `Exit` execution output but no execution input.
 
 ```csharp
-[Node("On Start", category: "Events", isCallable: true, isExecutionInitiator: true)]
-public void OnStart(out ExecutionPath Exit)
+public sealed class OnStartNode : NodeBase
 {
-    Exit = new ExecutionPath();
-    Exit.Signal();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("On Start").Category("Events")
+            .Description("Entry point for execution.")
+            .ExecutionInitiator();
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        await context.TriggerAsync("Exit");
+    }
 }
 ```
 
 ### Branching Nodes
 
-Create conditional execution by signaling different execution paths:
+Create conditional execution by using named execution outputs with `ExecutionInput` / `ExecutionOutput` and triggering different paths:
 
 ```csharp
-[Node("Branch", category: "Flow", isCallable: true)]
-public void Branch(ExecutionPath Entry, bool Condition,
-                   out ExecutionPath True, out ExecutionPath False)
+public sealed class BranchNode : NodeBase
 {
-    True = new ExecutionPath();
-    False = new ExecutionPath();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Branch").Category("Conditions")
+            .Description("Branch on a boolean condition.")
+            .ExecutionInput("Start")
+            .Input<bool>("Cond")
+            .ExecutionOutput("True")
+            .ExecutionOutput("False");
+    }
 
-    if (Condition)
-        True.Signal();
-    else
-        False.Signal();
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var cond = context.GetInput<bool>("Cond");
+        await context.TriggerAsync(cond ? "True" : "False");
+    }
 }
 ```
 
@@ -238,23 +300,32 @@ foreach (var warning in result.Warnings)
 
 ## Using Socket Editors
 
-Control how socket values are edited using the `[SocketEditor]` attribute:
+Control how socket values are edited by passing a `SocketEditorHint` to the builder's `Input` call:
 
 ```csharp
 using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
 
-[Node("Image Loader", category: "Media", isCallable: true)]
-public void LoadImage(
-    ExecutionPath Entry,
-    [SocketEditor(SocketEditorKind.Image, Label = "Image Path")] string ImagePath,
-    [SocketEditor(SocketEditorKind.Dropdown, Options = "PNG,JPEG,BMP")] string Format,
-    [SocketEditor(SocketEditorKind.NumberUpDown, Min = 0, Max = 100, Step = 1)] int Quality,
-    out ExecutionPath Exit)
+public sealed class ImageLoaderNode : NodeBase
 {
-    // ...
-    Exit = new ExecutionPath();
-    Exit.Signal();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Image Loader").Category("Media")
+            .Description("Load an image file.")
+            .Callable()
+            .Input<string>("ImagePath", "",
+                editorHint: new SocketEditorHint(SocketEditorKind.Image, Label: "Image Path"))
+            .Input<string>("Format", "PNG",
+                editorHint: new SocketEditorHint(SocketEditorKind.Dropdown, Options: "PNG,JPEG,BMP"))
+            .Input<int>("Quality", 80,
+                editorHint: new SocketEditorHint(SocketEditorKind.NumberUpDown, Min: 0, Max: 100, Step: 1));
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        // ...
+        await context.TriggerAsync("Exit");
+    }
 }
 ```
 

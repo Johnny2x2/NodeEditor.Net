@@ -24,7 +24,6 @@ Complete API reference for NodeEditor.Blazor library.
   - [SocketData](#socketdata)
     - [SocketEditorHint](#socketeditorhint)
     - [SocketEditorKind](#socketeditorkind)
-    - [SocketEditorAttribute](#socketeditorattribute)
   - [ConnectionData](#connectiondata)
   - [GraphDto](#graphdto)
   - [Point2D, Size2D, Rect2D](#geometry-primitives)
@@ -32,7 +31,8 @@ Complete API reference for NodeEditor.Blazor library.
   - [NodeViewModel](#nodeviewmodel)
   - [SocketViewModel](#socketviewmodel)
 - [Interfaces](#interfaces)
-  - [INodeContext](#inodecontext)
+  - [INodeContext](#inodecontext) *(legacy)*
+  - [NodeBase](#nodebase)
   - [INodePlugin](#inodeplugin)
   - [INodeCustomEditor](#inodecustomeditor)
 - [Extension Points](#extension-points)
@@ -595,27 +595,10 @@ public enum SocketEditorKind
 
 ---
 
-### SocketEditorAttribute
+### SocketEditorHint (see above)
 
-Attribute for selecting a standard editor on node input parameters.
-
-**Namespace:** `NodeEditor.Net.Services.Execution`
-
-```csharp
-[AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
-public sealed class SocketEditorAttribute : Attribute
-{
-    public SocketEditorAttribute(SocketEditorKind kind);
-
-    public SocketEditorKind Kind { get; }
-    public string? Options { get; init; }
-    public double Min { get; init; }
-    public double Max { get; init; }
-    public double Step { get; init; }
-    public string? Placeholder { get; init; }
-    public string? Label { get; init; }
-}
-```
+Socket editor hints are passed via the builder's `Input` call, not via attributes.
+See the [SocketEditorHint](#socketeditorhint) record above.
 
 ---
 
@@ -727,22 +710,38 @@ Sets the socket value and updates the Data property.
 
 ## Interfaces
 
-### INodeContext
+### INodeContext *(legacy)*
 
-Interface for providing node method implementations.
+Legacy interface for providing node method implementations. **No longer used** — see `NodeBase` below.
 
-**Namespace:** `NodeEditor.Net.Models`
+---
+
+### NodeBase
+
+Base class for all node implementations. Subclass this to create custom nodes.
+
+**Namespace:** `NodeEditor.Net.Services.Execution`
 
 ```csharp
-public interface INodeContext
+public abstract class NodeBase
 {
-    event EventHandler<FeedbackEventArgs>? FeedbackInfo;
-    event EventHandler<FeedbackEventArgs>? FeedbackWarning;
-    event EventHandler<FeedbackEventArgs>? FeedbackError;
+    public string NodeId { get; internal set; }
+
+    // Define sockets and metadata
+    public abstract void Configure(INodeBuilder builder);
+
+    // Execute node logic
+    public abstract Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct);
+
+    // Optional: resolve services after creation
+    public virtual Task OnCreatedAsync(IServiceProvider services) => Task.CompletedTask;
+
+    // Optional: cleanup
+    public virtual void OnDisposed() { }
 }
 ```
 
-Methods with `[Node]` attribute will be discovered and registered.
+Discovery scans assemblies for `NodeBase` subclasses with parameterless constructors.
 
 ---
 
@@ -760,7 +759,7 @@ public interface INodePlugin
     Version Version { get; }
     Version MinApiVersion { get; }
     
-    void Register(NodeRegistryService registry);
+    void Register(INodeRegistryService registry);
 }
 ```
 
@@ -800,22 +799,30 @@ Create assemblies implementing `INodePlugin` and load them:
 await pluginLoader.LoadAndRegisterAsync("./plugins");
 ```
 
-### Node Contexts
+### Custom Nodes
 
-Create classes implementing `INodeContext` with `[Node]` attributed methods:
+Create `NodeBase` subclasses and register via assembly scanning:
 
 ```csharp
-public class MyContext : INodeContext
+public sealed class MyNode : NodeBase
 {
-    [Node("My Node", category: "Custom")]
-    public void MyNode(int Input, out int Output)
+    public override void Configure(INodeBuilder builder)
     {
-        Output = Input * 2;
+        builder.Name("My Node").Category("Custom")
+            .Input<int>("Input", 0)
+            .Output<int>("Output");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Output", context.GetInput<int>("Input") * 2);
+        return Task.CompletedTask;
     }
 }
-```
 
-Register in DI and pass to execution service.
+// Register
+registry.RegisterFromAssembly(typeof(MyNode).Assembly);
+```
 
 ---
 

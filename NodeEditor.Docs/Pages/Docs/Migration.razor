@@ -89,7 +89,7 @@ PluginLoader (plugin system)</code></pre>
         <pre><code>// Program.cs
 builder.Services.AddNodeEditor();</code></pre>
 
-        <h3>Step 3: Update Node Context Classes</h3>
+        <h3>Step 3: Update Node Classes</h3>
         <pre><code>// Before (WinForms)
 public class MyNodes : INodesContext
 {
@@ -100,15 +100,25 @@ public class MyNodes : INodesContext
     }
 }
 
-// After (Blazor) — same pattern, new namespace
-using NodeEditor.Net.Services.Registry;
+// After (Blazor) — NodeBase subclass pattern
+using NodeEditor.Net.Models;
 
-public class MyNodes : INodeContext
+public class AddNode : NodeBase
 {
-    [Node("Add", category: "Math")]
-    public void Add(int a, int b, out int result)
+    public override void Configure(INodeBuilder builder)
     {
-        result = a + b;
+        builder.Name("Add").Category("Math")
+               .Input&lt;int&gt;("A", 0)
+               .Input&lt;int&gt;("B", 0)
+               .Output&lt;int&gt;("Result");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Result",
+            context.GetInput&lt;int&gt;("A") + context.GetInput&lt;int&gt;("B"));
+        return Task.CompletedTask;
     }
 }</code></pre>
 

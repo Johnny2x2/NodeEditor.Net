@@ -8,7 +8,7 @@ Learn how to create custom nodes and custom socket editors for NodeEditor.Blazor
 - [Part 1: Creating Your First Custom Node](#part-1-creating-your-first-custom-node)
 - [Part 2: Working with Execution Flow](#part-2-working-with-execution-flow)
 - [Part 3: Advanced Node Features](#part-3-advanced-node-features)
-- [Part 4: Standard Socket Editors (Attribute-Based)](#part-4-standard-socket-editors-attribute-based)
+- [Part 4: Socket Editor Hints](#part-4-socket-editor-hints)
 - [Part 5: Custom Socket Editors](#part-5-custom-socket-editors)
 - [Part 6: Creating a Plugin](#part-6-creating-a-plugin)
 - [Best Practices](#best-practices)
@@ -17,7 +17,7 @@ Learn how to create custom nodes and custom socket editors for NodeEditor.Blazor
 
 ## Overview
 
-Custom nodes allow you to extend the node editor with domain-specific functionality. Nodes are defined as methods on classes implementing `INodeContext`, using the `[Node]` attribute for metadata.
+Custom nodes allow you to extend the node editor with domain-specific functionality. Nodes are defined by subclassing `NodeBase`, overriding `Configure` (to declare sockets via the fluent builder API) and `ExecuteAsync` (to implement logic).
 
 ### Node Types
 
@@ -30,74 +30,83 @@ Custom nodes allow you to extend the node editor with domain-specific functional
 
 ## Part 1: Creating Your First Custom Node
 
-### Step 1: Create a Node Context Class
+### Step 1: Create Node Classes
 
 ```csharp
-using NodeEditor.Net.Services.Registry;
 using NodeEditor.Net.Services.Execution;
 
 namespace MyApp.Nodes;
 
-public class MathContext : INodeContext
+public sealed class AddNode : NodeBase
 {
-    public event EventHandler<FeedbackEventArgs>? FeedbackInfo;
-    public event EventHandler<FeedbackEventArgs>? FeedbackWarning;
-    public event EventHandler<FeedbackEventArgs>? FeedbackError;
-
-    [Node("Add", category: "Math", description: "Add two numbers")]
-    public void Add(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add").Category("Math")
+            .Description("Add two numbers")
+            .Input<double>("A", 0.0)
+            .Input<double>("B", 0.0)
+            .Output<double>("Result");
     }
 
-    [Node("Multiply", category: "Math", description: "Multiply two numbers")]
-    public void Multiply(double A, double B, out double Result)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Result = A * B;
+        context.SetOutput("Result", context.GetInput<double>("A") + context.GetInput<double>("B"));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class MultiplyNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Multiply").Category("Math")
+            .Description("Multiply two numbers")
+            .Input<double>("A", 0.0)
+            .Input<double>("B", 0.0)
+            .Output<double>("Result");
     }
 
-    [Node("Power", category: "Math", description: "Raise A to the power of B")]
-    public void Power(double A, double B, out double Result)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Result = Math.Pow(A, B);
+        context.SetOutput("Result", context.GetInput<double>("A") * context.GetInput<double>("B"));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class PowerNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Power").Category("Math")
+            .Description("Raise A to the power of B")
+            .Input<double>("A", 0.0)
+            .Input<double>("B", 2.0)
+            .Output<double>("Result");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Result", Math.Pow(context.GetInput<double>("A"), context.GetInput<double>("B")));
+        return Task.CompletedTask;
     }
 }
 ```
 
-### Step 2: Register the Context
-
-**Option A: Register in DI (recommended)**
-
-```csharp
-// Program.cs
-builder.Services.AddNodeEditor();
-builder.Services.AddScoped<MathContext>();
-
-// Later, get from DI when executing
-var mathContext = serviceProvider.GetRequiredService<MathContext>();
-```
-
-**Option B: Create manually when needed**
-
-```csharp
-var mathContext = new MathContext();
-```
-
-### Step 3: Initialize the Registry
+### Step 2: Register the Nodes
 
 ```razor
-@inject NodeRegistryService Registry
+@inject INodeRegistryService Registry
 
 @code {
     protected override void OnInitialized()
     {
-        // Register nodes from your assembly
-        Registry.EnsureInitialized(new[] { typeof(MathContext).Assembly });
+        // Register all NodeBase subclasses from your assembly
+        Registry.RegisterFromAssembly(typeof(AddNode).Assembly);
     }
 }
 ```
 
-### Step 4: Nodes Appear Automatically
+### Step 3: Nodes Appear Automatically
 
 Right-click on the canvas → "Math" category → Select "Add", "Multiply", or "Power"
 
@@ -107,89 +116,123 @@ Right-click on the canvas → "Math" category → Select "Add", "Multiply", or "
 
 ### Executable Nodes
 
-Nodes with execution flow use `ExecutionPath` parameters:
+Nodes with execution flow use `Callable()` on the builder, which adds `Enter` and `Exit` execution sockets:
 
 ```csharp
-[Node("Print", category: "Debug", description: "Print value to console", isCallable: true)]
-public void Print(ExecutionPath Entry, string Message, out ExecutionPath Exit)
+public sealed class PrintNode : NodeBase
 {
-    Console.WriteLine(Message);
-    Exit = new ExecutionPath();
-    Exit.Signal(); // Continue execution
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Print").Category("Debug")
+            .Description("Print value to console")
+            .Callable()
+            .Input<string>("Message", "");
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var message = context.GetInput<string>("Message");
+        context.EmitFeedback(message, ExecutionFeedbackType.DebugPrint);
+        await context.TriggerAsync("Exit");
+    }
 }
 ```
 
 **Key points:**
-- Input execution sockets are `ExecutionPath` parameters
-- Output execution sockets are `out ExecutionPath` parameters
-- Call `Signal()` to continue execution flow
-- Set `isCallable: true` in the attribute
+- Call `Callable()` to add `Enter` and `Exit` execution sockets
+- Use `context.TriggerAsync("Exit")` to continue execution flow
+- Use `context.EmitFeedback()` for user-visible messages
 
 ### Entry Nodes
 
 Entry nodes start execution automatically:
 
 ```csharp
-[Node("On Start", category: "Events", description: "Executes when the graph starts", isCallable: true, isExecInit: true)]
-public void OnStart(out ExecutionPath Exit)
+public sealed class OnStartNode : NodeBase
 {
-    FeedbackInfo?.Invoke(this, new FeedbackEventArgs("Graph started", FeedbackType.Info));
-    Exit = new ExecutionPath();
-    Exit.Signal();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("On Start").Category("Events")
+            .Description("Executes when the graph starts")
+            .ExecutionInitiator();
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        context.EmitFeedback("Graph started", ExecutionFeedbackType.Info);
+        await context.TriggerAsync("Exit");
+    }
 }
 ```
 
 **Key points:**
-- Set `isExecInit: true` for entry nodes
-- No input execution paths
-- Always have at least one output execution path
+- Call `ExecutionInitiator()` for entry nodes (adds `Exit` output, no input)
+- Always trigger at least one output execution path
 
 ### Branching Nodes
 
-Nodes with conditional execution:
+Nodes with conditional execution use named execution inputs/outputs:
 
 ```csharp
-[Node("Branch", category: "Flow", description: "Execute different paths based on condition", isCallable: true)]
-public void Branch(ExecutionPath Entry, bool Condition, out ExecutionPath True, out ExecutionPath False)
+public sealed class BranchNode : NodeBase
 {
-    True = new ExecutionPath();
-    False = new ExecutionPath();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Branch").Category("Flow")
+            .Description("Execute different paths based on condition")
+            .ExecutionInput("Start")
+            .Input<bool>("Condition")
+            .ExecutionOutput("True")
+            .ExecutionOutput("False");
+    }
 
-    if (Condition)
-        True.Signal();
-    else
-        False.Signal();
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var cond = context.GetInput<bool>("Condition");
+        await context.TriggerAsync(cond ? "True" : "False");
+    }
 }
 ```
 
 **Key points:**
-- Multiple output execution paths
-- Only signal the paths you want to execute
-- Can signal multiple paths for parallel execution
+- Use `ExecutionInput()` / `ExecutionOutput()` for named execution sockets
+- Trigger only the paths you want to execute
+- Can trigger multiple paths for parallel execution
 
 ---
 
 ## Part 3: Advanced Node Features
 
-### Using Feedback Events
+### Using Feedback
 
 Send messages to the user during execution:
 
 ```csharp
-[Node("Divide", category: "Math", description: "Divide A by B")]
-public void Divide(double A, double B, out double Result)
+public sealed class DivideNode : NodeBase
 {
-    if (Math.Abs(B) < 0.0001)
+    public override void Configure(INodeBuilder builder)
     {
-        FeedbackWarning?.Invoke(this, new FeedbackEventArgs(
-            "Division by zero, returning 0",
-            FeedbackType.Warning
-        ));
-        Result = 0;
-        return;
+        builder.Name("Divide").Category("Math")
+            .Description("Divide A by B")
+            .Input<double>("A", 0.0)
+            .Input<double>("B", 1.0)
+            .Output<double>("Result");
     }
-    
-    Result = A / B;
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var b = context.GetInput<double>("B");
+        if (Math.Abs(b) < 0.0001)
+        {
+            context.EmitFeedback("Division by zero, returning 0", ExecutionFeedbackType.Warning);
+            context.SetOutput("Result", 0.0);
+        }
+        else
+        {
+            context.SetOutput("Result", context.GetInput<double>("A") / b);
+        }
+        return Task.CompletedTask;
+    }
 }
 ```
 
@@ -205,33 +248,77 @@ public class Vector3
     public double Z { get; set; }
 }
 
-public class VectorContext : INodeContext
+public class CreateVectorNode : NodeBase
 {
-    public event EventHandler<FeedbackEventArgs>? FeedbackInfo;
-    public event EventHandler<FeedbackEventArgs>? FeedbackWarning;
-    public event EventHandler<FeedbackEventArgs>? FeedbackError;
-
-    [Node("Create Vector", category: "Vector", description: "Create a 3D vector")]
-    public void CreateVector(double X, double Y, double Z, out Vector3 Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = new Vector3 { X = X, Y = Y, Z = Z };
+        builder.Name("Create Vector")
+               .Category("Vector")
+               .Description("Create a 3D vector")
+               .Input<double>("X", 0.0)
+               .Input<double>("Y", 0.0)
+               .Input<double>("Z", 0.0)
+               .Output<Vector3>("Result");
     }
 
-    [Node("Vector Length", category: "Vector", description: "Get vector magnitude")]
-    public void VectorLength(Vector3 Input, out double Length)
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Length = Math.Sqrt(Input.X * Input.X + Input.Y * Input.Y + Input.Z * Input.Z);
-    }
-
-    [Node("Add Vectors", category: "Vector", description: "Add two vectors")]
-    public void AddVectors(Vector3 A, Vector3 B, out Vector3 Result)
-    {
-        Result = new Vector3
+        context.SetOutput("Result", new Vector3
         {
-            X = A.X + B.X,
-            Y = A.Y + B.Y,
-            Z = A.Z + B.Z
-        };
+            X = context.GetInput<double>("X"),
+            Y = context.GetInput<double>("Y"),
+            Z = context.GetInput<double>("Z")
+        });
+        return Task.CompletedTask;
+    }
+}
+
+public class VectorLengthNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Vector Length")
+               .Category("Vector")
+               .Description("Get vector magnitude")
+               .Input<Vector3>("Input")
+               .Output<double>("Length");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var v = context.GetInput<Vector3>("Input");
+        context.SetOutput("Length",
+            Math.Sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z));
+        return Task.CompletedTask;
+    }
+}
+
+public class AddVectorsNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Add Vectors")
+               .Category("Vector")
+               .Description("Add two vectors")
+               .Input<Vector3>("A")
+               .Input<Vector3>("B")
+               .Output<Vector3>("Result");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var a = context.GetInput<Vector3>("A");
+        var b = context.GetInput<Vector3>("B");
+        context.SetOutput("Result", new Vector3
+        {
+            X = a.X + b.X,
+            Y = a.Y + b.Y,
+            Z = a.Z + b.Z
+        });
+        return Task.CompletedTask;
     }
 }
 ```
@@ -248,54 +335,96 @@ protected override void OnInitialized()
 }
 ```
 
-### Multiple Return Values
+### Multiple Outputs
 
-Use multiple `out` parameters:
+Use multiple `Output<T>()` calls:
 
 ```csharp
-[Node("Min Max", category: "Math", description: "Get minimum and maximum")]
-public void MinMax(double A, double B, out double Min, out double Max)
+public sealed class MinMaxNode : NodeBase
 {
-    Min = Math.Min(A, B);
-    Max = Math.Max(A, B);
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Min Max").Category("Math")
+            .Description("Get minimum and maximum")
+            .Input<double>("A", 0.0)
+            .Input<double>("B", 0.0)
+            .Output<double>("Min")
+            .Output<double>("Max");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var a = context.GetInput<double>("A");
+        var b = context.GetInput<double>("B");
+        context.SetOutput("Min", Math.Min(a, b));
+        context.SetOutput("Max", Math.Max(a, b));
+        return Task.CompletedTask;
+    }
 }
 ```
 
-### Optional Parameters
+### Default Values
 
-Use default values for optional inputs:
+Provide defaults in the `Input<T>()` call:
 
 ```csharp
-[Node("Clamp", category: "Math", description: "Clamp value between min and max")]
-public void Clamp(double Value, double Min = 0, double Max = 1, out double Result)
+public sealed class ClampNode : NodeBase
 {
-    Result = Math.Max(Min, Math.Min(Max, Value));
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Clamp").Category("Math")
+            .Description("Clamp value between min and max")
+            .Input<double>("Value", 0.0)
+            .Input<double>("Min", 0.0)
+            .Input<double>("Max", 1.0)
+            .Output<double>("Result");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var value = context.GetInput<double>("Value");
+        var min = context.GetInput<double>("Min");
+        var max = context.GetInput<double>("Max");
+        context.SetOutput("Result", Math.Max(min, Math.Min(max, value)));
+        return Task.CompletedTask;
+    }
 }
 ```
 
 ---
 
-## Part 4: Standard Socket Editors (Attribute-Based)
+## Part 4: Socket Editor Hints
 
-Use `[SocketEditor]` to select a built-in editor for an input socket. This keeps UIs consistent and avoids custom component code.
+Use `SocketEditorHint` to select a built-in editor for an input socket. Pass it as the `editorHint` parameter in the builder's `Input` call.
 
 ```csharp
 using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
 
-[Node("Image Loader", category: "Media")]
-public void LoadImage(
-    [SocketEditor(SocketEditorKind.Image, Label = "Image Path")] string ImagePath,
-    [SocketEditor(SocketEditorKind.Dropdown, Options = "PNG,JPEG,BMP")] string Format,
-    [SocketEditor(SocketEditorKind.NumberUpDown, Min = 0, Max = 100, Step = 1)] int Quality,
-    out ExecutionPath Exit)
+public sealed class ImageLoaderNode : NodeBase
 {
-    Exit = default;
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Image Loader").Category("Media")
+            .Callable()
+            .Input<string>("ImagePath", "",
+                editorHint: new SocketEditorHint(SocketEditorKind.Image, Label: "Image Path"))
+            .Input<string>("Format", "PNG",
+                editorHint: new SocketEditorHint(SocketEditorKind.Dropdown, Options: "PNG,JPEG,BMP"))
+            .Input<int>("Quality", 80,
+                editorHint: new SocketEditorHint(SocketEditorKind.NumberUpDown, Min: 0, Max: 100, Step: 1));
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        // ...
+        await context.TriggerAsync("Exit");
+    }
 }
 ```
 
 Notes:
-- Enum-typed inputs automatically render as dropdowns without `[SocketEditor]`.
+- Enum-typed inputs automatically render as dropdowns without an explicit hint.
 - If an input is connected, editors remain hidden (same as existing behavior).
 
 ---
@@ -346,13 +475,24 @@ public sealed class ColorEditorDefinition : INodeCustomEditor
 services.AddSingleton<INodeCustomEditor, ColorEditorDefinition>();
 ```
 
-### Step 3: Use in Node Context
+### Step 3: Use in a Node
 
 ```csharp
-[Node("Set Color", category: "Graphics", description: "Define a color")]
-public void SetColor(string Color, out string Result)
+public sealed class SetColorNode : NodeBase
 {
-    Result = Color;
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Set Color").Category("Graphics")
+            .Description("Define a color")
+            .Input<string>("Color", "#000000")
+            .Output<string>("Result");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Result", context.GetInput<string>("Color"));
+        return Task.CompletedTask;
+    }
 }
 ```
 
@@ -481,35 +621,54 @@ public sealed class ImageProcessingPlugin : INodePlugin
     public Version Version => new(1, 0, 0);
     public Version MinApiVersion => new(1, 0, 0);
 
-    public void Register(NodeRegistryService registry)
+    public void Register(INodeRegistryService registry)
     {
-        // Register all contexts in this assembly
+        // Register all NodeBase subclasses in this assembly
         registry.RegisterFromAssembly(typeof(ImageProcessingPlugin).Assembly);
     }
 }
 
-public class ImageContext : INodeContext
+public sealed class BlurNode : NodeBase
 {
-    public event EventHandler<FeedbackEventArgs>? FeedbackInfo;
-    public event EventHandler<FeedbackEventArgs>? FeedbackWarning;
-    public event EventHandler<FeedbackEventArgs>? FeedbackError;
-
-    [Node("Blur", category: "Image", description: "Apply Gaussian blur")]
-    public void Blur(string ImagePath, double Radius, out string Result)
+    public override void Configure(INodeBuilder builder)
     {
-        // Implementation
-        Result = ImagePath;
-        FeedbackInfo?.Invoke(this, new FeedbackEventArgs(
-            $"Blurred {ImagePath} with radius {Radius}",
-            FeedbackType.Info
-        ));
+        builder.Name("Blur").Category("Image")
+            .Description("Apply Gaussian blur")
+            .Callable()
+            .Input<string>("ImagePath", "")
+            .Input<double>("Radius", 5.0)
+            .Output<string>("Result");
     }
 
-    [Node("Resize", category: "Image", description: "Resize image")]
-    public void Resize(string ImagePath, int Width, int Height, out string Result)
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var path = context.GetInput<string>("ImagePath");
+        var radius = context.GetInput<double>("Radius");
+        // Implementation
+        context.SetOutput("Result", path);
+        context.EmitFeedback($"Blurred {path} with radius {radius}", ExecutionFeedbackType.Info);
+        await context.TriggerAsync("Exit");
+    }
+}
+
+public sealed class ResizeNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Resize").Category("Image")
+            .Description("Resize image")
+            .Callable()
+            .Input<string>("ImagePath", "")
+            .Input<int>("Width", 800)
+            .Input<int>("Height", 600)
+            .Output<string>("Result");
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
         // Implementation
-        Result = ImagePath;
+        context.SetOutput("Result", context.GetInput<string>("ImagePath"));
+        await context.TriggerAsync("Exit");
     }
 }
 ```
@@ -553,7 +712,7 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var registry = scope.ServiceProvider.GetRequiredService<NodeRegistryService>();
+    var registry = scope.ServiceProvider.GetRequiredService<INodeRegistryService>();
     var plugin = new ImageProcessingPlugin();
     plugin.Register(registry);
 }
@@ -567,20 +726,22 @@ using (var scope = app.Services.CreateScope())
 
 ✅ **Good:**
 ```csharp
-[Node("Add Numbers", category: "Math", description: "Add two numbers")]
-public void AddNumbers(double A, double B, out double Result)
+builder.Name("Add Numbers").Category("Math")
+    .Description("Add two numbers")
+    .Input<double>("A", 0.0).Input<double>("B", 0.0)
+    .Output<double>("Result");
 ```
 
 ❌ **Bad:**
 ```csharp
-[Node("add", category: "math")] // Lowercase, no description
-public void add(double a, double b, out double r) // Unclear parameter names
+builder.Name("add").Category("math"); // Lowercase, no description
+// Unclear socket names like "a", "b", "r"
 ```
 
-### Parameter Names
+### Socket Names
 
-- Use **PascalCase** for all parameters
-- Use **descriptive names**: `Value`, `Result`, `Entry`, `Exit`
+- Use **PascalCase** for all socket names
+- Use **descriptive names**: `Value`, `Result`, `Enter`, `Exit`
 - Avoid abbreviations: `Result` not `Res`
 
 ### Categories
@@ -588,56 +749,61 @@ public void add(double a, double b, out double r) // Unclear parameter names
 Organize nodes into logical categories:
 
 ```csharp
-[Node("Add", category: "Math/Basic")]
-[Node("Sin", category: "Math/Trigonometry")]
-[Node("Random", category: "Math/Random")]
-[Node("Print", category: "Debug/Console")]
-[Node("Log", category: "Debug/File")]
+builder.Name("Add").Category("Math/Basic");
+builder.Name("Sin").Category("Math/Trigonometry");
+builder.Name("Random").Category("Math/Random");
+builder.Name("Print").Category("Debug/Console");
+builder.Name("Log").Category("Debug/File");
 ```
 
 ### Error Handling
 
-Always validate inputs and use feedback events:
+Always validate inputs and use feedback:
 
 ```csharp
-[Node("Read File", category: "File")]
-public void ReadFile(string Path, out string Content)
+public sealed class ReadFileNode : NodeBase
 {
-    if (string.IsNullOrWhiteSpace(Path))
+    public override void Configure(INodeBuilder builder)
     {
-        FeedbackError?.Invoke(this, new FeedbackEventArgs(
-            "File path cannot be empty",
-            FeedbackType.Error
-        ));
-        Content = string.Empty;
-        return;
+        builder.Name("Read File").Category("File")
+            .Callable()
+            .Input<string>("Path", "")
+            .Output<string>("Content");
     }
 
-    if (!File.Exists(Path))
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        FeedbackError?.Invoke(this, new FeedbackEventArgs(
-            $"File not found: {Path}",
-            FeedbackType.Error
-        ));
-        Content = string.Empty;
-        return;
-    }
+        var path = context.GetInput<string>("Path");
 
-    try
-    {
-        Content = File.ReadAllText(Path);
-        FeedbackInfo?.Invoke(this, new FeedbackEventArgs(
-            $"Successfully read {Path}",
-            FeedbackType.Info
-        ));
-    }
-    catch (Exception ex)
-    {
-        FeedbackError?.Invoke(this, new FeedbackEventArgs(
-            $"Error reading file: {ex.Message}",
-            FeedbackType.Error
-        ));
-        Content = string.Empty;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            context.EmitFeedback("File path cannot be empty", ExecutionFeedbackType.Error);
+            context.SetOutput("Content", string.Empty);
+            await context.TriggerAsync("Exit");
+            return;
+        }
+
+        if (!File.Exists(path))
+        {
+            context.EmitFeedback($"File not found: {path}", ExecutionFeedbackType.Error);
+            context.SetOutput("Content", string.Empty);
+            await context.TriggerAsync("Exit");
+            return;
+        }
+
+        try
+        {
+            var content = File.ReadAllText(path);
+            context.SetOutput("Content", content);
+            context.EmitFeedback($"Successfully read {path}", ExecutionFeedbackType.Info);
+        }
+        catch (Exception ex)
+        {
+            context.EmitFeedback($"Error reading file: {ex.Message}", ExecutionFeedbackType.Error);
+            context.SetOutput("Content", string.Empty);
+        }
+
+        await context.TriggerAsync("Exit");
     }
 }
 ```
@@ -654,42 +820,55 @@ TypeResolver.Register(typeof(MyCustomType).FullName!, typeof(MyCustomType));
 
 ### Documentation
 
-Add XML documentation to your context classes:
+Add XML documentation to your node classes:
 
 ```csharp
 /// <summary>
-/// Provides mathematical operations for the node editor.
+/// Adds two numbers together.
 /// </summary>
-public class MathContext : INodeContext
+public sealed class AddNode : NodeBase
 {
-    /// <summary>
-    /// Adds two numbers together.
-    /// </summary>
-    /// <param name="A">First number</param>
-    /// <param name="B">Second number</param>
-    /// <param name="Result">Sum of A and B</param>
-    [Node("Add", category: "Math", description: "Add two numbers")]
-    public void Add(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add").Category("Math")
+            .Description("Add two numbers")
+            .Input<double>("A", 0.0)
+            .Input<double>("B", 0.0)
+            .Output<double>("Result");
+    }
+
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Result", context.GetInput<double>("A") + context.GetInput<double>("B"));
+        return Task.CompletedTask;
     }
 }
+```
 ```
 
 ### Performance
 
-For heavy computations, consider async operations:
+Nodes are inherently async — use `await` for heavy work:
 
 ```csharp
-[Node("Heavy Computation", category: "Async", isCallable: true)]
-public async Task HeavyComputation(ExecutionPath Entry, int Iterations, out ExecutionPath Exit, out int Result)
+public sealed class HeavyComputationNode : NodeBase
 {
-    // Simulate heavy work
-    await Task.Delay(100);
-    Result = Iterations * 2;
-    
-    Exit = new ExecutionPath();
-    Exit.Signal();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Heavy Computation").Category("Async")
+            .Callable()
+            .Input<int>("Iterations", 10)
+            .Output<int>("Result");
+    }
+
+    public override async Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
+    {
+        var iterations = context.GetInput<int>("Iterations");
+        // Simulate heavy work
+        await Task.Delay(100, ct);
+        context.SetOutput("Result", iterations * 2);
+        await context.TriggerAsync("Exit");
+    }
 }
 ```
 
@@ -711,60 +890,115 @@ public sealed class StringPlugin : INodePlugin
     public Version Version => new(1, 0, 0);
     public Version MinApiVersion => new(1, 0, 0);
 
-    public void Register(NodeRegistryService registry)
+    public void Register(INodeRegistryService registry)
     {
         registry.RegisterFromAssembly(typeof(StringPlugin).Assembly);
     }
 }
 
-public class StringContext : INodeContext
+public sealed class ConcatNode : NodeBase
 {
-    public event EventHandler<FeedbackEventArgs>? FeedbackInfo;
-    public event EventHandler<FeedbackEventArgs>? FeedbackWarning;
-    public event EventHandler<FeedbackEventArgs>? FeedbackError;
-
-    [Node("Concat", category: "String", description: "Concatenate two strings")]
-    public void Concat(string A, string B, out string Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Concat").Category("String")
+            .Description("Concatenate two strings")
+            .Input<string>("A", "").Input<string>("B", "")
+            .Output<string>("Result");
     }
 
-    [Node("To Upper", category: "String", description: "Convert to uppercase")]
-    public void ToUpper(string Input, out string Result)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Result = Input.ToUpper();
+        context.SetOutput("Result", context.GetInput<string>("A") + context.GetInput<string>("B"));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class ToUpperNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("To Upper").Category("String")
+            .Description("Convert to uppercase")
+            .Input<string>("Input", "")
+            .Output<string>("Result");
     }
 
-    [Node("To Lower", category: "String", description: "Convert to lowercase")]
-    public void ToLower(string Input, out string Result)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Result = Input.ToLower();
+        context.SetOutput("Result", context.GetInput<string>("Input").ToUpper());
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class ToLowerNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("To Lower").Category("String")
+            .Description("Convert to lowercase")
+            .Input<string>("Input", "")
+            .Output<string>("Result");
     }
 
-    [Node("Split", category: "String", description: "Split string by delimiter")]
-    public void Split(string Input, string Delimiter, out string FirstPart, out string SecondPart)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        var parts = Input.Split(new[] { Delimiter }, StringSplitOptions.None);
-        FirstPart = parts.Length > 0 ? parts[0] : string.Empty;
-        SecondPart = parts.Length > 1 ? parts[1] : string.Empty;
+        context.SetOutput("Result", context.GetInput<string>("Input").ToLower());
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class StringLengthNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Length").Category("String")
+            .Description("Get string length")
+            .Input<string>("Input", "")
+            .Output<int>("Length");
     }
 
-    [Node("Length", category: "String", description: "Get string length")]
-    public void Length(string Input, out int Length)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Length = Input.Length;
+        context.SetOutput("Length", context.GetInput<string>("Input").Length);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class StringContainsNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Contains").Category("String")
+            .Description("Check if string contains substring")
+            .Input<string>("Input", "").Input<string>("Substring", "")
+            .Output<bool>("Result");
     }
 
-    [Node("Contains", category: "String", description: "Check if string contains substring")]
-    public void Contains(string Input, string Substring, out bool Result)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Result = Input.Contains(Substring);
+        context.SetOutput("Result",
+            context.GetInput<string>("Input").Contains(context.GetInput<string>("Substring")));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class StringReplaceNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Replace").Category("String")
+            .Description("Replace all occurrences")
+            .Input<string>("Input", "").Input<string>("OldValue", "").Input<string>("NewValue", "")
+            .Output<string>("Result");
     }
 
-    [Node("Replace", category: "String", description: "Replace all occurrences")]
-    public void Replace(string Input, string OldValue, string NewValue, out string Result)
+    public override Task ExecuteAsync(INodeExecutionContext context, CancellationToken ct)
     {
-        Result = Input.Replace(OldValue, NewValue);
+        context.SetOutput("Result",
+            context.GetInput<string>("Input").Replace(
+                context.GetInput<string>("OldValue"),
+                context.GetInput<string>("NewValue")));
+        return Task.CompletedTask;
     }
 }
 ```

@@ -11,124 +11,207 @@
 
         <h2>Overview</h2>
         <p>
-            Custom nodes are defined as methods on classes implementing <code>INodeContext</code>,
-            decorated with the <code>[Node]</code> attribute. The system supports four node types:
+            Custom nodes are defined by subclassing <code>NodeBase</code>, overriding <code>Configure(INodeBuilder)</code>
+            for metadata/sockets and <code>ExecuteAsync(INodeExecutionContext, CancellationToken)</code> for logic.
+            The system supports four node types:
         </p>
         <ol>
             <li><strong>Data Nodes</strong> — Process inputs and produce outputs (no execution flow)</li>
-            <li><strong>Executable Nodes</strong> — Have execution flow control</li>
-            <li><strong>Entry Nodes</strong> — Start execution automatically</li>
+            <li><strong>Callable Nodes</strong> — Have execution flow control (Enter/Exit sockets)</li>
+            <li><strong>Initiator Nodes</strong> — Start execution automatically (Exit socket only)</li>
             <li><strong>Branching Nodes</strong> — Conditional execution paths</li>
         </ol>
 
         <h2>Part 1: Your First Custom Node</h2>
 
-        <h3>Step 1: Create a Node Context Class</h3>
-        <pre><code>using NodeEditor.Net.Services.Registry;
+        <h3>Step 1: Create a Node Class</h3>
+        <pre><code>using NodeEditor.Net.Models;
 using NodeEditor.Net.Services.Execution;
 
 namespace MyApp.Nodes;
 
-public class MathContext : INodeContext
+public class AddNode : NodeBase
 {
-    [Node("Add", category: "Math", description: "Add two numbers")]
-    public void Add(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add")
+               .Category("Math")
+               .Description("Add two numbers")
+               .Input&lt;double&gt;("A", 0.0)
+               .Input&lt;double&gt;("B", 0.0)
+               .Output&lt;double&gt;("Result");
     }
 
-    [Node("Multiply", category: "Math", description: "Multiply two numbers")]
-    public void Multiply(double A, double B, out double Result)
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Result = A * B;
+        var a = context.GetInput&lt;double&gt;("A");
+        var b = context.GetInput&lt;double&gt;("B");
+        context.SetOutput("Result", a + b);
+        return Task.CompletedTask;
+    }
+}
+
+public class MultiplyNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Multiply")
+               .Category("Math")
+               .Description("Multiply two numbers")
+               .Input&lt;double&gt;("A", 0.0)
+               .Input&lt;double&gt;("B", 0.0)
+               .Output&lt;double&gt;("Result");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        context.SetOutput("Result",
+            context.GetInput&lt;double&gt;("A") * context.GetInput&lt;double&gt;("B"));
+        return Task.CompletedTask;
     }
 }</code></pre>
 
-        <h3>Step 2: Register the Context</h3>
-        <pre><code>@@inject NodeRegistryService Registry
+        <h3>Step 2: Register the Assembly</h3>
+        <pre><code>@@inject INodeRegistryService Registry
 
 @@code {
     protected override void OnInitialized()
     {
-        Registry.EnsureInitialized(new[] { typeof(MathContext).Assembly });
+        Registry.RegisterFromAssembly(typeof(AddNode).Assembly);
     }
 }</code></pre>
         <p>Nodes appear automatically in the context menu at their configured category.</p>
 
         <h2>Part 2: Working with Execution Flow</h2>
 
-        <h3>Executable Nodes</h3>
-        <p>Nodes with execution flow use <code>ExecutionPath</code> parameters:</p>
-        <pre><code>[Node("Print", category: "Debug", isCallable: true)]
-public void Print(ExecutionPath Entry, string Message, out ExecutionPath Exit)
+        <h3>Callable Nodes</h3>
+        <p>Nodes with execution flow use <code>.Callable()</code> to add Enter/Exit sockets:</p>
+        <pre><code>public class PrintNode : NodeBase
 {
-    Console.WriteLine(Message);
-    Exit = new ExecutionPath();
-    Exit.Signal(); // Continue execution
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Print").Category("Debug")
+               .Input&lt;string&gt;("Message", "")
+               .Callable();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        Console.WriteLine(context.GetInput&lt;string&gt;("Message"));
+        await context.TriggerAsync("Exit");
+    }
 }</code></pre>
 
-        <h3>Entry Nodes (Execution Initiators)</h3>
-        <pre><code>[Node("Start", category: "Flow", isCallable: true, isExecutionInitiator: true)]
-public void Start(out ExecutionPath Exit)
+        <h3>Initiator Nodes (Execution Entry Points)</h3>
+        <pre><code>public class StartNode : NodeBase
 {
-    Exit = new ExecutionPath();
-    Exit.Signal();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Start").Category("Flow")
+               .ExecutionInitiator(); // Exit socket only
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        await context.TriggerAsync("Exit");
+    }
 }</code></pre>
 
         <h3>Branching Nodes</h3>
-        <pre><code>[Node("Branch", category: "Flow", isCallable: true)]
-public void Branch(ExecutionPath Entry, bool Condition,
-                   out ExecutionPath True, out ExecutionPath False)
+        <pre><code>public class BranchNode : NodeBase
 {
-    True = new ExecutionPath();
-    False = new ExecutionPath();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Branch").Category("Flow")
+               .Input&lt;bool&gt;("Condition", false)
+               .Callable()
+               .ExecutionOutput("True")
+               .ExecutionOutput("False");
+    }
 
-    if (Condition) True.Signal();
-    else False.Signal();
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        if (context.GetInput&lt;bool&gt;("Condition"))
+            await context.TriggerAsync("True");
+        else
+            await context.TriggerAsync("False");
+    }
 }</code></pre>
 
         <h2>Part 3: Advanced Features</h2>
 
         <h3>Async Operations</h3>
-        <p>Node methods can return <code>Task</code> for async work:</p>
-        <pre><code>[Node("HTTP Get", category: "Network", isCallable: true)]
-public Task HttpGet(ExecutionPath Entry, string Url,
-                    out string Response, out ExecutionPath Exit)
+        <p>The <code>ExecuteAsync</code> method is natively async:</p>
+        <pre><code>public class HttpGetNode : NodeBase
 {
-    // Note: out params don't work directly with async
-    // Use .GetAwaiter().GetResult() pattern
-    var client = new HttpClient();
-    Response = client.GetStringAsync(Url).GetAwaiter().GetResult();
-    Exit = new ExecutionPath();
-    Exit.Signal();
-    return Task.CompletedTask;
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("HTTP Get").Category("Network")
+               .Input&lt;string&gt;("Url", "")
+               .Output&lt;string&gt;("Response")
+               .Callable();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var url = context.GetInput&lt;string&gt;("Url");
+        using var client = new HttpClient();
+        var response = await client.GetStringAsync(url, ct);
+        context.SetOutput("Response", response);
+        await context.TriggerAsync("Exit");
+    }
 }</code></pre>
 
         <h3>Cancellation Token</h3>
-        <p>Add a <code>CancellationToken</code> parameter — it's automatically injected:</p>
-        <pre><code>[Node("Long Operation", category: "Utils", isCallable: true)]
-public void LongOp(ExecutionPath Entry, int DurationMs,
-                   CancellationToken token, out ExecutionPath Exit)
+        <p>The <code>CancellationToken</code> is passed directly to <code>ExecuteAsync</code>:</p>
+        <pre><code>public class DelayNode : NodeBase
 {
-    Task.Delay(DurationMs, token).GetAwaiter().GetResult();
-    Exit = new ExecutionPath();
-    Exit.Signal();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Delay").Category("Utils")
+               .Input&lt;int&gt;("DurationMs", 1000)
+               .Callable();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var ms = context.GetInput&lt;int&gt;("DurationMs");
+        await Task.Delay(ms, ct);
+        await context.TriggerAsync("Exit");
+    }
 }</code></pre>
 
-        <h2>Part 4: Socket Editors (Attribute-Based)</h2>
-        <p>Use <code>[SocketEditor]</code> to control inline editing:</p>
-        <pre><code>[Node("Config Node", category: "Settings", isCallable: true)]
-public void Config(
-    ExecutionPath Entry,
-    [SocketEditor(SocketEditorKind.Text, Label = "Name")] string Name,
-    [SocketEditor(SocketEditorKind.NumberUpDown, Min = 0, Max = 100)] int Value,
-    [SocketEditor(SocketEditorKind.Dropdown, Options = "Low,Medium,High")] string Priority,
-    [SocketEditor(SocketEditorKind.Bool)] bool Enabled,
-    out ExecutionPath Exit)
+        <h2>Part 4: Socket Editors (Builder-Based)</h2>
+        <p>Use <code>SocketEditorHint</code> via the builder's <code>Input</code> method:</p>
+        <pre><code>public class ConfigNode : NodeBase
 {
-    // ...
-    Exit = new ExecutionPath();
-    Exit.Signal();
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Config").Category("Settings")
+            .Input&lt;string&gt;("Name", "",
+                new SocketEditorHint(SocketEditorKind.Text, Label: "Name"))
+            .Input&lt;int&gt;("Value", 50,
+                new SocketEditorHint(SocketEditorKind.NumberUpDown, Min: 0, Max: 100))
+            .Input&lt;string&gt;("Priority", "Medium",
+                new SocketEditorHint(SocketEditorKind.Dropdown, Options: "Low,Medium,High"))
+            .Input&lt;bool&gt;("Enabled", true,
+                new SocketEditorHint(SocketEditorKind.Bool))
+            .Callable();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        // ...
+        await context.TriggerAsync("Exit");
+    }
 }</code></pre>
 
         <h2>Part 5: Custom Socket Editors (Plugin)</h2>
@@ -168,20 +251,20 @@ public void Config(
     }
 }</code></pre>
             </li>
-            <li>Add your <code>INodeContext</code> classes with <code>[Node]</code> methods</li>
+            <li>Add your <code>NodeBase</code> subclasses</li>
             <li>Create <code>plugin.json</code> manifest</li>
             <li>Build and publish: <code>./publish-plugin.ps1 -PluginProject path/to/MyPlugin.csproj</code></li>
         </ol>
 
         <h2>Best Practices</h2>
         <ul>
-            <li>Keep node methods focused — one operation per node</li>
+            <li>Keep each node focused — one operation per <code>NodeBase</code> subclass</li>
             <li>Use descriptive names and categories for easy discovery</li>
-            <li>Use <code>out</code> parameters for all outputs</li>
-            <li>Always <code>Signal()</code> at least one <code>ExecutionPath</code> output</li>
-            <li><code>INodeContext</code> implementations must have parameterless constructors</li>
+            <li>Use <code>context.SetOutput()</code> for all outputs</li>
+            <li>Always <code>await context.TriggerAsync()</code> at least one execution output in callable nodes</li>
+            <li><code>NodeBase</code> subclasses must have parameterless constructors</li>
             <li>Handle exceptions gracefully — failed nodes show error state in the UI</li>
-            <li>Add <code>[SocketEditor]</code> hints for better UX on input sockets</li>
+            <li>Add <code>SocketEditorHint</code> for better UX on input sockets</li>
         </ul>
 
         <div class="doc-nav">

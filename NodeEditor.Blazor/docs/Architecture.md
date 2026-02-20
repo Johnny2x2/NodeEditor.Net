@@ -582,17 +582,29 @@ Discovery Process:
    - Socket definitions from parameter types
    - Execution socket (if async or has await)
    - Metadata from attribute properties
-5. Register with NodeRegistryService
+5. Register with INodeRegistryService
 ```
 
 **Example Node Declaration:**
 ```csharp
-public class StandardNodeContext : INodeContext
+public class AddNode : NodeBase
 {
-    [Node(Category = "Math", Color = "#4CAF50")]
-    public int Add(int a, int b)
+    public override void Configure(INodeBuilder builder)
     {
-        return a + b;
+        builder.Name("Add")
+               .Category("Math")
+               .Input<int>("A", 0)
+               .Input<int>("B", 0)
+               .Output<int>("Result");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var a = context.GetInput<int>("A");
+        var b = context.GetInput<int>("B");
+        context.SetOutput("Result", a + b);
+        return Task.CompletedTask;
     }
 }
 ```
@@ -1066,15 +1078,27 @@ Plugin System:
 ## Extension Points
 
 ### 1. Custom Nodes
-Implement `INodeContext` and decorate methods with `[Node]`:
+Subclass `NodeBase` and override `Configure` + `ExecuteAsync`:
 
 ```csharp
-public class MyCustomNodes : INodeContext
+public class FetchDataNode : NodeBase
 {
-    [Node(Category = "Custom", Color = "#FF5722")]
-    public async Task<string> FetchDataAsync(string url)
+    public override void Configure(INodeBuilder builder)
     {
-        // Implementation
+        builder.Name("Fetch Data")
+               .Category("Custom")
+               .Input<string>("Url", "")
+               .Output<string>("Result")
+               .Callable();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var url = context.GetInput<string>("Url");
+        // fetch data...
+        context.SetOutput("Result", "data");
+        await context.TriggerAsync("Exit");
     }
 }
 ```

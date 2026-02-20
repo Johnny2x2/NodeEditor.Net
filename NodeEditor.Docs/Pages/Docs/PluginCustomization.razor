@@ -11,53 +11,66 @@
 
         <h2>1. Custom Nodes</h2>
         <p>
-            Plugins define node logic by creating classes that implement <code>INodeContext</code> and
-            decorating methods with <code>[Node]</code>. Each decorated method becomes a node in the editor.
+            Plugins define node logic by subclassing <code>NodeBase</code>, overriding
+            <code>Configure(INodeBuilder)</code> for metadata/sockets and
+            <code>ExecuteAsync(INodeExecutionContext, CancellationToken)</code> for logic.
         </p>
 
-        <h3>[Node] Attribute Properties</h3>
+        <h3>Builder API</h3>
         <table class="docs-table">
-            <thead><tr><th>Property</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+            <thead><tr><th>Method</th><th>Description</th></tr></thead>
             <tbody>
-                <tr><td><code>Name</code></td><td><code>string</code></td><td><code>"Node"</code></td><td>Display name in the editor</td></tr>
-                <tr><td><code>Menu</code></td><td><code>string</code></td><td><code>""</code></td><td>Submenu path for the node picker</td></tr>
-                <tr><td><code>Category</code></td><td><code>string</code></td><td><code>"General"</code></td><td>Grouping category</td></tr>
-                <tr><td><code>Description</code></td><td><code>string</code></td><td><code>"Some node."</code></td><td>Tooltip / description text</td></tr>
-                <tr><td><code>IsCallable</code></td><td><code>bool</code></td><td><code>true</code></td><td>Whether the node has execution flow sockets</td></tr>
-                <tr><td><code>IsExecutionInitiator</code></td><td><code>bool</code></td><td><code>false</code></td><td>Whether the node can start an execution chain</td></tr>
+                <tr><td><code>Name(string)</code></td><td>Display name in the editor</td></tr>
+                <tr><td><code>Category(string)</code></td><td>Grouping category</td></tr>
+                <tr><td><code>Description(string)</code></td><td>Tooltip / description text</td></tr>
+                <tr><td><code>Input&lt;T&gt;(name, default?, editorHint?)</code></td><td>Add an input socket</td></tr>
+                <tr><td><code>Output&lt;T&gt;(name)</code></td><td>Add an output socket</td></tr>
+                <tr><td><code>Callable()</code></td><td>Add Enter/Exit execution sockets</td></tr>
+                <tr><td><code>ExecutionInitiator()</code></td><td>Add Exit only (entry point)</td></tr>
+                <tr><td><code>ExecutionInput(name)</code></td><td>Named execution input</td></tr>
+                <tr><td><code>ExecutionOutput(name)</code></td><td>Named execution output</td></tr>
             </tbody>
         </table>
 
-        <h3>Socket Discovery</h3>
-        <ul>
-            <li><strong>Regular parameters</strong> → input sockets</li>
-            <li><strong><code>out</code> parameters</strong> → output sockets</li>
-            <li><strong><code>ExecutionPath</code> type</strong> → execution flow sockets</li>
-        </ul>
-
         <h3>Example</h3>
-        <pre><code>public sealed class MyContext : INodeContext
+        <pre><code>public sealed class EchoStringNode : NodeBase
 {
-    [Node("Echo String", category: "Utilities",
-          description: "Echoes a string", isCallable: false)]
-    public void Echo(string Input, out string Output)
+    public override void Configure(INodeBuilder builder)
     {
-        Output = Input;
+        builder.Name("Echo String")
+               .Category("Utilities")
+               .Description("Echoes a string")
+               .Input&lt;string&gt;("Input", "")
+               .Output&lt;string&gt;("Output");
     }
 
-    [Node("Start", category: "Flow",
-          isCallable: true, isExecutionInitiator: true)]
-    public void Start(out ExecutionPath Exit)
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        context.SetOutput("Output", context.GetInput&lt;string&gt;("Input"));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class StartNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Start").Category("Flow")
+               .ExecutionInitiator();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        await context.TriggerAsync("Exit");
     }
 }</code></pre>
 
         <h2>2. Node Registration</h2>
         <p>In the <code>Register(INodeRegistryService registry)</code> method, plugins register their nodes:</p>
         <ul>
-            <li><strong>Auto-discovery:</strong> <code>registry.RegisterFromAssembly(typeof(MyPlugin).Assembly)</code></li>
+            <li><strong>Auto-discovery:</strong> <code>registry.RegisterFromAssembly(typeof(MyPlugin).Assembly)</code> scans for <code>NodeBase</code> subclasses</li>
             <li><strong>Manual:</strong> <code>registry.RegisterDefinitions(...)</code> for fine-grained control</li>
         </ul>
         <p>The registry also supports <code>RemoveDefinitions</code>, <code>RemoveDefinitionsFromAssembly</code>, and <code>GetCatalog()</code>.</p>

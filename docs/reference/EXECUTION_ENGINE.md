@@ -229,27 +229,27 @@ sequenceDiagram
     end
 ```
 
-### Attribute-to-Socket Mapping
+### Builder-to-Socket Mapping
 
 ```mermaid
 graph TD
-    subgraph "C# Method Signature"
-        Method["[Node(Name='Add', IsCallable=true)]<br/>void Add(int a, int b, out int result)"]
+    subgraph "NodeBase.Configure(INodeBuilder)"
+        Method["builder.Name('Add').Callable()<br/>.Input&lt;int&gt;('A').Input&lt;int&gt;('B')<br/>.Output&lt;int&gt;('Result')"]
     end
 
     subgraph "Generated Node Definition"
         Enter["⚡ Enter (Exec Input)"]
-        InputA["📥 a : Int32"]
-        InputB["📥 b : Int32"]
-        OutputR["📤 result : Int32"]
+        InputA["📥 A : Int32"]
+        InputB["📥 B : Int32"]
+        OutputR["📤 Result : Int32"]
         Exit["⚡ Exit (Exec Output)"]
     end
 
-    Method -->|"auto-generated<br/>(IsCallable=true)"| Enter
-    Method -->|"regular param"| InputA
-    Method -->|"regular param"| InputB
-    Method -->|"out param"| OutputR
-    Method -->|"auto-generated<br/>(IsCallable=true)"| Exit
+    Method -->|"auto-generated<br/>(.Callable())"| Enter
+    Method -->|".Input&lt;int&gt;()"| InputA
+    Method -->|".Input&lt;int&gt;()"| InputB
+    Method -->|".Output&lt;int&gt;()"| OutputR
+    Method -->|"auto-generated<br/>(.Callable())"| Exit
 
     style Enter fill:#ff6b6b,color:#fff
     style Exit fill:#ff6b6b,color:#fff

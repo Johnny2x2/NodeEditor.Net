@@ -73,7 +73,7 @@ flowchart LR
 
     subgraph Plugin[NodeEditor.Plugins.LLMTornado]
       P[LLMTornadoPlugin : INodePlugin]
-      Ctx[INodeContext classes]
+      Ctx[NodeBase subclasses]
       Facade[LLMTornadoFacade]
       Cfg[LLMTornadoConfigResolver]
     end
@@ -108,8 +108,8 @@ flowchart LR
 - **Plugin entry (`INodePlugin`)**
   - registers services and node contexts
   - performs startup validation (non-fatal where possible)
-- **Node contexts (`INodeContext`)**
-  - expose `[Node]` methods and typed sockets
+- **Node classes (`NodeBase` subclasses)**
+  - define sockets via `Configure(INodeBuilder)` and logic via `ExecuteAsync`
   - convert socket inputs into request DTOs
   - delegate all API calls to facade/service layer
 - **Plugin facade/services**

@@ -6,43 +6,59 @@ This document describes everything a plugin can currently customize in NodeEdito
 
 ## 1. Custom Nodes
 
-Plugins define node logic by creating classes that implement `INodeContext` and decorating methods with `[NodeAttribute]`. Each decorated method becomes a node in the editor.
+Plugins define node logic by subclassing `NodeBase` and overriding `Configure(INodeBuilder)` for metadata/sockets and `ExecuteAsync(INodeExecutionContext, CancellationToken)` for logic.
 
-### `[Node]` Attribute Properties
+### Builder API
 
-| Property | Type | Default | Description |
-|---|---|---|---|
-| `Name` | `string` | `"Node"` | Display name in the editor |
-| `Menu` | `string` | `""` | Submenu path for the node picker |
-| `Category` | `string` | `"General"` | Grouping category (e.g. `"Test"`, `"Test/Image"`) |
-| `Description` | `string` | `"Some node."` | Tooltip / description text |
-| `IsCallable` | `bool` | `true` | Whether the node has execution flow sockets |
-| `IsExecutionInitiator` | `bool` | `false` | Whether the node can start an execution chain |
+The fluent `INodeBuilder` provides:
 
-### Socket Discovery
-
-Input and output sockets are derived automatically from method signatures:
-
-- **Regular parameters** → input sockets
-- **`out` parameters** → output sockets
-- **`ExecutionPath` type** → execution flow sockets
+| Method | Description |
+|---|---|
+| `Name(string)` | Display name in the editor |
+| `Category(string)` | Grouping category (e.g. `"Test"`, `"Test/Image"`) |
+| `Description(string)` | Tooltip / description text |
+| `Input<T>(name, default?, editorHint?)` | Add an input socket |
+| `Output<T>(name)` | Add an output socket |
+| `Callable()` | Add Enter/Exit execution flow sockets |
+| `ExecutionInitiator()` | Add Exit socket only (entry point for execution chains) |
+| `ExecutionInput(name)` | Named execution input |
+| `ExecutionOutput(name)` | Named execution output |
 
 ### Example
 
 ```csharp
-public sealed class MyContext : INodeContext
+public sealed class EchoStringNode : NodeBase
 {
-    [Node("Echo String", category: "Utilities", description: "Echoes a string", isCallable: false)]
-    public void Echo(string Input, out string Output)
+    public override void Configure(INodeBuilder builder)
     {
-        Output = Input;
+        builder.Name("Echo String")
+               .Category("Utilities")
+               .Description("Echoes a string")
+               .Input<string>("Input", "")
+               .Output<string>("Output");
     }
 
-    [Node("Start", category: "Flow", isCallable: true, isExecutionInitiator: true)]
-    public void Start(out ExecutionPath Exit)
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
     {
-        Exit = new ExecutionPath();
-        Exit.Signal();
+        context.SetOutput("Output", context.GetInput<string>("Input"));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class StartNode : NodeBase
+{
+    public override void Configure(INodeBuilder builder)
+    {
+        builder.Name("Start")
+               .Category("Flow")
+               .ExecutionInitiator();
+    }
+
+    public override async Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        await context.TriggerAsync("Exit");
     }
 }
 ```
@@ -53,7 +69,7 @@ public sealed class MyContext : INodeContext
 
 In the `Register(INodeRegistryService registry)` method, plugins register their node definitions with the editor. Two approaches:
 
-- **Auto-discovery**: `registry.RegisterFromAssembly(typeof(MyPlugin).Assembly)` scans the assembly for all `[Node]`-attributed methods on `INodeContext` implementations.
+- **Auto-discovery**: `registry.RegisterFromAssembly(typeof(MyPlugin).Assembly)` scans the assembly for all `NodeBase` subclasses.
 - **Manual**: `registry.RegisterDefinitions(...)` for fine-grained control over which definitions are added.
 
 The registry also supports removing definitions (`RemoveDefinitions`, `RemoveDefinitionsFromAssembly`) and querying via `GetCatalog()`.

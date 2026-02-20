@@ -226,26 +226,37 @@ public class MathContext : INodesContext
 
 **After (Blazor):**
 ```csharp
-using NodeEditor.Net.Services.Registry;
+using NodeEditor.Net.Models;
+using NodeEditor.Net.Services.Execution;
 
-public class MathContext : INodeContext
+public class AddNode : NodeBase
 {
-    public event EventHandler<FeedbackEventArgs>? FeedbackInfo;
-    public event EventHandler<FeedbackEventArgs>? FeedbackWarning;
-    public event EventHandler<FeedbackEventArgs>? FeedbackError;
-
-    [Node("Add", category: "Math", description: "Add two numbers")]
-    public void Add(double A, double B, out double Result)
+    public override void Configure(INodeBuilder builder)
     {
-        Result = A + B;
+        builder.Name("Add")
+               .Category("Math")
+               .Description("Add two numbers")
+               .Input<double>("A", 0.0)
+               .Input<double>("B", 0.0)
+               .Output<double>("Result");
+    }
+
+    public override Task ExecuteAsync(
+        INodeExecutionContext context, CancellationToken ct)
+    {
+        var a = context.GetInput<double>("A");
+        var b = context.GetInput<double>("B");
+        context.SetOutput("Result", a + b);
+        return Task.CompletedTask;
     }
 }
 ```
 
 **Changes:**
-- `INodesContext` → `INodeContext`
-- Import `NodeEditor.Blazor.Models` instead of `NodeEditor`
-- Add `description` parameter to `[Node]` attribute (optional)
+- `INodesContext` → `NodeBase` subclass
+- Methods with `[Node]` attribute → `Configure(INodeBuilder)` + `ExecuteAsync`
+- `out` parameters → `context.SetOutput()`
+- Import `NodeEditor.Net.Models` and `NodeEditor.Net.Services.Execution`
 
 ### Step 6: Migrate Node Execution
 
